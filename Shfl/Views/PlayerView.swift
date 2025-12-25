@@ -4,28 +4,36 @@ struct PlayerView: View {
     @ObservedObject var player: ShufflePlayer
     let onManageTapped: () -> Void
 
+    @State private var showError = false
+    @State private var errorMessage = ""
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 backgroundGradient
 
                 VStack(spacing: 0) {
+                    // Error banner at top
+                    if showError {
+                        ErrorBanner(message: errorMessage) {
+                            withAnimation {
+                                showError = false
+                            }
+                        }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     HStack {
                         Spacer()
                         CapacityIndicator(current: player.songCount, maximum: player.capacity)
                         Spacer()
                     }
-                    .padding(.top, geometry.safeAreaInsets.top + 16)
+                    .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
 
                     Spacer()
 
                     VStack(spacing: 48) {
-                        if let song = player.playbackState.currentSong {
-                            NowPlayingInfo(title: song.title, artist: song.artist)
-                                .transition(.opacity)
-                        } else {
-                            emptyStateView
-                        }
+                        nowPlayingSection
 
                         controlsSection
                     }
@@ -42,6 +50,34 @@ struct PlayerView: View {
                 }
             }
             .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.2), value: showError)
+            .onChange(of: player.playbackState) { _, newState in
+                if case .error(let error) = newState {
+                    errorMessage = error.localizedDescription
+                    withAnimation {
+                        showError = true
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var nowPlayingSection: some View {
+        switch player.playbackState {
+        case .loading(let song):
+            VStack(spacing: 12) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                NowPlayingInfo(title: song.title, artist: song.artist)
+                    .opacity(0.7)
+            }
+            .transition(.opacity)
+        case .playing(let song), .paused(let song):
+            NowPlayingInfo(title: song.title, artist: song.artist)
+                .transition(.opacity)
+        default:
+            emptyStateView
         }
     }
 
