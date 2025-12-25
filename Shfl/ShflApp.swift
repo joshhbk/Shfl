@@ -24,7 +24,8 @@ struct ShflApp: App {
     var body: some Scene {
         WindowGroup {
             MainView(
-                musicService: AppleMusicService(),
+                // TODO: Switch to AppleMusicService() once MusicKit entitlement is available
+                musicService: MockMusicService(),
                 modelContext: sharedModelContainer.mainContext
             )
         }
