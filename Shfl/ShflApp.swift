@@ -23,7 +23,10 @@ struct ShflApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView(
+                musicService: AppleMusicService(),
+                modelContext: sharedModelContainer.mainContext
+            )
         }
         .modelContainer(sharedModelContainer)
     }
