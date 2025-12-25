@@ -26,11 +26,11 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     }
 
     func searchLibrary(query: String) async throws -> [Song] {
-        var request = MusicLibraryRequest<MusicKit.Song>()
-        request.filter(matching: \.title, contains: query)
+        var request = MusicCatalogSearchRequest(term: query, types: [MusicKit.Song.self])
+        request.limit = 25
 
         let response = try await request.response()
-        return response.items.map { musicKitSong in
+        return response.songs.map { musicKitSong in
             Song(
                 id: musicKitSong.id.rawValue,
                 title: musicKitSong.title,
