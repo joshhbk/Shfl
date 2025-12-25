@@ -12,7 +12,7 @@ final class ShufflePlayer: ObservableObject {
     static let maxSongs = 120
 
     private let musicService: MusicService
-    private var songs: [Song] = []
+    @Published private(set) var songs: [Song] = []
     private var stateTask: Task<Void, Never>?
 
     @Published private(set) var playbackState: PlaybackState = .empty
