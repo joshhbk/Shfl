@@ -25,11 +25,49 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         return status == .authorized
     }
 
-    func searchLibrary(query: String) async throws -> [Song] {
-        var request = MusicCatalogSearchRequest(term: query, types: [MusicKit.Song.self])
-        request.limit = 25
+    func fetchLibrarySongs(
+        sortedBy: SortOption,
+        limit: Int,
+        offset: Int
+    ) async throws -> LibraryPage {
+        var request = MusicLibraryRequest<MusicKit.Song>()
+
+        switch sortedBy {
+        case .mostPlayed:
+            request.sort(by: \.playCount, ascending: false)
+        case .recentlyPlayed:
+            request.sort(by: \.lastPlayedDate, ascending: false)
+        case .recentlyAdded:
+            request.sort(by: \.libraryAddedDate, ascending: false)
+        case .alphabetical:
+            request.sort(by: \.title, ascending: true)
+        }
 
         let response = try await request.response()
+
+        // Manual pagination since MusicLibraryRequest doesn't support offset
+        let allSongs = response.items.map { musicKitSong in
+            Song(
+                id: musicKitSong.id.rawValue,
+                title: musicKitSong.title,
+                artist: musicKitSong.artistName,
+                albumTitle: musicKitSong.albumTitle ?? "",
+                artworkURL: musicKitSong.artwork?.url(width: 300, height: 300)
+            )
+        }
+
+        let startIndex = min(offset, allSongs.count)
+        let endIndex = min(offset + limit, allSongs.count)
+        let pageItems = Array(allSongs[startIndex..<endIndex])
+        let hasMore = endIndex < allSongs.count
+
+        return LibraryPage(songs: pageItems, hasMore: hasMore)
+    }
+
+    func searchLibrarySongs(query: String) async throws -> [Song] {
+        var request = MusicLibrarySearchRequest(term: query, types: [MusicKit.Song.self])
+        let response = try await request.response()
+
         return response.songs.map { musicKitSong in
             Song(
                 id: musicKitSong.id.rawValue,
