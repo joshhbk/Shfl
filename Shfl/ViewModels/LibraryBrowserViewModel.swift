@@ -94,4 +94,33 @@ final class LibraryBrowserViewModel: ObservableObject {
 
         isLoadingMore = false
     }
+
+    // MARK: - Search Methods
+
+    func performSearch(query: String) async {
+        guard !query.isEmpty else {
+            searchResults = []
+            return
+        }
+
+        searchLoading = true
+
+        do {
+            searchResults = try await musicService.searchLibrarySongs(query: query)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        searchLoading = false
+    }
+
+    func setupSearchDebounce() {
+        // Call this from the view to set up debounced search
+        searchTask?.cancel()
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+            guard !Task.isCancelled else { return }
+            await performSearch(query: searchText)
+        }
+    }
 }

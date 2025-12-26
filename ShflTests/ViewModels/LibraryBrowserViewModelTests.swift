@@ -68,4 +68,29 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.browseSongs.count, 60)
         XCTAssertFalse(viewModel.hasMorePages)
     }
+
+    func test_performSearch_fetchesResults() async {
+        let songs = [
+            Song(id: "1", title: "Hello World", artist: "Artist", albumTitle: "Album", artworkURL: nil),
+            Song(id: "2", title: "Goodbye", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        ]
+        await mockService.setLibrarySongs(songs)
+
+        await viewModel.performSearch(query: "Hello")
+
+        XCTAssertEqual(viewModel.searchResults.count, 1)
+        XCTAssertEqual(viewModel.searchResults.first?.title, "Hello World")
+    }
+
+    func test_performSearch_clearsResultsForEmptyQuery() async {
+        let songs = [
+            Song(id: "1", title: "Hello", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        ]
+        await mockService.setLibrarySongs(songs)
+        await viewModel.performSearch(query: "Hello")
+
+        await viewModel.performSearch(query: "")
+
+        XCTAssertTrue(viewModel.searchResults.isEmpty)
+    }
 }
