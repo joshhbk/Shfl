@@ -23,6 +23,11 @@ final class AppViewModel: ObservableObject {
     func onAppear() async {
         isAuthorized = await musicService.isAuthorized
 
+        // Prefetch library in background for faster access later
+        Task {
+            await musicService.prefetchLibrary()
+        }
+
         do {
             let songs = try repository.loadSongs()
             for song in songs {

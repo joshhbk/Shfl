@@ -7,6 +7,10 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     private var stateObservationTask: Task<Void, Never>?
     private var continuation: AsyncStream<PlaybackState>.Continuation?
 
+    // Library cache
+    private var cachedLibrary: [SortOption: [Song]] = [:]
+    private var prefetchTask: Task<Void, Never>?
+
     var playbackStateStream: AsyncStream<PlaybackState> {
         AsyncStream { [weak self] continuation in
             self?.continuation = continuation
@@ -25,11 +29,18 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         return status == .authorized
     }
 
-    func fetchLibrarySongs(
-        sortedBy: SortOption,
-        limit: Int,
-        offset: Int
-    ) async throws -> LibraryPage {
+    /// Prefetch library songs in background for faster access later
+    func prefetchLibrary() async {
+        // Prefetch most common sort option
+        _ = try? await fetchAllLibrarySongs(sortedBy: .mostPlayed)
+    }
+
+    private func fetchAllLibrarySongs(sortedBy: SortOption) async throws -> [Song] {
+        // Return cached if available
+        if let cached = cachedLibrary[sortedBy] {
+            return cached
+        }
+
         var request = MusicLibraryRequest<MusicKit.Song>()
 
         switch sortedBy {
@@ -45,16 +56,51 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
         let response = try await request.response()
 
-        // Manual pagination since MusicLibraryRequest doesn't support offset
-        let allSongs = response.items.map { musicKitSong in
-            Song(
-                id: musicKitSong.id.rawValue,
-                title: musicKitSong.title,
-                artist: musicKitSong.artistName,
-                albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: musicKitSong.artwork?.url(width: 300, height: 300)
-            )
+        // Map songs and try to get artwork (preserving order)
+        let allSongs = await withTaskGroup(of: (Int, Song).self, returning: [Song].self) { group in
+            for (index, musicKitSong) in response.items.enumerated() {
+                group.addTask {
+                    // Try to load artwork by requesting full song data
+                    var artworkURL: URL?
+                    if let artwork = musicKitSong.artwork {
+                        artworkURL = artwork.url(width: 300, height: 300)
+                    } else {
+                        // Artwork is nil, try to fetch full song
+                        if let fullSong = try? await musicKitSong.with(.albums) {
+                            artworkURL = fullSong.artwork?.url(width: 300, height: 300)
+                        }
+                    }
+
+                    let song = Song(
+                        id: musicKitSong.id.rawValue,
+                        title: musicKitSong.title,
+                        artist: musicKitSong.artistName,
+                        albumTitle: musicKitSong.albumTitle ?? "",
+                        artworkURL: artworkURL
+                    )
+                    return (index, song)
+                }
+            }
+
+            var indexedSongs: [(Int, Song)] = []
+            for await result in group {
+                indexedSongs.append(result)
+            }
+            // Sort by original index to preserve order
+            return indexedSongs.sorted { $0.0 < $1.0 }.map { $0.1 }
         }
+
+        // Cache the result
+        cachedLibrary[sortedBy] = allSongs
+        return allSongs
+    }
+
+    func fetchLibrarySongs(
+        sortedBy: SortOption,
+        limit: Int,
+        offset: Int
+    ) async throws -> LibraryPage {
+        let allSongs = try await fetchAllLibrarySongs(sortedBy: sortedBy)
 
         let startIndex = min(offset, allSongs.count)
         let endIndex = min(offset + limit, allSongs.count)
