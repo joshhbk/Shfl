@@ -46,4 +46,52 @@ final class LibraryBrowserViewModel: ObservableObject {
     init(musicService: MusicService) {
         self.musicService = musicService
     }
+
+    // MARK: - Browse Methods
+
+    func loadInitialPage() async {
+        browseLoading = true
+        currentOffset = 0
+        browseSongs = []
+
+        do {
+            let page = try await musicService.fetchLibrarySongs(
+                sortedBy: sortOption,
+                limit: pageSize,
+                offset: 0
+            )
+            browseSongs = page.songs
+            hasMorePages = page.hasMore
+            currentOffset = page.songs.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        browseLoading = false
+    }
+
+    func loadNextPageIfNeeded(currentSong: Song) async {
+        guard hasMorePages,
+              !isLoadingMore,
+              currentSong.id == browseSongs.last?.id else {
+            return
+        }
+
+        isLoadingMore = true
+
+        do {
+            let page = try await musicService.fetchLibrarySongs(
+                sortedBy: sortOption,
+                limit: pageSize,
+                offset: currentOffset
+            )
+            browseSongs.append(contentsOf: page.songs)
+            hasMorePages = page.hasMore
+            currentOffset += page.songs.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingMore = false
+    }
 }
