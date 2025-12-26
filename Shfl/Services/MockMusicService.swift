@@ -45,7 +45,22 @@ final class MockMusicService: MusicService, @unchecked Sendable {
         true
     }
 
-    func searchLibrary(query: String) async throws -> [Song] {
+    func fetchLibrarySongs(
+        sortedBy: SortOption,
+        limit: Int,
+        offset: Int
+    ) async throws -> LibraryPage {
+        // Simulate network delay
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        let endIndex = min(offset + limit, mockSongs.count)
+        let songs = offset < mockSongs.count ? Array(mockSongs[offset..<endIndex]) : []
+        let hasMore = endIndex < mockSongs.count
+
+        return LibraryPage(songs: songs, hasMore: hasMore)
+    }
+
+    func searchLibrarySongs(query: String) async throws -> [Song] {
         // Simulate network delay
         try await Task.sleep(nanoseconds: 300_000_000)
 

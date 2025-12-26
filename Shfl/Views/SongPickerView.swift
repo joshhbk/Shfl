@@ -93,7 +93,7 @@ struct SongPickerView: View {
         isSearching = true
         Task {
             do {
-                let results = try await musicService.searchLibrary(query: query)
+                let results = try await musicService.searchLibrarySongs(query: query)
                 await MainActor.run {
                     searchResults = results
                     isSearching = false
