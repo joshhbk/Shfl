@@ -1,5 +1,17 @@
 import Foundation
 
+enum SortOption: Sendable {
+    case mostPlayed
+    case recentlyPlayed
+    case recentlyAdded
+    case alphabetical
+}
+
+struct LibraryPage: Sendable {
+    let songs: [Song]
+    let hasMore: Bool
+}
+
 protocol MusicService: Sendable {
     /// Request authorization to access Apple Music
     func requestAuthorization() async -> Bool
