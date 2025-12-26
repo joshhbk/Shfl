@@ -3,9 +3,20 @@ import SwiftUI
 struct PlayerView: View {
     @ObservedObject var player: ShufflePlayer
     let onManageTapped: () -> Void
+    let onAddTapped: () -> Void
 
     @State private var showError = false
     @State private var errorMessage = ""
+
+    init(
+        player: ShufflePlayer,
+        onManageTapped: @escaping () -> Void,
+        onAddTapped: @escaping () -> Void = {}
+    ) {
+        self.player = player
+        self.onManageTapped = onManageTapped
+        self.onAddTapped = onAddTapped
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -25,7 +36,18 @@ struct PlayerView: View {
 
                     HStack {
                         Spacer()
+
                         CapacityIndicator(current: player.songCount, maximum: player.capacity)
+
+                        Button(action: onAddTapped) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(.blue)
+                        }
+                        .disabled(player.remainingCapacity == 0)
+                        .opacity(player.remainingCapacity == 0 ? 0.4 : 1.0)
+                        .padding(.leading, 8)
+
                         Spacer()
                     }
                     .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
@@ -147,11 +169,11 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
 #Preview("Empty State") {
     let mockService = PreviewMockMusicService()
     let player = ShufflePlayer(musicService: mockService)
-    return PlayerView(player: player, onManageTapped: {})
+    return PlayerView(player: player, onManageTapped: {}, onAddTapped: {})
 }
 
 #Preview("Playing") {
     let mockService = PreviewMockMusicService()
     let player = ShufflePlayer(musicService: mockService)
-    return PlayerView(player: player, onManageTapped: {})
+    return PlayerView(player: player, onManageTapped: {}, onAddTapped: {})
 }

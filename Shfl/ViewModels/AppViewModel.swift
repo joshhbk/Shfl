@@ -11,6 +11,7 @@ final class AppViewModel: ObservableObject {
     @Published var isAuthorized = false
     @Published var showingManage = false
     @Published var showingPicker = false
+    @Published var showingPickerDirect = false
     @Published var authorizationError: String?
 
     init(musicService: MusicService, modelContext: ModelContext) {
@@ -35,7 +36,7 @@ final class AppViewModel: ObservableObject {
     func requestAuthorization() async {
         isAuthorized = await musicService.requestAuthorization()
         if !isAuthorized {
-            authorizationError = "Apple Music access is required to use Shfl. Please enable it in Settings."
+            authorizationError = "Apple Music access is required to use Shuffled. Please enable it in Settings."
         }
     }
 
@@ -62,6 +63,15 @@ final class AppViewModel: ObservableObject {
 
     func closePicker() {
         showingPicker = false
+        persistSongs()
+    }
+
+    func openPickerDirect() {
+        showingPickerDirect = true
+    }
+
+    func closePickerDirect() {
+        showingPickerDirect = false
         persistSongs()
     }
 }

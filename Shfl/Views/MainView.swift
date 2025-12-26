@@ -16,6 +16,8 @@ struct MainView: View {
             if viewModel.isAuthorized {
                 PlayerView(player: viewModel.player) {
                     viewModel.openManage()
+                } onAddTapped: {
+                    viewModel.openPickerDirect()
                 }
             } else {
                 authorizationView
@@ -37,6 +39,13 @@ struct MainView: View {
                     onDismiss: { viewModel.closePicker() }
                 )
             }
+        }
+        .sheet(isPresented: $viewModel.showingPickerDirect) {
+            SongPickerView(
+                player: viewModel.player,
+                musicService: viewModel.musicService,
+                onDismiss: { viewModel.closePickerDirect() }
+            )
         }
         .alert("Authorization Required", isPresented: .init(
             get: { viewModel.authorizationError != nil },
@@ -62,7 +71,7 @@ struct MainView: View {
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 8) {
-                Text("Welcome to Shfl")
+                Text("Welcome to Shuffled")
                     .font(.title2.bold())
 
                 Text("Connect to Apple Music to start shuffling")
