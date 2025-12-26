@@ -7,6 +7,8 @@ actor MockMusicService: MusicService {
     var shouldThrowOnPlay: Error?
     var shouldThrowOnSearch: Error?
     var shouldThrowOnSkip: Error?
+    var librarySongs: [Song] = []
+    var shouldThrowOnFetch: Error?
 
     private var currentState: PlaybackState = .empty
     private var continuation: AsyncStream<PlaybackState>.Continuation?
@@ -32,11 +34,26 @@ actor MockMusicService: MusicService {
         authorizationResult
     }
 
-    func searchLibrary(query: String) async throws -> [Song] {
+    func fetchLibrarySongs(
+        sortedBy: SortOption,
+        limit: Int,
+        offset: Int
+    ) async throws -> LibraryPage {
+        if let error = shouldThrowOnFetch {
+            throw error
+        }
+        let startIndex = min(offset, librarySongs.count)
+        let endIndex = min(offset + limit, librarySongs.count)
+        let pageItems = Array(librarySongs[startIndex..<endIndex])
+        let hasMore = endIndex < librarySongs.count
+        return LibraryPage(songs: pageItems, hasMore: hasMore)
+    }
+
+    func searchLibrarySongs(query: String) async throws -> [Song] {
         if let error = shouldThrowOnSearch {
             throw error
         }
-        return searchResults.filter {
+        return librarySongs.filter {
             $0.title.localizedCaseInsensitiveContains(query) ||
             $0.artist.localizedCaseInsensitiveContains(query)
         }
@@ -83,8 +100,8 @@ actor MockMusicService: MusicService {
     }
 
     // Test helpers
-    func setSearchResults(_ songs: [Song]) {
-        searchResults = songs
+    func setLibrarySongs(_ songs: [Song]) {
+        librarySongs = songs
     }
 
     func simulatePlaybackState(_ state: PlaybackState) {
