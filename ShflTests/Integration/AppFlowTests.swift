@@ -130,4 +130,36 @@ final class AppFlowTests: XCTestCase {
         let songCount = await player.songCount
         XCTAssertEqual(songCount, 1)
     }
+
+    func testDirectAddFromPlayerView() async throws {
+        // This tests the navigation flow: PlayerView -> "+" -> SongPickerView -> Done
+        // The actual UI navigation is tested via UI tests, but we can verify the state management
+
+        let mockService = MockMusicService()
+        let player = await ShufflePlayer(musicService: mockService)
+
+        let song = Song(id: "1", title: "Test Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song)
+
+        let songCount = await player.songCount
+        XCTAssertEqual(songCount, 1)
+
+        // Verify song can be removed
+        await player.removeSong(id: "1")
+        let afterRemove = await player.songCount
+        XCTAssertEqual(afterRemove, 0)
+    }
+
+    @MainActor
+    func testUndoManagerIntegration() async throws {
+        let undoManager = SongUndoManager()
+        let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+
+        // Record an add action
+        undoManager.recordAction(.added, song: song)
+
+        let state = undoManager.currentState
+        XCTAssertNotNil(state)
+        XCTAssertEqual(state?.action, .added)
+    }
 }

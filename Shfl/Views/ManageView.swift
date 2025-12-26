@@ -14,7 +14,7 @@ struct ManageView: View {
                     songList
                 }
             }
-            .navigationTitle("Your Songs")
+            .navigationTitle("Library")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -47,43 +47,14 @@ struct ManageView: View {
         List {
             Section {
                 ForEach(player.allSongs) { song in
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(width: 44, height: 44)
-                            .overlay {
-                                if let url = song.artworkURL {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Image(systemName: "music.note")
-                                            .foregroundStyle(.gray)
-                                    }
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                                } else {
-                                    Image(systemName: "music.note")
-                                        .foregroundStyle(.gray)
-                                }
+                    SongDisplay(song: song)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                player.removeSong(id: song.id)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
                             }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(song.title)
-                                .font(.system(size: 16, weight: .medium))
-                                .lineLimit(1)
-
-                            Text(song.artist)
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
                         }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            player.removeSong(id: song.id)
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                        }
-                    }
                 }
             } header: {
                 Text("\(player.songCount) of \(player.capacity) songs")

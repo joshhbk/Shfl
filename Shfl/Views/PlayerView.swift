@@ -64,7 +64,7 @@ struct PlayerView: View {
                     Spacer()
 
                     Button(action: onManageTapped) {
-                        Text("Manage Songs")
+                        Text("View Library")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
