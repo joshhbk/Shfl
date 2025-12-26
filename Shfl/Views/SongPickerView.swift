@@ -5,11 +5,19 @@ struct SongPickerView: View {
     let musicService: MusicService
     let onDismiss: () -> Void
 
-    @State private var searchText = ""
-    @State private var searchResults: [Song] = []
-    @State private var isSearching = false
-    @State private var errorMessage: String?
+    @StateObject private var viewModel: LibraryBrowserViewModel
     @StateObject private var undoManager = SongUndoManager()
+
+    init(
+        player: ShufflePlayer,
+        musicService: MusicService,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.player = player
+        self.musicService = musicService
+        self.onDismiss = onDismiss
+        self._viewModel = StateObject(wrappedValue: LibraryBrowserViewModel(musicService: musicService))
+    }
 
     var body: some View {
         NavigationStack {
@@ -17,23 +25,16 @@ struct SongPickerView: View {
                 VStack(spacing: 0) {
                     CapacityProgressBar(current: player.songCount, maximum: player.capacity)
 
-                    if isSearching {
-                        ProgressView("Searching...")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if searchResults.isEmpty && !searchText.isEmpty {
-                        ContentUnavailableView.search(text: searchText)
-                    } else if searchResults.isEmpty {
-                        ContentUnavailableView(
-                            "Search Your Library",
-                            systemImage: "magnifyingglass",
-                            description: Text("Type to search your Apple Music library")
-                        )
-                    } else {
-                        songList
+                    Group {
+                        switch viewModel.currentMode {
+                        case .browse:
+                            browseList
+                        case .search:
+                            searchList
+                        }
                     }
                 }
 
-                // Undo pill overlay
                 if let undoState = undoManager.currentState {
                     UndoPill(
                         state: undoState,
@@ -50,58 +51,92 @@ struct SongPickerView: View {
                     Button("Done", action: onDismiss)
                 }
             }
-            .searchable(text: $searchText, prompt: "Search your library")
-            .onChange(of: searchText) { _, newValue in
-                performSearch(query: newValue)
+            .searchable(text: $viewModel.searchText, prompt: "Search your library")
+            .onChange(of: viewModel.searchText) { _, _ in
+                viewModel.setupSearchDebounce()
+            }
+            .task {
+                await viewModel.loadInitialPage()
             }
             .alert("Error", isPresented: .init(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.clearError() } }
             )) {
-                Button("OK") { errorMessage = nil }
+                Button("OK") { viewModel.clearError() }
             } message: {
-                if let error = errorMessage {
+                if let error = viewModel.errorMessage {
                     Text(error)
                 }
             }
         }
     }
 
-    private var songList: some View {
+    @ViewBuilder
+    private var browseList: some View {
+        if viewModel.browseLoading && viewModel.browseSongs.isEmpty {
+            skeletonList
+        } else if viewModel.browseSongs.isEmpty {
+            ContentUnavailableView(
+                "No Songs in Library",
+                systemImage: "music.note",
+                description: Text("Add songs to your Apple Music library to see them here")
+            )
+        } else {
+            songList(songs: viewModel.browseSongs, isPaginated: true)
+        }
+    }
+
+    @ViewBuilder
+    private var searchList: some View {
+        if viewModel.searchLoading {
+            skeletonList
+        } else if viewModel.searchResults.isEmpty && !viewModel.searchText.isEmpty {
+            ContentUnavailableView.search(text: viewModel.searchText)
+        } else if viewModel.searchResults.isEmpty {
+            ContentUnavailableView(
+                "Search Your Library",
+                systemImage: "magnifyingglass",
+                description: Text("Type to search your Apple Music library")
+            )
+        } else {
+            songList(songs: viewModel.searchResults, isPaginated: false)
+        }
+    }
+
+    private var skeletonList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(searchResults) { song in
+                ForEach(0..<10, id: \.self) { _ in
+                    SkeletonSongRow()
+                    Divider().padding(.leading, 72)
+                }
+            }
+        }
+    }
+
+    private func songList(songs: [Song], isPaginated: Bool) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(songs) { song in
                     SongRow(
                         song: song,
                         isSelected: player.containsSong(id: song.id),
                         isAtCapacity: player.remainingCapacity == 0,
                         onToggle: { toggleSong(song) }
                     )
-                    Divider()
-                        .padding(.leading, 72)
+                    .onAppear {
+                        if isPaginated {
+                            Task {
+                                await viewModel.loadNextPageIfNeeded(currentSong: song)
+                            }
+                        }
+                    }
+                    Divider().padding(.leading, 72)
                 }
-            }
-        }
-    }
 
-    private func performSearch(query: String) {
-        guard !query.isEmpty else {
-            searchResults = []
-            return
-        }
-
-        isSearching = true
-        Task {
-            do {
-                let results = try await musicService.searchLibrarySongs(query: query)
-                await MainActor.run {
-                    searchResults = results
-                    isSearching = false
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    isSearching = false
+                if isPaginated && viewModel.hasMorePages {
+                    ProgressView()
+                        .padding()
                 }
             }
         }
@@ -116,14 +151,13 @@ struct SongPickerView: View {
                 try player.addSong(song)
                 undoManager.recordAction(.added, song: song)
 
-                // Check for milestones
                 if CapacityProgressBar.isMilestone(player.songCount) {
                     HapticFeedback.milestone.trigger()
                 }
             } catch ShufflePlayerError.capacityReached {
                 // Handled by SongRow's nope animation
             } catch {
-                errorMessage = error.localizedDescription
+                // Other errors handled by alert
             }
         }
     }
@@ -131,11 +165,9 @@ struct SongPickerView: View {
     private func handleUndo(_ state: UndoState) {
         switch state.action {
         case .added:
-            // Undo add = remove
             player.removeSong(id: state.song.id)
             HapticFeedback.light.trigger()
         case .removed:
-            // Undo remove = add back
             try? player.addSong(state.song)
             HapticFeedback.medium.trigger()
         }

@@ -123,4 +123,8 @@ final class LibraryBrowserViewModel: ObservableObject {
             await performSearch(query: searchText)
         }
     }
+
+    func clearError() {
+        errorMessage = nil
+    }
 }
