@@ -1,13 +1,13 @@
 //
-//  ShflUITestsLaunchTests.swift
-//  ShflUITests
+//  ShuffledUITestsLaunchTests.swift
+//  ShuffledUITests
 //
 //  Created by Joshua Hughes on 2025-12-25.
 //
 
 import XCTest
 
-final class ShflUITestsLaunchTests: XCTestCase {
+final class ShuffledUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

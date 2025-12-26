@@ -1,13 +1,13 @@
 //
-//  ShflUITests.swift
-//  ShflUITests
+//  ShuffledUITests.swift
+//  ShuffledUITests
 //
 //  Created by Joshua Hughes on 2025-12-25.
 //
 
 import XCTest
 
-final class ShflUITests: XCTestCase {
+final class ShuffledUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

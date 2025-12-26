@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  Shfl
+//  Shuffled
 //
 //  Created by Joshua Hughes on 2025-12-25.
 //
