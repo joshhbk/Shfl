@@ -19,8 +19,15 @@ protocol MusicService: Sendable {
     /// Check current authorization status
     var isAuthorized: Bool { get async }
 
-    /// Search for songs in user's library
-    func searchLibrary(query: String) async throws -> [Song]
+    /// Fetch songs from user's library with sorting and pagination
+    func fetchLibrarySongs(
+        sortedBy: SortOption,
+        limit: Int,
+        offset: Int
+    ) async throws -> LibraryPage
+
+    /// Search user's library for songs matching query
+    func searchLibrarySongs(query: String) async throws -> [Song]
 
     /// Set the playback queue with songs and shuffle them
     func setQueue(songs: [Song]) async throws
