@@ -82,7 +82,7 @@ struct PlayerView: View {
                     Button(action: onManageTapped) {
                         Text("View Library")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(currentTheme.secondaryTextColor)
                     }
                     .padding(.bottom, geometry.safeAreaInsets.bottom + 24)
                 }
@@ -139,7 +139,7 @@ struct PlayerView: View {
             VStack(spacing: 12) {
                 ProgressView()
                     .scaleEffect(1.2)
-                    .tint(.white)
+                    .tint(currentTheme.textColor)
                 NowPlayingInfo(title: song.title, artist: song.artist)
                     .opacity(0.7)
             }
@@ -216,11 +216,11 @@ struct PlayerView: View {
         VStack(spacing: 8) {
             Text("No songs yet")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(currentTheme.textColor)
 
             Text("Add some music to get started")
                 .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(currentTheme.secondaryTextColor)
         }
     }
 
