@@ -13,6 +13,14 @@ struct PlayerView: View {
     @State private var progressTimer: Timer?
     @State private var removedSong: Song?
     @State private var showUndoPill = false
+    @State private var currentThemeIndex: Int = Int.random(in: 0..<ShuffleTheme.allThemes.count)
+    @State private var dragOffset: CGFloat = 0
+
+    private var currentTheme: ShuffleTheme {
+        ShuffleTheme.allThemes[currentThemeIndex]
+    }
+
+    private let swipeThreshold: CGFloat = 100
 
     init(
         player: ShufflePlayer,
@@ -29,7 +37,7 @@ struct PlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                backgroundGradient
+                themedBackground(geometry: geometry)
 
                 VStack(spacing: 0) {
                     // Error banner at top
@@ -97,9 +105,11 @@ struct PlayerView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .gesture(themeSwipeGesture)
             .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.2), value: showError)
             .animation(.easeInOut(duration: 0.2), value: showUndoPill)
+            .environment(\.shuffleTheme, currentTheme)
             .onChange(of: player.playbackState) { _, newState in
                 handlePlaybackStateChange(newState)
             }
@@ -142,15 +152,64 @@ struct PlayerView: View {
         }
     }
 
-    private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.75, green: 0.22, blue: 0.32),
-                Color(red: 0.65, green: 0.18, blue: 0.28)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    @ViewBuilder
+    private func themedBackground(geometry: GeometryProxy) -> some View {
+        let screenWidth = geometry.size.width
+        let themeCount = ShuffleTheme.allThemes.count
+
+        HStack(spacing: 0) {
+            ForEach(Array(ShuffleTheme.allThemes.enumerated()), id: \.element.id) { _, theme in
+                theme.bodyGradient
+                    .frame(width: screenWidth)
+            }
+        }
+        .frame(width: screenWidth * CGFloat(themeCount), alignment: .leading)
+        .offset(x: calculateBackgroundOffset(geometry: geometry))
+    }
+
+    private func calculateBackgroundOffset(geometry: GeometryProxy) -> CGFloat {
+        let screenWidth = geometry.size.width
+        let baseOffset = -CGFloat(currentThemeIndex) * screenWidth
+        return baseOffset + dragOffset
+    }
+
+    private var themeSwipeGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                let translation = value.translation.width
+                // Add rubber-band resistance at edges
+                if (currentThemeIndex == 0 && translation > 0) ||
+                   (currentThemeIndex == ShuffleTheme.allThemes.count - 1 && translation < 0) {
+                    dragOffset = translation * 0.3 // Resistance
+                } else {
+                    dragOffset = translation
+                }
+            }
+            .onEnded { value in
+                let translation = value.translation.width
+                let velocity = value.predictedEndTranslation.width
+
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    if translation < -swipeThreshold || velocity < -500 {
+                        // Swipe left - next theme
+                        if currentThemeIndex < ShuffleTheme.allThemes.count - 1 {
+                            currentThemeIndex += 1
+                            HapticFeedback.light.trigger()
+                        } else {
+                            HapticFeedback.light.trigger() // Boundary bump
+                        }
+                    } else if translation > swipeThreshold || velocity > 500 {
+                        // Swipe right - previous theme
+                        if currentThemeIndex > 0 {
+                            currentThemeIndex -= 1
+                            HapticFeedback.light.trigger()
+                        } else {
+                            HapticFeedback.light.trigger() // Boundary bump
+                        }
+                    }
+                    dragOffset = 0
+                }
+            }
     }
 
     private var emptyStateView: some View {
