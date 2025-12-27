@@ -126,10 +126,16 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     }
 
     func setQueue(songs: [Song]) async throws {
-        // Convert our Song models back to MusicKit songs
         let ids = songs.map { MusicItemID($0.id) }
-        let request = MusicCatalogResourceRequest<MusicKit.Song>(matching: \.id, memberOf: ids)
+
+        // Use MusicLibraryRequest instead of MusicCatalogResourceRequest
+        var request = MusicLibraryRequest<MusicKit.Song>()
+        request.filter(matching: \.id, memberOf: ids)
         let response = try await request.response()
+
+        guard !response.items.isEmpty else {
+            return
+        }
 
         let queue = ApplicationMusicPlayer.Queue(for: response.items, startingAt: nil)
         player.queue = queue
