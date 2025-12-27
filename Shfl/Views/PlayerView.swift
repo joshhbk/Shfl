@@ -38,8 +38,7 @@ struct PlayerView: View {
         GeometryReader { geometry in
             ZStack {
                 themedBackground(geometry: geometry)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
+                    .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // Error banner at top
@@ -157,22 +156,19 @@ struct PlayerView: View {
     @ViewBuilder
     private func themedBackground(geometry: GeometryProxy) -> some View {
         let screenWidth = geometry.size.width
-        let themeCount = ShuffleTheme.allThemes.count
+        let screenHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
 
-        HStack(spacing: 0) {
-            ForEach(Array(ShuffleTheme.allThemes.enumerated()), id: \.element.id) { _, theme in
-                theme.bodyGradient
-                    .frame(width: screenWidth)
+        GeometryReader { _ in
+            HStack(spacing: 0) {
+                ForEach(ShuffleTheme.allThemes) { theme in
+                    theme.bodyGradient
+                        .frame(width: screenWidth, height: screenHeight)
+                }
             }
+            .offset(x: -CGFloat(currentThemeIndex) * screenWidth + dragOffset)
         }
-        .frame(width: screenWidth * CGFloat(themeCount), alignment: .leading)
-        .offset(x: calculateBackgroundOffset(geometry: geometry))
-    }
-
-    private func calculateBackgroundOffset(geometry: GeometryProxy) -> CGFloat {
-        let screenWidth = geometry.size.width
-        let baseOffset = -CGFloat(currentThemeIndex) * screenWidth
-        return baseOffset + dragOffset
+        .frame(width: screenWidth, height: screenHeight)
+        .clipped()
     }
 
     private var themeSwipeGesture: some Gesture {
