@@ -8,6 +8,8 @@ actor MockMusicService: MusicService {
     var shouldThrowOnSearch: Error?
     var shouldThrowOnSkip: Error?
     var librarySongs: [Song] = []
+    var setQueueCallCount: Int = 0
+    var lastQueuedSongs: [Song] = []
     var shouldThrowOnFetch: Error?
 
     private var currentState: PlaybackState = .empty
@@ -65,6 +67,8 @@ actor MockMusicService: MusicService {
     }
 
     func setQueue(songs: [Song]) async throws {
+        setQueueCallCount += 1
+        lastQueuedSongs = songs
         queuedSongs = songs.shuffled()
         currentIndex = 0
         if queuedSongs.isEmpty {
@@ -123,5 +127,10 @@ actor MockMusicService: MusicService {
 
     func simulatePlaybackState(_ state: PlaybackState) {
         updateState(state)
+    }
+
+    func resetQueueTracking() {
+        setQueueCallCount = 0
+        lastQueuedSongs = []
     }
 }
