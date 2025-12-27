@@ -10,6 +10,8 @@ import SwiftData
 
 @main
 struct ShuffledApp: App {
+    @State private var motionManager = MotionManager()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([PersistedSong.self])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -27,6 +29,7 @@ struct ShuffledApp: App {
                 musicService: AppleMusicService(),
                 modelContext: sharedModelContainer.mainContext
             )
+            .environment(\.motionManager, motionManager)
         }
         .modelContainer(sharedModelContainer)
     }
