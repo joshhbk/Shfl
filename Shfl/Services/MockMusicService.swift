@@ -32,5 +32,6 @@ final class MockMusicService: MusicService, @unchecked Sendable {
     func play() async throws {}
     func pause() async {}
     func skipToNext() async throws {}
-    func restartCurrentSong() async throws {}
+    func skipToPrevious() async throws {}
+    func restartOrSkipToPrevious() async throws {}
 }

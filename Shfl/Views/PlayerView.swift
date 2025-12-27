@@ -225,7 +225,7 @@ struct PlayerView: View {
 
     private func handleSkipBack() {
         Task {
-            try? await player.restartCurrentSong()
+            try? await player.restartOrSkipToPrevious()
         }
     }
 
@@ -302,7 +302,8 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     func play() async throws {}
     func pause() async {}
     func skipToNext() async throws {}
-    func restartCurrentSong() async throws {}
+    func skipToPrevious() async throws {}
+    func restartOrSkipToPrevious() async throws {}
 }
 
 #Preview("Empty State") {
