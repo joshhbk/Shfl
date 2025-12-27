@@ -42,7 +42,9 @@ struct PlayerView: View {
                 // Background - first in ZStack = behind
                 BrushedMetalBackground(
                     baseColor: currentTheme.bodyGradientTop,
-                    highlightOffset: highlightOffset
+                    intensity: currentTheme.brushedMetalIntensity,
+                    highlightOffset: highlightOffset,
+                    motionEnabled: currentTheme.motionEnabled
                 )
 
                 // Content
@@ -297,7 +299,7 @@ struct PlayerView: View {
         highlightOffset = MotionManager.highlightOffset(
             pitch: manager.pitch,
             roll: manager.roll,
-            sensitivity: 0.5,  // Will move to theme later
+            sensitivity: currentTheme.motionSensitivity,
             maxOffset: 50
         )
     }
