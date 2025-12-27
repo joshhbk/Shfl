@@ -14,11 +14,12 @@ struct MainView: View {
     var body: some View {
         Group {
             if viewModel.isAuthorized {
-                PlayerView(player: viewModel.player) {
-                    viewModel.openManage()
-                } onAddTapped: {
-                    viewModel.openPickerDirect()
-                }
+                PlayerView(
+                    player: viewModel.player,
+                    musicService: viewModel.musicService,
+                    onManageTapped: { viewModel.openManage() },
+                    onAddTapped: { viewModel.openPickerDirect() }
+                )
             } else {
                 authorizationView
             }
