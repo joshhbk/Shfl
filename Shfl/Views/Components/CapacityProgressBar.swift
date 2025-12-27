@@ -104,7 +104,7 @@ struct CapacityProgressBar: View {
     }
 }
 
-#Preview {
+#Preview("States") {
     VStack(spacing: 20) {
         CapacityProgressBar(current: 0, maximum: 120)
         CapacityProgressBar(current: 42, maximum: 120)
@@ -112,4 +112,27 @@ struct CapacityProgressBar: View {
         CapacityProgressBar(current: 120, maximum: 120)
     }
     .padding()
+}
+
+#Preview("Celebration") {
+    struct CelebrationDemo: View {
+        @State private var count = 119
+
+        var body: some View {
+            VStack(spacing: 20) {
+                CapacityProgressBar(current: count, maximum: 120)
+
+                Button("Fill Library") {
+                    count = 120
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Reset") {
+                    count = 119
+                }
+            }
+            .padding()
+        }
+    }
+    return CelebrationDemo()
 }
