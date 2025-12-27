@@ -104,7 +104,7 @@ struct PlayerView: View {
                 }
             }
             .background(themedBackground(geometry: geometry).ignoresSafeArea())
-            .gesture(themeSwipeGesture)
+            .simultaneousGesture(themeSwipeGesture)
             .animation(.easeInOut(duration: 0.2), value: showError)
             .animation(.easeInOut(duration: 0.2), value: showUndoPill)
             .environment(\.shuffleTheme, currentTheme)
