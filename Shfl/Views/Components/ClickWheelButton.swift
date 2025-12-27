@@ -23,6 +23,7 @@ struct ClickWheelButton: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(iconColor)
                 .frame(width: 44, height: 44)
+                .contentShape(Rectangle().size(width: 60, height: 60))
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.impact(weight: .light), trigger: tapCount)

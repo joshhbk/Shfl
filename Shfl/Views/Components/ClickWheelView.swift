@@ -7,8 +7,8 @@ struct ClickWheelView: View {
     let onPlayPause: () -> Void
     let onSkipForward: () -> Void
     let onSkipBack: () -> Void
-    let onAdd: () -> Void
-    let onRemove: () -> Void
+    let onVolumeUp: () -> Void
+    let onVolumeDown: () -> Void
 
     private let wheelSize: CGFloat = 280
     private let centerButtonSize: CGFloat = 80
@@ -40,14 +40,14 @@ struct ClickWheelView: View {
 
             // Control buttons positioned around the wheel
             VStack {
-                ClickWheelButton(systemName: "plus", action: onAdd, wheelStyle: theme.wheelStyle)
+                ClickWheelButton(systemName: "plus", action: onVolumeUp, wheelStyle: theme.wheelStyle)
                 Spacer()
             }
             .frame(height: wheelSize - 40)
 
             VStack {
                 Spacer()
-                ClickWheelButton(systemName: "minus", action: onRemove, wheelStyle: theme.wheelStyle)
+                ClickWheelButton(systemName: "minus", action: onVolumeDown, wheelStyle: theme.wheelStyle)
             }
             .frame(height: wheelSize - 40)
 
@@ -76,8 +76,8 @@ struct ClickWheelView: View {
         onPlayPause: {},
         onSkipForward: {},
         onSkipBack: {},
-        onAdd: {},
-        onRemove: {}
+        onVolumeUp: {},
+        onVolumeDown: {}
     )
     .padding()
     .background(ShuffleTheme.pink.bodyGradient)
@@ -90,8 +90,8 @@ struct ClickWheelView: View {
         onPlayPause: {},
         onSkipForward: {},
         onSkipBack: {},
-        onAdd: {},
-        onRemove: {}
+        onVolumeUp: {},
+        onVolumeDown: {}
     )
     .padding()
     .background(ShuffleTheme.silver.bodyGradient)
