@@ -28,6 +28,10 @@ struct CapacityProgressBar: View {
     let current: Int
     let maximum: Int
 
+    @State private var previousCount: Int?
+    @State private var isShowingCelebration = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var progress: Double {
         Self.calculateProgress(current: current, maximum: maximum)
     }
@@ -61,6 +65,18 @@ struct CapacityProgressBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color(.systemGroupedBackground))
+        .onChange(of: current) { oldValue, newValue in
+            if Self.shouldCelebrate(previous: oldValue, current: newValue, maximum: maximum) {
+                triggerCelebration()
+            }
+        }
+    }
+
+    private func triggerCelebration() {
+        HapticFeedback.medium.trigger()
+        if !reduceMotion {
+            isShowingCelebration = true
+        }
     }
 
     // MARK: - Static Helpers (for testing)
