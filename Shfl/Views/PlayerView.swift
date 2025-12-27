@@ -6,6 +6,8 @@ struct PlayerView: View {
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
 
+    @Environment(\.motionManager) private var motionManager
+    @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var currentTime: TimeInterval = 0
@@ -39,7 +41,8 @@ struct PlayerView: View {
             ZStack {
                 // Background - first in ZStack = behind
                 BrushedMetalBackground(
-                    baseColor: currentTheme.bodyGradientTop
+                    baseColor: currentTheme.bodyGradientTop,
+                    highlightOffset: highlightOffset
                 )
 
                 // Content
@@ -118,9 +121,17 @@ struct PlayerView: View {
             }
             .onAppear {
                 startProgressTimer()
+                motionManager?.start()
             }
             .onDisappear {
                 stopProgressTimer()
+                motionManager?.stop()
+            }
+            .onChange(of: motionManager?.pitch) { _, _ in
+                updateHighlightOffset()
+            }
+            .onChange(of: motionManager?.roll) { _, _ in
+                updateHighlightOffset()
             }
         }
     }
@@ -277,6 +288,18 @@ struct PlayerView: View {
     private func stopProgressTimer() {
         progressTimer?.invalidate()
         progressTimer = nil
+    }
+
+    // MARK: - Motion
+
+    private func updateHighlightOffset() {
+        guard let manager = motionManager else { return }
+        highlightOffset = MotionManager.highlightOffset(
+            pitch: manager.pitch,
+            roll: manager.roll,
+            sensitivity: 0.5,  // Will move to theme later
+            maxOffset: 50
+        )
     }
 }
 
