@@ -66,6 +66,7 @@ struct ClickWheelView: View {
             // Center play/pause button
             PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, wheelStyle: theme.wheelStyle)
         }
+        .compositingGroup()
     }
 }
 
