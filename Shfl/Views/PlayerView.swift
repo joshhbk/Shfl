@@ -37,8 +37,11 @@ struct PlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
+                // Background - first in ZStack = behind
+                currentTheme.bodyGradient
+
+                // Content
                 VStack(spacing: 0) {
-                    // Error banner at top
                     if showError {
                         ErrorBanner(message: errorMessage) {
                             withAnimation {
@@ -103,7 +106,7 @@ struct PlayerView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .background(themedBackground(geometry: geometry).ignoresSafeArea())
+            .ignoresSafeArea()
             .simultaneousGesture(themeSwipeGesture)
             .animation(.easeInOut(duration: 0.2), value: showError)
             .animation(.easeInOut(duration: 0.2), value: showUndoPill)
@@ -152,19 +155,11 @@ struct PlayerView: View {
 
     @ViewBuilder
     private func themedBackground(geometry: GeometryProxy) -> some View {
-        let screenWidth = geometry.size.width
-
-        HStack(spacing: 0) {
-            ForEach(ShuffleTheme.allThemes) { theme in
-                theme.bodyGradient
-                    .frame(width: screenWidth)
-            }
-        }
-        .offset(x: -CGFloat(currentThemeIndex) * screenWidth + dragOffset)
+        currentTheme.bodyGradient
     }
 
     private var themeSwipeGesture: some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 30)
             .onChanged { value in
                 let translation = value.translation.width
                 // Add rubber-band resistance at edges
