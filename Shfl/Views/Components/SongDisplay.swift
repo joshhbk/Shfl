@@ -1,3 +1,4 @@
+import MusicKit
 import SwiftUI
 
 struct SongDisplay: View {
@@ -5,7 +6,7 @@ struct SongDisplay: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SongArtwork(url: song.artworkURL)
+            SongArtwork(songId: song.id)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
@@ -23,25 +24,24 @@ struct SongDisplay: View {
 }
 
 struct SongArtwork: View {
-    let url: URL?
+    let songId: String
+    @ObservedObject private var loader = ArtworkLoader.shared
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
             .fill(Color.gray.opacity(0.2))
             .frame(width: 44, height: 44)
             .overlay {
-                if let url {
-                    AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Image(systemName: "music.note")
-                            .foregroundStyle(.gray)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                if let artwork = loader.artwork(for: songId) {
+                    ArtworkImage(artwork, width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
                     Image(systemName: "music.note")
                         .foregroundStyle(.gray)
                 }
+            }
+            .onAppear {
+                loader.requestArtwork(for: songId)
             }
     }
 }

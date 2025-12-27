@@ -52,9 +52,6 @@ struct SongPickerView: View {
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search your library")
-            .onChange(of: viewModel.searchText) { _, _ in
-                viewModel.setupSearchDebounce()
-            }
             .task {
                 await viewModel.loadInitialPage()
             }

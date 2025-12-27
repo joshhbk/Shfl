@@ -51,9 +51,11 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     private func fetchAllLibrarySongs(sortedBy: SortOption) async throws -> [Song] {
         // Return cached if available
         if let cached = cachedLibrary[sortedBy] {
+            print("📚 Returning \(cached.count) cached songs for \(sortedBy)")
             return cached
         }
 
+        print("📚 Fetching library songs for \(sortedBy)...")
         var request = MusicLibraryRequest<MusicKit.Song>()
 
         switch sortedBy {
@@ -68,43 +70,24 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         }
 
         let response = try await request.response()
+        print("📚 Got \(response.items.count) songs from MusicKit")
 
-        // Map songs and try to get artwork (preserving order)
-        let allSongs = await withTaskGroup(of: (Int, Song).self, returning: [Song].self) { group in
-            for (index, musicKitSong) in response.items.enumerated() {
-                group.addTask {
-                    // Try to load artwork by requesting full song data
-                    var artworkURL: URL?
-                    if let artwork = musicKitSong.artwork {
-                        artworkURL = artwork.url(width: 300, height: 300)
-                    } else {
-                        // Artwork is nil, try to fetch full song
-                        if let fullSong = try? await musicKitSong.with(.albums) {
-                            artworkURL = fullSong.artwork?.url(width: 300, height: 300)
-                        }
-                    }
-
-                    let song = Song(
-                        id: musicKitSong.id.rawValue,
-                        title: musicKitSong.title,
-                        artist: musicKitSong.artistName,
-                        albumTitle: musicKitSong.albumTitle ?? "",
-                        artworkURL: artworkURL
-                    )
-                    return (index, song)
-                }
-            }
-
-            var indexedSongs: [(Int, Song)] = []
-            for await result in group {
-                indexedSongs.append(result)
-            }
-            // Sort by original index to preserve order
-            return indexedSongs.sorted { $0.0 < $1.0 }.map { $0.1 }
+        // Map songs (artwork loaded lazily by ArtworkLoader)
+        let allSongs = response.items.map { musicKitSong in
+            Song(
+                id: musicKitSong.id.rawValue,
+                title: musicKitSong.title,
+                artist: musicKitSong.artistName,
+                albumTitle: musicKitSong.albumTitle ?? "",
+                artworkURL: nil
+            )
         }
 
-        // Cache the result
-        cachedLibrary[sortedBy] = allSongs
+        // Only cache if we got results
+        if !allSongs.isEmpty {
+            cachedLibrary[sortedBy] = allSongs
+        }
+        print("📚 Processed \(allSongs.count) songs")
         return allSongs
     }
 
@@ -124,51 +107,69 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     }
 
     func searchLibrarySongs(query: String) async throws -> [Song] {
-        var request = MusicLibrarySearchRequest(term: query, types: [MusicKit.Song.self])
-        let response = try await request.response()
+        print("🔍 Searching for: '\(query)'")
 
-        return response.songs.map { musicKitSong in
-            Song(
-                id: musicKitSong.id.rawValue,
-                title: musicKitSong.title,
-                artist: musicKitSong.artistName,
-                albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: musicKitSong.artwork?.url(width: 300, height: 300)
-            )
+        // Search directly against cached library - no async fetch needed
+        guard let allSongs = cachedLibrary[.mostPlayed] else {
+            print("🔍 Cache miss - no songs cached yet")
+            return []
         }
+
+        let lowercasedQuery = query.lowercased()
+        let results = allSongs.filter { song in
+            song.title.lowercased().contains(lowercasedQuery) ||
+            song.artist.lowercased().contains(lowercasedQuery) ||
+            song.albumTitle.lowercased().contains(lowercasedQuery)
+        }
+
+        print("🔍 Found \(results.count) results for '\(query)'")
+        return results
     }
 
     func setQueue(songs: [Song]) async throws {
+        print("🎵 setQueue() called with \(songs.count) songs")
         let ids = songs.map { MusicItemID($0.id) }
 
         // Use MusicLibraryRequest instead of MusicCatalogResourceRequest
         var request = MusicLibraryRequest<MusicKit.Song>()
         request.filter(matching: \.id, memberOf: ids)
+        print("🎵 Fetching songs from library...")
         let response = try await request.response()
+        print("🎵 Got \(response.items.count) songs from library")
 
         guard !response.items.isEmpty else {
+            print("🎵 No songs found, returning")
             return
         }
 
         let queue = ApplicationMusicPlayer.Queue(for: response.items, startingAt: nil)
         player.queue = queue
         player.state.shuffleMode = .songs
+        print("🎵 setQueue() completed")
     }
 
     func play() async throws {
+        print("▶️ play() called")
         try await player.play()
+        print("▶️ play() completed")
     }
 
     func pause() async {
+        print("⏸️ pause() called")
         player.pause()
+        print("⏸️ pause() completed")
     }
 
     func skipToNext() async throws {
+        print("⏭️ skipToNext() called")
         try await player.skipToNextEntry()
+        print("⏭️ skipToNext() completed")
     }
 
     func restartCurrentSong() async throws {
+        print("⏮️ restartCurrentSong() called")
         player.playbackTime = 0
+        print("⏮️ restartCurrentSong() completed")
     }
 
     private func startObservingPlaybackState() {
@@ -188,10 +189,12 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
     private func emitCurrentState() {
         let state = mapPlaybackState()
+        print("📻 Emitting state: \(state)")
         continuation?.yield(state)
     }
 
     private func mapPlaybackState() -> PlaybackState {
+        print("📻 Mapping state - playbackStatus: \(player.state.playbackStatus)")
         guard let currentEntry = player.queue.currentEntry else {
             return .empty
         }
