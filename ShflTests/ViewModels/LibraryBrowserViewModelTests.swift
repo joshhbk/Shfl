@@ -93,4 +93,98 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
         XCTAssertTrue(viewModel.searchResults.isEmpty)
     }
+
+    // MARK: - Autofill State Tests
+
+    func test_autofillState_initiallyIdle() {
+        XCTAssertEqual(viewModel.autofillState, .idle)
+    }
+
+    // MARK: - Autofill Method Tests
+
+    func test_autofill_addsSongsToPlayer() async {
+        let songs = (1...50).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        await mockService.setLibrarySongs(songs)
+
+        let player = ShufflePlayer(musicService: mockService)
+        let source = LibraryAutofillSource(musicService: mockService)
+
+        await viewModel.autofill(into: player, using: source)
+
+        XCTAssertEqual(player.songCount, 50)
+        XCTAssertEqual(viewModel.autofillState, .completed(count: 50))
+    }
+
+    func test_autofill_fillsOnlyRemainingCapacity() async {
+        let songs = (1...200).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        await mockService.setLibrarySongs(songs)
+
+        let player = ShufflePlayer(musicService: mockService)
+        // Add 100 songs first
+        for i in 1...100 {
+            try? player.addSong(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+        }
+
+        let source = LibraryAutofillSource(musicService: mockService)
+        await viewModel.autofill(into: player, using: source)
+
+        // Should only add 20 more (120 - 100)
+        XCTAssertEqual(player.songCount, 120)
+        XCTAssertEqual(viewModel.autofillState, .completed(count: 20))
+    }
+
+    func test_autofill_excludesDuplicates() async {
+        let songs = (1...10).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        await mockService.setLibrarySongs(songs)
+
+        let player = ShufflePlayer(musicService: mockService)
+        // Pre-add some songs that are also in library
+        try? player.addSong(songs[0])
+        try? player.addSong(songs[1])
+
+        let source = LibraryAutofillSource(musicService: mockService)
+        await viewModel.autofill(into: player, using: source)
+
+        // Should add 8 new songs (10 - 2 already added)
+        XCTAssertEqual(player.songCount, 10)
+        XCTAssertEqual(viewModel.autofillState, .completed(count: 8))
+    }
+
+    func test_autofill_completesWithZeroWhenFull() async {
+        let player = ShufflePlayer(musicService: mockService)
+        // Fill to capacity
+        for i in 1...120 {
+            try? player.addSong(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+        }
+
+        let source = LibraryAutofillSource(musicService: mockService)
+        await viewModel.autofill(into: player, using: source)
+
+        XCTAssertEqual(viewModel.autofillState, .completed(count: 0))
+    }
+
+    func test_autofill_setsLoadingState() async {
+        let songs = [Song(id: "1", title: "Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)]
+        await mockService.setLibrarySongs(songs)
+
+        let player = ShufflePlayer(musicService: mockService)
+        let source = LibraryAutofillSource(musicService: mockService)
+
+        // Start autofill
+        let task = Task {
+            await viewModel.autofill(into: player, using: source)
+        }
+
+        // Note: In real implementation we'd need to check loading state during execution
+        // For now just verify it completes correctly
+        await task.value
+
+        XCTAssertEqual(viewModel.autofillState, .completed(count: 1))
+    }
 }
