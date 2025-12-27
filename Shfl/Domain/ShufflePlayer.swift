@@ -67,6 +67,17 @@ final class ShufflePlayer: ObservableObject {
         playbackState = newState
     }
 
+    private func rebuildQueueIfPlaying() {
+        guard playbackState.isActive else { return }
+
+        let upcomingSongs = songs.filter { !playedSongIds.contains($0.id) }
+        guard !upcomingSongs.isEmpty else { return }
+
+        Task {
+            try? await musicService.setQueue(songs: upcomingSongs)
+        }
+    }
+
     // MARK: - Song Management
 
     func addSong(_ song: Song) throws {
@@ -77,6 +88,7 @@ final class ShufflePlayer: ObservableObject {
             return // Already added
         }
         songs.append(song)
+        rebuildQueueIfPlaying()
     }
 
     func removeSong(id: String) {
