@@ -67,13 +67,18 @@ struct SongPickerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Autofill") {
-                        Task {
-                            let source = LibraryAutofillSource(musicService: musicService)
-                            await viewModel.autofill(into: player, using: source)
+                    if viewModel.autofillState == .loading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                    } else {
+                        Button("Autofill") {
+                            Task {
+                                let source = LibraryAutofillSource(musicService: musicService)
+                                await viewModel.autofill(into: player, using: source)
+                            }
                         }
+                        .disabled(player.remainingCapacity == 0)
                     }
-                    .disabled(player.remainingCapacity == 0 || viewModel.autofillState == .loading)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: onDismiss)
