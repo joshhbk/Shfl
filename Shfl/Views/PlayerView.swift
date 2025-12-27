@@ -37,8 +37,6 @@ struct PlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                themedBackground(geometry: geometry)
-
                 VStack(spacing: 0) {
                     // Error banner at top
                     if showError {
@@ -105,8 +103,8 @@ struct PlayerView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .background(themedBackground(geometry: geometry).ignoresSafeArea())
             .gesture(themeSwipeGesture)
-            .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.2), value: showError)
             .animation(.easeInOut(duration: 0.2), value: showUndoPill)
             .environment(\.shuffleTheme, currentTheme)
@@ -155,17 +153,14 @@ struct PlayerView: View {
     @ViewBuilder
     private func themedBackground(geometry: GeometryProxy) -> some View {
         let screenWidth = geometry.size.width
-        let screenHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
 
         HStack(spacing: 0) {
             ForEach(ShuffleTheme.allThemes) { theme in
                 theme.bodyGradient
-                    .frame(width: screenWidth, height: screenHeight)
+                    .frame(width: screenWidth)
             }
         }
         .offset(x: -CGFloat(currentThemeIndex) * screenWidth + dragOffset)
-        .frame(width: screenWidth, height: screenHeight, alignment: .leading)
-        .clipped()
     }
 
     private var themeSwipeGesture: some Gesture {
