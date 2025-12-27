@@ -68,8 +68,8 @@ struct PlayerView: View {
                             onPlayPause: handlePlayPause,
                             onSkipForward: handleSkipForward,
                             onSkipBack: handleSkipBack,
-                            onAdd: onAddTapped,
-                            onRemove: handleRemove
+                            onVolumeUp: { VolumeController.increaseVolume() },
+                            onVolumeDown: { VolumeController.decreaseVolume() }
                         )
                         .disabled(player.songCount == 0)
                         .opacity(player.songCount == 0 ? 0.6 : 1.0)
@@ -121,10 +121,19 @@ struct PlayerView: View {
     @ViewBuilder
     private func topBar(geometry: GeometryProxy) -> some View {
         HStack {
+            Button(action: onAddTapped) {
+                HStack(spacing: 4) {
+                    Text("Songs")
+                        .font(.system(size: 16, weight: .medium))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(currentTheme.textColor)
+            }
             Spacer()
             CapacityIndicator(current: player.songCount, maximum: player.capacity)
-            Spacer()
         }
+        .padding(.horizontal, 20)
         .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
     }
 
