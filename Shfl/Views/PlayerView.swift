@@ -158,16 +158,14 @@ struct PlayerView: View {
         let screenWidth = geometry.size.width
         let screenHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
 
-        GeometryReader { _ in
-            HStack(spacing: 0) {
-                ForEach(ShuffleTheme.allThemes) { theme in
-                    theme.bodyGradient
-                        .frame(width: screenWidth, height: screenHeight)
-                }
+        HStack(spacing: 0) {
+            ForEach(ShuffleTheme.allThemes) { theme in
+                theme.bodyGradient
+                    .frame(width: screenWidth, height: screenHeight)
             }
-            .offset(x: -CGFloat(currentThemeIndex) * screenWidth + dragOffset)
         }
-        .frame(width: screenWidth, height: screenHeight)
+        .offset(x: -CGFloat(currentThemeIndex) * screenWidth + dragOffset)
+        .frame(width: screenWidth, height: screenHeight, alignment: .leading)
         .clipped()
     }
 
