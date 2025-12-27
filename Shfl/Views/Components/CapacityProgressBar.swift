@@ -28,7 +28,6 @@ struct CapacityProgressBar: View {
     let current: Int
     let maximum: Int
 
-    @State private var previousCount: Int?
     @State private var isShowingCelebration = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
