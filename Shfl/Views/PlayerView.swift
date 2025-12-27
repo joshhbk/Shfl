@@ -84,8 +84,13 @@ struct PlayerView: View {
                     VStack {
                         Spacer()
                         UndoPill(
-                            message: "Removed \"\(song.title)\"",
-                            onUndo: handleUndo
+                            state: UndoState(action: .removed, song: song),
+                            onUndo: handleUndo,
+                            onDismiss: {
+                                withAnimation {
+                                    showUndoPill = false
+                                }
+                            }
                         )
                         .padding(.bottom, geometry.safeAreaInsets.bottom + 60)
                     }
