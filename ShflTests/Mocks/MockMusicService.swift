@@ -99,8 +99,16 @@ actor MockMusicService: MusicService {
         updateState(.playing(song))
     }
 
-    func restartCurrentSong() async throws {
-        // No-op for mock
+    func skipToPrevious() async throws {
+        guard !queuedSongs.isEmpty else { return }
+        currentIndex = (currentIndex - 1 + queuedSongs.count) % queuedSongs.count
+        let song = queuedSongs[currentIndex]
+        updateState(.playing(song))
+    }
+
+    func restartOrSkipToPrevious() async throws {
+        // For testing, just skip to previous
+        try await skipToPrevious()
     }
 
     private func updateState(_ state: PlaybackState) {

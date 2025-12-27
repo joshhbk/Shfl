@@ -169,10 +169,22 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("⏭️ skipToNext() completed")
     }
 
-    func restartCurrentSong() async throws {
-        print("⏮️ restartCurrentSong() called")
-        player.playbackTime = 0
-        print("⏮️ restartCurrentSong() completed")
+    func skipToPrevious() async throws {
+        print("⏮️ skipToPrevious() called")
+        try await player.skipToPreviousEntry()
+        print("⏮️ skipToPrevious() completed")
+    }
+
+    func restartOrSkipToPrevious() async throws {
+        let threshold: TimeInterval = 3.0
+        print("⏮️ restartOrSkipToPrevious() called - playbackTime: \(player.playbackTime)")
+
+        if player.playbackTime <= threshold {
+            try await skipToPrevious()
+        } else {
+            player.playbackTime = 0
+            print("⏮️ Restarted current song")
+        }
     }
 
     private func startObservingPlaybackState() {
