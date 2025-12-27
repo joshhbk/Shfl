@@ -55,9 +55,9 @@ final class ShufflePlayer: ObservableObject {
         }
         lastObservedSongId = newSongId
 
-        // Clear history on stop/empty
+        // Clear history on stop/empty/error
         switch newState {
-        case .stopped, .empty:
+        case .stopped, .empty, .error:
             playedSongIds.removeAll()
             lastObservedSongId = nil
         default:
