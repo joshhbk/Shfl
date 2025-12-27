@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ClickWheelView: View {
+    @Environment(\.shuffleTheme) private var theme
+
     let isPlaying: Bool
     let onPlayPause: () -> Void
     let onSkipForward: () -> Void
@@ -11,52 +13,63 @@ struct ClickWheelView: View {
     private let wheelSize: CGFloat = 280
     private let centerButtonSize: CGFloat = 80
 
+    private var wheelGradient: LinearGradient {
+        switch theme.wheelStyle {
+        case .light:
+            return LinearGradient(
+                colors: [Color(white: 0.95), Color(white: 0.88)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .dark:
+            return LinearGradient(
+                colors: [Color(white: 0.25), Color(white: 0.15)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
     var body: some View {
         ZStack {
             // Outer wheel background
             Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(white: 0.95), Color(white: 0.88)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(wheelGradient)
                 .frame(width: wheelSize, height: wheelSize)
                 .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
 
             // Control buttons positioned around the wheel
             VStack {
-                ClickWheelButton(systemName: "plus", action: onAdd)
+                ClickWheelButton(systemName: "plus", action: onAdd, wheelStyle: theme.wheelStyle)
                 Spacer()
             }
             .frame(height: wheelSize - 40)
 
             VStack {
                 Spacer()
-                ClickWheelButton(systemName: "minus", action: onRemove)
+                ClickWheelButton(systemName: "minus", action: onRemove, wheelStyle: theme.wheelStyle)
             }
             .frame(height: wheelSize - 40)
 
             HStack {
-                ClickWheelButton(systemName: "backward.end.fill", action: onSkipBack)
+                ClickWheelButton(systemName: "backward.end.fill", action: onSkipBack, wheelStyle: theme.wheelStyle)
                 Spacer()
             }
             .frame(width: wheelSize - 40)
 
             HStack {
                 Spacer()
-                ClickWheelButton(systemName: "forward.end.fill", action: onSkipForward)
+                ClickWheelButton(systemName: "forward.end.fill", action: onSkipForward, wheelStyle: theme.wheelStyle)
             }
             .frame(width: wheelSize - 40)
 
             // Center play/pause button
-            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause)
+            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, wheelStyle: theme.wheelStyle)
         }
     }
 }
 
-#Preview("Paused") {
+#Preview("Pink Theme") {
     ClickWheelView(
         isPlaying: false,
         onPlayPause: {},
@@ -66,10 +79,11 @@ struct ClickWheelView: View {
         onRemove: {}
     )
     .padding()
-    .background(Color(red: 0.8, green: 0.2, blue: 0.3))
+    .background(ShuffleTheme.pink.bodyGradient)
+    .environment(\.shuffleTheme, .pink)
 }
 
-#Preview("Playing") {
+#Preview("Silver Theme") {
     ClickWheelView(
         isPlaying: true,
         onPlayPause: {},
@@ -79,5 +93,6 @@ struct ClickWheelView: View {
         onRemove: {}
     )
     .padding()
-    .background(Color(red: 0.8, green: 0.2, blue: 0.3))
+    .background(ShuffleTheme.silver.bodyGradient)
+    .environment(\.shuffleTheme, .silver)
 }
