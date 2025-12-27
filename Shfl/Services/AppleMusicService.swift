@@ -59,7 +59,7 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         var request = MusicLibraryRequest<MusicKit.Song>()
 
         // Limit for faster loading during development
-        request.limit = 100
+        request.limit = 1000
 
         switch sortedBy {
         case .mostPlayed:
