@@ -93,4 +93,10 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
         XCTAssertTrue(viewModel.searchResults.isEmpty)
     }
+
+    // MARK: - Autofill State Tests
+
+    func test_autofillState_initiallyIdle() {
+        XCTAssertEqual(viewModel.autofillState, .idle)
+    }
 }

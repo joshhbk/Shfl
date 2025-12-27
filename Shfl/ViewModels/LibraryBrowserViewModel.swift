@@ -8,6 +8,16 @@ final class LibraryBrowserViewModel: ObservableObject {
         case search
     }
 
+    enum AutofillState: Equatable {
+        case idle
+        case loading
+        case completed(count: Int)
+        case error(String)
+    }
+
+    // Autofill state
+    @Published private(set) var autofillState: AutofillState = .idle
+
     // Browse state
     @Published private(set) var browseSongs: [Song] = []
     @Published private(set) var browseLoading = true  // Start true to show skeleton
