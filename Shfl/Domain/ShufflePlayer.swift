@@ -17,6 +17,9 @@ final class ShufflePlayer: ObservableObject {
 
     @Published private(set) var playbackState: PlaybackState = .empty
 
+    private var playedSongIds: Set<String> = []
+    private var lastObservedSongId: String?
+
     var songCount: Int { songs.count }
     var allSongs: [Song] { songs }
     var capacity: Int { Self.maxSongs }
