@@ -43,6 +43,14 @@ struct CapacityProgressBar: View {
         HStack(spacing: 12) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
+                    // Glow layer (behind everything)
+                    if isShowingCelebration {
+                        BreathingGlow {
+                            isShowingCelebration = false
+                        }
+                        .frame(width: geometry.size.width, height: 6)
+                    }
+
                     // Track
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.gray.opacity(0.2))
