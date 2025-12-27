@@ -2,18 +2,26 @@ import SwiftUI
 
 struct PlayerView: View {
     @ObservedObject var player: ShufflePlayer
+    let musicService: MusicService
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
 
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var currentTime: TimeInterval = 0
+    @State private var duration: TimeInterval = 0
+    @State private var progressTimer: Timer?
+    @State private var removedSong: Song?
+    @State private var showUndoPill = false
 
     init(
         player: ShufflePlayer,
+        musicService: MusicService,
         onManageTapped: @escaping () -> Void,
         onAddTapped: @escaping () -> Void = {}
     ) {
         self.player = player
+        self.musicService = musicService
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
     }
@@ -34,54 +42,79 @@ struct PlayerView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
-                    HStack {
-                        Spacer()
-
-                        CapacityIndicator(current: player.songCount, maximum: player.capacity)
-
-                        Button(action: onAddTapped) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundStyle(.blue)
-                        }
-                        .disabled(player.remainingCapacity == 0)
-                        .opacity(player.remainingCapacity == 0 ? 0.4 : 1.0)
-                        .padding(.leading, 8)
-
-                        Spacer()
-                    }
-                    .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
+                    topBar(geometry: geometry)
 
                     Spacer()
 
-                    VStack(spacing: 48) {
+                    VStack(spacing: 32) {
                         nowPlayingSection
 
-                        controlsSection
+                        ClickWheelView(
+                            isPlaying: player.playbackState.isPlaying,
+                            onPlayPause: handlePlayPause,
+                            onSkipForward: handleSkipForward,
+                            onSkipBack: handleSkipBack,
+                            onAdd: onAddTapped,
+                            onRemove: handleRemove
+                        )
+                        .disabled(player.songCount == 0)
+                        .opacity(player.songCount == 0 ? 0.6 : 1.0)
+
+                        if FeatureFlags.showProgressBar {
+                            PlaybackProgressBar(
+                                currentTime: currentTime,
+                                duration: duration
+                            )
+                            .padding(.horizontal, 40)
+                        }
                     }
-                    .padding(.horizontal, 32)
 
                     Spacer()
 
                     Button(action: onManageTapped) {
                         Text("View Library")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.8))
                     }
                     .padding(.bottom, geometry.safeAreaInsets.bottom + 24)
+                }
+
+                // Undo pill
+                if showUndoPill, let song = removedSong {
+                    VStack {
+                        Spacer()
+                        UndoPill(
+                            message: "Removed \"\(song.title)\"",
+                            onUndo: handleUndo
+                        )
+                        .padding(.bottom, geometry.safeAreaInsets.bottom + 60)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.2), value: showError)
+            .animation(.easeInOut(duration: 0.2), value: showUndoPill)
             .onChange(of: player.playbackState) { _, newState in
-                if case .error(let error) = newState {
-                    errorMessage = error.localizedDescription
-                    withAnimation {
-                        showError = true
-                    }
-                }
+                handlePlaybackStateChange(newState)
+            }
+            .onAppear {
+                startProgressTimer()
+            }
+            .onDisappear {
+                stopProgressTimer()
             }
         }
+    }
+
+    @ViewBuilder
+    private func topBar(geometry: GeometryProxy) -> some View {
+        HStack {
+            Spacer()
+            CapacityIndicator(current: player.songCount, maximum: player.capacity)
+            Spacer()
+        }
+        .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
     }
 
     @ViewBuilder
@@ -91,6 +124,7 @@ struct PlayerView: View {
             VStack(spacing: 12) {
                 ProgressView()
                     .scaleEffect(1.2)
+                    .tint(.white)
                 NowPlayingInfo(title: song.title, artist: song.artist)
                     .opacity(0.7)
             }
@@ -106,8 +140,8 @@ struct PlayerView: View {
     private var backgroundGradient: some View {
         LinearGradient(
             colors: [
-                Color(white: 0.95),
-                Color(white: 0.90)
+                Color(red: 0.75, green: 0.22, blue: 0.32),
+                Color(red: 0.65, green: 0.18, blue: 0.28)
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -118,48 +152,97 @@ struct PlayerView: View {
         VStack(spacing: 8) {
             Text("No songs yet")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
 
             Text("Add some music to get started")
                 .font(.system(size: 14))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.7))
         }
     }
 
-    private var controlsSection: some View {
-        HStack(spacing: 40) {
-            if player.songCount > 0 {
-                SkipButton {
-                    Task {
-                        try? await player.skipToNext()
-                    }
-                }
-            } else {
-                Color.clear.frame(width: 56, height: 56)
-            }
+    // MARK: - Actions
 
-            PlayPauseButton(isPlaying: player.playbackState.isPlaying) {
-                Task {
-                    try? await player.togglePlayback()
-                }
-            }
-            .disabled(player.songCount == 0)
-            .opacity(player.songCount == 0 ? 0.5 : 1.0)
-
-            Color.clear.frame(width: 56, height: 56)
+    private func handlePlayPause() {
+        Task {
+            try? await player.togglePlayback()
         }
+    }
+
+    private func handleSkipForward() {
+        Task {
+            try? await player.skipToNext()
+        }
+    }
+
+    private func handleSkipBack() {
+        Task {
+            try? await player.restartCurrentSong()
+        }
+    }
+
+    private func handleRemove() {
+        guard let currentSong = player.playbackState.currentSong else { return }
+
+        removedSong = currentSong
+        player.removeSong(id: currentSong.id)
+
+        withAnimation {
+            showUndoPill = true
+        }
+
+        // Auto-hide after 5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            withAnimation {
+                showUndoPill = false
+            }
+        }
+    }
+
+    private func handleUndo() {
+        guard let song = removedSong else { return }
+        try? player.addSong(song)
+        removedSong = nil
+        withAnimation {
+            showUndoPill = false
+        }
+    }
+
+    private func handlePlaybackStateChange(_ newState: PlaybackState) {
+        if case .error(let error) = newState {
+            errorMessage = error.localizedDescription
+            withAnimation {
+                showError = true
+            }
+        }
+
+        // Update duration when song changes
+        duration = musicService.currentSongDuration
+    }
+
+    // MARK: - Progress Timer
+
+    private func startProgressTimer() {
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            currentTime = musicService.currentPlaybackTime
+            duration = musicService.currentSongDuration
+        }
+    }
+
+    private func stopProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = nil
     }
 }
 
 private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     var isAuthorized: Bool { true }
+    var currentPlaybackTime: TimeInterval { 78 }
+    var currentSongDuration: TimeInterval { 242 }
     var playbackStateStream: AsyncStream<PlaybackState> {
         AsyncStream { continuation in
             continuation.yield(.empty)
         }
     }
-    var currentPlaybackTime: TimeInterval { 0 }
-    var currentSongDuration: TimeInterval { 180 }
     func requestAuthorization() async -> Bool { true }
     func prefetchLibrary() async {}
     func fetchLibrarySongs(sortedBy: SortOption, limit: Int, offset: Int) async throws -> LibraryPage {
@@ -176,11 +259,21 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
 #Preview("Empty State") {
     let mockService = PreviewMockMusicService()
     let player = ShufflePlayer(musicService: mockService)
-    return PlayerView(player: player, onManageTapped: {}, onAddTapped: {})
+    return PlayerView(
+        player: player,
+        musicService: mockService,
+        onManageTapped: {},
+        onAddTapped: {}
+    )
 }
 
 #Preview("Playing") {
     let mockService = PreviewMockMusicService()
     let player = ShufflePlayer(musicService: mockService)
-    return PlayerView(player: player, onManageTapped: {}, onAddTapped: {})
+    return PlayerView(
+        player: player,
+        musicService: mockService,
+        onManageTapped: {},
+        onAddTapped: {}
+    )
 }
