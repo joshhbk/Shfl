@@ -13,8 +13,6 @@ struct PlayerView: View {
     @State private var currentTime: TimeInterval = 0
     @State private var duration: TimeInterval = 0
     @State private var progressTimer: Timer?
-    @State private var removedSong: Song?
-    @State private var showUndoPill = false
     @State private var currentThemeIndex: Int = Int.random(in: 0..<ShuffleTheme.allThemes.count)
     @State private var dragOffset: CGFloat = 0
 
@@ -95,28 +93,10 @@ struct PlayerView: View {
                     .padding(.bottom, geometry.safeAreaInsets.bottom + 24)
                 }
 
-                // Undo pill
-                if showUndoPill, let song = removedSong {
-                    VStack {
-                        Spacer()
-                        UndoPill(
-                            state: UndoState(action: .removed, song: song),
-                            onUndo: handleUndo,
-                            onDismiss: {
-                                withAnimation {
-                                    showUndoPill = false
-                                }
-                            }
-                        )
-                        .padding(.bottom, geometry.safeAreaInsets.bottom + 60)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
             }
             .ignoresSafeArea()
             .simultaneousGesture(themeSwipeGesture)
             .animation(.easeInOut(duration: 0.2), value: showError)
-            .animation(.easeInOut(duration: 0.2), value: showUndoPill)
             .environment(\.shuffleTheme, currentTheme)
             .onChange(of: player.playbackState) { _, newState in
                 handlePlaybackStateChange(newState)
@@ -236,33 +216,6 @@ struct PlayerView: View {
     private func handleSkipBack() {
         Task {
             try? await player.restartOrSkipToPrevious()
-        }
-    }
-
-    private func handleRemove() {
-        guard let currentSong = player.playbackState.currentSong else { return }
-
-        removedSong = currentSong
-        player.removeSong(id: currentSong.id)
-
-        withAnimation {
-            showUndoPill = true
-        }
-
-        // Auto-hide after 5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            withAnimation {
-                showUndoPill = false
-            }
-        }
-    }
-
-    private func handleUndo() {
-        guard let song = removedSong else { return }
-        try? player.addSong(song)
-        removedSong = nil
-        withAnimation {
-            showUndoPill = false
         }
     }
 
