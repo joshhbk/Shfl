@@ -58,6 +58,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("📚 Fetching library songs for \(sortedBy)...")
         var request = MusicLibraryRequest<MusicKit.Song>()
 
+        // Limit for faster loading during development
+        request.limit = 100
+
         switch sortedBy {
         case .mostPlayed:
             request.sort(by: \.playCount, ascending: false)
@@ -180,10 +183,23 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             // Initial state
             self.emitCurrentState()
 
-            // Observe state changes
-            for await _ in self.player.state.objectWillChange.values {
-                self.emitCurrentState()
-            }
+            // Observe both state AND queue changes
+            // State changes: play/pause/stop status
+            // Queue changes: current song advances
+            async let stateChanges: Void = {
+                for await _ in self.player.state.objectWillChange.values {
+                    self.emitCurrentState()
+                }
+            }()
+
+            async let queueChanges: Void = {
+                for await _ in self.player.queue.objectWillChange.values {
+                    self.emitCurrentState()
+                }
+            }()
+
+            // Keep both running
+            _ = await (stateChanges, queueChanges)
         }
     }
 
