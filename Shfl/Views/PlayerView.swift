@@ -38,6 +38,8 @@ struct PlayerView: View {
         GeometryReader { geometry in
             ZStack {
                 themedBackground(geometry: geometry)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
 
                 VStack(spacing: 0) {
                     // Error banner at top
