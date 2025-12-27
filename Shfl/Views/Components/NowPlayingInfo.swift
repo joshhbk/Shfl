@@ -7,20 +7,21 @@ struct NowPlayingInfo: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
 
             Text(artist)
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 16))
+                .foregroundStyle(.white.opacity(0.8))
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
     }
 }
 
 #Preview {
-    NowPlayingInfo(title: "Bohemian Rhapsody", artist: "Queen")
+    NowPlayingInfo(title: "Song Title", artist: "Artist Name")
         .padding()
+        .background(Color(red: 0.75, green: 0.22, blue: 0.32))
 }
