@@ -38,7 +38,9 @@ struct PlayerView: View {
         GeometryReader { geometry in
             ZStack {
                 // Background - first in ZStack = behind
-                currentTheme.bodyGradient
+                BrushedMetalBackground(
+                    baseColor: currentTheme.bodyGradientTop
+                )
 
                 // Content
                 VStack(spacing: 0) {
@@ -151,11 +153,6 @@ struct PlayerView: View {
         default:
             emptyStateView
         }
-    }
-
-    @ViewBuilder
-    private func themedBackground(geometry: GeometryProxy) -> some View {
-        currentTheme.bodyGradient
     }
 
     private var themeSwipeGesture: some Gesture {
