@@ -7,6 +7,9 @@ struct ShuffleTheme: Identifiable, Equatable {
     let bodyGradientBottom: Color
     let wheelStyle: WheelStyle
     let textStyle: TextStyle
+    let brushedMetalIntensity: CGFloat
+    let motionEnabled: Bool
+    let motionSensitivity: CGFloat
 
     enum WheelStyle: Equatable {
         case light
@@ -50,7 +53,10 @@ extension ShuffleTheme {
         bodyGradientTop: Color(red: 0.75, green: 0.75, blue: 0.75),
         bodyGradientBottom: Color(red: 0.66, green: 0.66, blue: 0.66),
         wheelStyle: .dark,
-        textStyle: .dark
+        textStyle: .dark,
+        brushedMetalIntensity: 0.5,
+        motionEnabled: true,
+        motionSensitivity: 0.5
     )
 
     static let blue = ShuffleTheme(
@@ -59,7 +65,10 @@ extension ShuffleTheme {
         bodyGradientTop: Color(red: 0.29, green: 0.61, blue: 0.85),
         bodyGradientBottom: Color(red: 0.23, green: 0.48, blue: 0.69),
         wheelStyle: .light,
-        textStyle: .light
+        textStyle: .light,
+        brushedMetalIntensity: 0.5,
+        motionEnabled: true,
+        motionSensitivity: 0.5
     )
 
     static let green = ShuffleTheme(
@@ -68,7 +77,10 @@ extension ShuffleTheme {
         bodyGradientTop: Color(red: 0.48, green: 0.71, blue: 0.28),
         bodyGradientBottom: Color(red: 0.35, green: 0.59, blue: 0.19),
         wheelStyle: .light,
-        textStyle: .light
+        textStyle: .light,
+        brushedMetalIntensity: 0.5,
+        motionEnabled: true,
+        motionSensitivity: 0.5
     )
 
     static let orange = ShuffleTheme(
@@ -77,7 +89,10 @@ extension ShuffleTheme {
         bodyGradientTop: Color(red: 0.96, green: 0.65, blue: 0.14),
         bodyGradientBottom: Color(red: 0.83, green: 0.53, blue: 0.04),
         wheelStyle: .light,
-        textStyle: .light
+        textStyle: .light,
+        brushedMetalIntensity: 0.5,
+        motionEnabled: true,
+        motionSensitivity: 0.5
     )
 
     static let pink = ShuffleTheme(
@@ -86,7 +101,10 @@ extension ShuffleTheme {
         bodyGradientTop: Color(red: 0.91, green: 0.35, blue: 0.44),
         bodyGradientBottom: Color(red: 0.77, green: 0.29, blue: 0.38),
         wheelStyle: .light,
-        textStyle: .light
+        textStyle: .light,
+        brushedMetalIntensity: 0.5,
+        motionEnabled: true,
+        motionSensitivity: 0.5
     )
 
     static let allThemes: [ShuffleTheme] = [.silver, .blue, .green, .orange, .pink]
