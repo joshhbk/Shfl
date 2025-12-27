@@ -3,45 +3,74 @@ import SwiftUI
 struct BrushedMetalBackground: View {
     let baseColor: Color
     let intensity: CGFloat
+    let highlightOffset: CGPoint
+    let motionEnabled: Bool
 
-    init(baseColor: Color, intensity: CGFloat = 0.5) {
+    init(
+        baseColor: Color,
+        intensity: CGFloat = 0.5,
+        highlightOffset: CGPoint = .zero,
+        motionEnabled: Bool = true
+    ) {
         self.baseColor = baseColor
         self.intensity = intensity
+        self.highlightOffset = motionEnabled ? highlightOffset : .zero
+        self.motionEnabled = motionEnabled
     }
 
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
             let maxRadius = max(geometry.size.width, geometry.size.height)
+            let highlightCenter = Self.highlightCenter(base: center, offset: highlightOffset)
 
-            Canvas { context, size in
-                let ringSpacing: CGFloat = 2.0
-                let rings = Self.ringCount(for: maxRadius, spacing: ringSpacing)
+            ZStack {
+                // Base color
+                baseColor
 
-                for i in 0..<rings {
-                    let radius = CGFloat(i) * ringSpacing
-                    let opacity = Self.ringOpacity(at: i, intensity: intensity)
+                // Concentric rings
+                Canvas { context, _ in
+                    let ringSpacing: CGFloat = 2.0
+                    let rings = Self.ringCount(for: maxRadius, spacing: ringSpacing)
 
-                    let ringColor = Color.white.opacity(opacity)
+                    for i in 0..<rings {
+                        let radius = CGFloat(i) * ringSpacing
+                        let opacity = Self.ringOpacity(at: i, intensity: intensity)
+                        let ringColor = Color.white.opacity(opacity)
 
-                    let path = Path { p in
-                        p.addArc(
-                            center: center,
-                            radius: radius,
-                            startAngle: .zero,
-                            endAngle: .degrees(360),
-                            clockwise: false
-                        )
+                        let path = Path { p in
+                            p.addArc(
+                                center: center,
+                                radius: radius,
+                                startAngle: .zero,
+                                endAngle: .degrees(360),
+                                clockwise: false
+                            )
+                        }
+
+                        context.stroke(path, with: .color(ringColor), lineWidth: 1)
                     }
-
-                    context.stroke(path, with: .color(ringColor), lineWidth: 1)
                 }
+
+                // Highlight gradient
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(0.15 * intensity),
+                        Color.white.opacity(0.05 * intensity),
+                        Color.clear
+                    ],
+                    center: UnitPoint(
+                        x: highlightCenter.x / geometry.size.width,
+                        y: highlightCenter.y / geometry.size.height
+                    ),
+                    startRadius: 0,
+                    endRadius: maxRadius * 0.6
+                )
             }
         }
-        .background(baseColor)
     }
 
-    // MARK: - Calculations (static for testability)
+    // MARK: - Calculations
 
     static func ringCount(for radius: CGFloat, spacing: CGFloat) -> Int {
         Int(radius / spacing)
@@ -49,10 +78,12 @@ struct BrushedMetalBackground: View {
 
     static func ringOpacity(at index: Int, intensity: CGFloat) -> CGFloat {
         guard intensity > 0 else { return 0 }
-
-        // Alternate between lighter and darker rings
         let baseOpacity: CGFloat = index.isMultiple(of: 2) ? 0.08 : 0.04
         return baseOpacity * intensity
+    }
+
+    static func highlightCenter(base: CGPoint, offset: CGPoint) -> CGPoint {
+        CGPoint(x: base.x + offset.x, y: base.y + offset.y)
     }
 }
 

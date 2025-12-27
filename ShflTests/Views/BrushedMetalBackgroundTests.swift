@@ -24,4 +24,13 @@ struct BrushedMetalBackgroundTests {
         let opacity = BrushedMetalBackground.ringOpacity(at: 0, intensity: 0.0)
         #expect(opacity == 0.0)
     }
+
+    @Test("Highlight gradient center offset responds to input")
+    func highlightGradientOffset() {
+        let offset = CGPoint(x: 20, y: -10)
+        let center = CGPoint(x: 200, y: 300)
+        let result = BrushedMetalBackground.highlightCenter(base: center, offset: offset)
+        #expect(result.x == 220)
+        #expect(result.y == 290)
+    }
 }
