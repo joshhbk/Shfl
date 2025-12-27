@@ -1,12 +1,28 @@
 import SwiftUI
 
 struct PlaybackProgressBar: View {
+    @Environment(\.shuffleTheme) private var theme
+
     let currentTime: TimeInterval
     let duration: TimeInterval
 
     private var progress: Double {
         guard duration > 0 else { return 0 }
         return min(currentTime / duration, 1.0)
+    }
+
+    private var trackBackground: Color {
+        switch theme.textStyle {
+        case .light: return .white.opacity(0.3)
+        case .dark: return .black.opacity(0.2)
+        }
+    }
+
+    private var trackFill: Color {
+        switch theme.textStyle {
+        case .light: return .white
+        case .dark: return Color(white: 0.2)
+        }
     }
 
     var body: some View {
@@ -16,12 +32,12 @@ struct PlaybackProgressBar: View {
                 ZStack(alignment: .leading) {
                     // Background track
                     Capsule()
-                        .fill(Color.white.opacity(0.3))
+                        .fill(trackBackground)
                         .frame(height: 4)
 
                     // Filled track
                     Capsule()
-                        .fill(Color.white)
+                        .fill(trackFill)
                         .frame(width: geometry.size.width * progress, height: 4)
                 }
             }
@@ -31,13 +47,13 @@ struct PlaybackProgressBar: View {
             HStack {
                 Text(formatTime(currentTime))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(theme.secondaryTextColor)
 
                 Spacer()
 
                 Text(formatTime(duration))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(theme.secondaryTextColor)
             }
         }
     }
@@ -52,12 +68,24 @@ struct PlaybackProgressBar: View {
     }
 }
 
-#Preview {
+#Preview("Light Text") {
     VStack(spacing: 40) {
         PlaybackProgressBar(currentTime: 78, duration: 242)
         PlaybackProgressBar(currentTime: 0, duration: 180)
         PlaybackProgressBar(currentTime: 0, duration: 0)
     }
     .padding(32)
-    .background(Color(red: 0.8, green: 0.2, blue: 0.3))
+    .background(ShuffleTheme.pink.bodyGradient)
+    .environment(\.shuffleTheme, .pink)
+}
+
+#Preview("Dark Text") {
+    VStack(spacing: 40) {
+        PlaybackProgressBar(currentTime: 78, duration: 242)
+        PlaybackProgressBar(currentTime: 0, duration: 180)
+        PlaybackProgressBar(currentTime: 0, duration: 0)
+    }
+    .padding(32)
+    .background(ShuffleTheme.silver.bodyGradient)
+    .environment(\.shuffleTheme, .silver)
 }
