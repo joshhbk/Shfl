@@ -99,4 +99,21 @@ final class LibraryBrowserViewModelTests: XCTestCase {
     func test_autofillState_initiallyIdle() {
         XCTAssertEqual(viewModel.autofillState, .idle)
     }
+
+    // MARK: - Autofill Method Tests
+
+    func test_autofill_addsSongsToPlayer() async {
+        let songs = (1...50).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        await mockService.setLibrarySongs(songs)
+
+        let player = ShufflePlayer(musicService: mockService)
+        let source = LibraryAutofillSource(musicService: mockService)
+
+        await viewModel.autofill(into: player, using: source)
+
+        XCTAssertEqual(player.songCount, 50)
+        XCTAssertEqual(viewModel.autofillState, .completed(count: 50))
+    }
 }

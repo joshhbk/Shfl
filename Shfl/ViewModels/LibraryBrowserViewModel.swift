@@ -162,4 +162,40 @@ final class LibraryBrowserViewModel: ObservableObject {
     func clearError() {
         errorMessage = nil
     }
+
+    // MARK: - Autofill Methods
+
+    func autofill(into player: ShufflePlayer, using source: AutofillSource) async {
+        let limit = player.remainingCapacity
+        guard limit > 0 else {
+            autofillState = .completed(count: 0)
+            return
+        }
+
+        autofillState = .loading
+
+        do {
+            let excludedIds = Set(player.allSongs.map { $0.id })
+            let songs = try await source.fetchSongs(excluding: excludedIds, limit: limit)
+
+            var addedCount = 0
+            for song in songs {
+                do {
+                    try player.addSong(song)
+                    addedCount += 1
+                } catch {
+                    // Stop if we hit capacity
+                    break
+                }
+            }
+
+            autofillState = .completed(count: addedCount)
+        } catch {
+            autofillState = .error(error.localizedDescription)
+        }
+    }
+
+    func resetAutofillState() {
+        autofillState = .idle
+    }
 }
