@@ -47,6 +47,15 @@ struct SongPickerView: View {
             .navigationTitle("Add Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Autofill") {
+                        Task {
+                            let source = LibraryAutofillSource(musicService: musicService)
+                            await viewModel.autofill(into: player, using: source)
+                        }
+                    }
+                    .disabled(player.remainingCapacity == 0 || viewModel.autofillState == .loading)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: onDismiss)
                 }
