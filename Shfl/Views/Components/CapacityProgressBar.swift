@@ -49,6 +49,12 @@ struct CapacityProgressBar: View {
     static func isMilestone(_ count: Int) -> Bool {
         [1, 50, 100, 120].contains(count)
     }
+
+    static func shouldCelebrate(previous: Int, current: Int, maximum: Int) -> Bool {
+        let wasNotFull = previous < maximum
+        let isNowFull = current >= maximum
+        return wasNotFull && isNowFull
+    }
 }
 
 #Preview {

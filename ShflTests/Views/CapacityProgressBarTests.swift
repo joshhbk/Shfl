@@ -38,4 +38,25 @@ struct CapacityProgressBarTests {
         #expect(!CapacityProgressBar.isMilestone(0))
         #expect(!CapacityProgressBar.isMilestone(75))
     }
+
+    @Test("Celebration triggers only on transition to full")
+    func testShouldCelebrateOnTransitionToFull() {
+        // Only celebrates when transitioning from not-full to full
+        #expect(CapacityProgressBar.shouldCelebrate(previous: 119, current: 120, maximum: 120))
+        #expect(!CapacityProgressBar.shouldCelebrate(previous: 120, current: 120, maximum: 120))
+        #expect(!CapacityProgressBar.shouldCelebrate(previous: 118, current: 119, maximum: 120))
+        #expect(!CapacityProgressBar.shouldCelebrate(previous: 0, current: 0, maximum: 120))
+    }
+
+    @Test("Celebration does not trigger when already at capacity")
+    func testNoCelebrationWhenAlreadyFull() {
+        #expect(!CapacityProgressBar.shouldCelebrate(previous: 120, current: 120, maximum: 120))
+    }
+
+    @Test("Celebration triggers when jumping to full")
+    func testCelebrationOnJumpToFull() {
+        // e.g., autofill adding many songs at once
+        #expect(CapacityProgressBar.shouldCelebrate(previous: 50, current: 120, maximum: 120))
+        #expect(CapacityProgressBar.shouldCelebrate(previous: 0, current: 120, maximum: 120))
+    }
 }
