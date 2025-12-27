@@ -25,6 +25,9 @@ final class ShufflePlayer: ObservableObject {
     var capacity: Int { Self.maxSongs }
     var remainingCapacity: Int { Self.maxSongs - songs.count }
 
+    /// Exposed for testing only
+    var playedSongIdsForTesting: Set<String> { playedSongIds }
+
     init(musicService: MusicService) {
         self.musicService = musicService
         observePlaybackState()
@@ -38,9 +41,30 @@ final class ShufflePlayer: ObservableObject {
         stateTask = Task { [weak self] in
             guard let self else { return }
             for await state in musicService.playbackStateStream {
-                self.playbackState = state
+                self.handlePlaybackStateChange(state)
             }
         }
+    }
+
+    private func handlePlaybackStateChange(_ newState: PlaybackState) {
+        let newSongId = newState.currentSongId
+
+        // Song changed - add previous to history
+        if let lastId = lastObservedSongId, lastId != newSongId {
+            playedSongIds.insert(lastId)
+        }
+        lastObservedSongId = newSongId
+
+        // Clear history on stop/empty
+        switch newState {
+        case .stopped, .empty:
+            playedSongIds.removeAll()
+            lastObservedSongId = nil
+        default:
+            break
+        }
+
+        playbackState = newState
     }
 
     // MARK: - Song Management
