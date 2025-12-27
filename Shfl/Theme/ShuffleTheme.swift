@@ -54,9 +54,9 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.66, green: 0.66, blue: 0.66),
         wheelStyle: .dark,
         textStyle: .dark,
-        brushedMetalIntensity: 0.5,
+        brushedMetalIntensity: 1.0,
         motionEnabled: true,
-        motionSensitivity: 0.5
+        motionSensitivity: 1.0
     )
 
     static let blue = ShuffleTheme(
@@ -66,9 +66,9 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.23, green: 0.48, blue: 0.69),
         wheelStyle: .light,
         textStyle: .light,
-        brushedMetalIntensity: 0.5,
+        brushedMetalIntensity: 1.0,
         motionEnabled: true,
-        motionSensitivity: 0.5
+        motionSensitivity: 1.0
     )
 
     static let green = ShuffleTheme(
@@ -78,9 +78,9 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.35, green: 0.59, blue: 0.19),
         wheelStyle: .light,
         textStyle: .light,
-        brushedMetalIntensity: 0.5,
+        brushedMetalIntensity: 1.0,
         motionEnabled: true,
-        motionSensitivity: 0.5
+        motionSensitivity: 1.0
     )
 
     static let orange = ShuffleTheme(
@@ -90,9 +90,9 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.83, green: 0.53, blue: 0.04),
         wheelStyle: .light,
         textStyle: .light,
-        brushedMetalIntensity: 0.5,
+        brushedMetalIntensity: 1.0,
         motionEnabled: true,
-        motionSensitivity: 0.5
+        motionSensitivity: 1.0
     )
 
     static let pink = ShuffleTheme(
@@ -102,9 +102,9 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.77, green: 0.29, blue: 0.38),
         wheelStyle: .light,
         textStyle: .light,
-        brushedMetalIntensity: 0.5,
+        brushedMetalIntensity: 1.0,
         motionEnabled: true,
-        motionSensitivity: 0.5
+        motionSensitivity: 1.0
     )
 
     static let allThemes: [ShuffleTheme] = [.silver, .blue, .green, .orange, .pink]

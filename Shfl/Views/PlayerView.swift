@@ -300,7 +300,7 @@ struct PlayerView: View {
             pitch: manager.pitch,
             roll: manager.roll,
             sensitivity: currentTheme.motionSensitivity,
-            maxOffset: 50
+            maxOffset: 150
         )
     }
 }

@@ -55,8 +55,8 @@ struct BrushedMetalBackground: View {
                 // Highlight gradient
                 RadialGradient(
                     colors: [
+                        Color.white.opacity(0.4 * intensity),
                         Color.white.opacity(0.15 * intensity),
-                        Color.white.opacity(0.05 * intensity),
                         Color.clear
                     ],
                     center: UnitPoint(
@@ -64,7 +64,7 @@ struct BrushedMetalBackground: View {
                         y: highlightCenter.y / geometry.size.height
                     ),
                     startRadius: 0,
-                    endRadius: maxRadius * 0.6
+                    endRadius: maxRadius * 0.5
                 )
             }
         }
@@ -78,7 +78,7 @@ struct BrushedMetalBackground: View {
 
     static func ringOpacity(at index: Int, intensity: CGFloat) -> CGFloat {
         guard intensity > 0 else { return 0 }
-        let baseOpacity: CGFloat = index.isMultiple(of: 2) ? 0.08 : 0.04
+        let baseOpacity: CGFloat = index.isMultiple(of: 2) ? 0.15 : 0.08
         return baseOpacity * intensity
     }
 
