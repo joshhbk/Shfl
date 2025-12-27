@@ -1,5 +1,29 @@
 import SwiftUI
 
+private struct BreathingGlow: View {
+    @State private var isBreathing = false
+    let onComplete: () -> Void
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(Color.white)
+            .blur(radius: isBreathing ? 12 : 0)
+            .opacity(isBreathing ? 0.4 : 0.0)
+            .scaleEffect(isBreathing ? 1.05 : 1.0)
+            .animation(
+                .easeInOut(duration: 1.0).repeatCount(2, autoreverses: true),
+                value: isBreathing
+            )
+            .onAppear {
+                isBreathing = true
+            }
+            .task {
+                try? await Task.sleep(for: .seconds(4.0))
+                onComplete()
+            }
+    }
+}
+
 struct CapacityProgressBar: View {
     let current: Int
     let maximum: Int
