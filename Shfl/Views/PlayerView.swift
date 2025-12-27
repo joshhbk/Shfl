@@ -158,6 +158,8 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
             continuation.yield(.empty)
         }
     }
+    var currentPlaybackTime: TimeInterval { 0 }
+    var currentSongDuration: TimeInterval { 180 }
     func requestAuthorization() async -> Bool { true }
     func prefetchLibrary() async {}
     func fetchLibrarySongs(sortedBy: SortOption, limit: Int, offset: Int) async throws -> LibraryPage {
@@ -168,6 +170,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     func play() async throws {}
     func pause() async {}
     func skipToNext() async throws {}
+    func restartCurrentSong() async throws {}
 }
 
 #Preview("Empty State") {
