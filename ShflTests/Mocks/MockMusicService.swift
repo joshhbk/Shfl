@@ -21,6 +21,9 @@ actor MockMusicService: MusicService {
         }
     }
 
+    nonisolated var currentPlaybackTime: TimeInterval { 0 }
+    nonisolated var currentSongDuration: TimeInterval { 180 }
+
     private func setContinuation(_ cont: AsyncStream<PlaybackState>.Continuation) {
         self.continuation = cont
         cont.yield(currentState)
@@ -94,6 +97,10 @@ actor MockMusicService: MusicService {
         currentIndex = (currentIndex + 1) % queuedSongs.count
         let song = queuedSongs[currentIndex]
         updateState(.playing(song))
+    }
+
+    func restartCurrentSong() async throws {
+        // No-op for mock
     }
 
     private func updateState(_ state: PlaybackState) {

@@ -18,6 +18,19 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         }
     }
 
+    var currentPlaybackTime: TimeInterval {
+        player.playbackTime
+    }
+
+    var currentSongDuration: TimeInterval {
+        guard let entry = player.queue.currentEntry,
+              case .song(let song) = entry.item,
+              let duration = song.duration else {
+            return 0
+        }
+        return duration
+    }
+
     var isAuthorized: Bool {
         get async {
             MusicAuthorization.currentStatus == .authorized
@@ -152,6 +165,10 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
     func skipToNext() async throws {
         try await player.skipToNextEntry()
+    }
+
+    func restartCurrentSong() async throws {
+        player.playbackTime = 0
     }
 
     private func startObservingPlaybackState() {

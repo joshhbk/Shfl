@@ -44,6 +44,15 @@ protocol MusicService: Sendable {
     /// Skip to next song
     func skipToNext() async throws
 
+    /// Restart current song from beginning
+    func restartCurrentSong() async throws
+
     /// Get current playback state (observable)
     var playbackStateStream: AsyncStream<PlaybackState> { get }
+
+    /// Current playback time in seconds
+    var currentPlaybackTime: TimeInterval { get }
+
+    /// Duration of current song in seconds (0 if nothing playing)
+    var currentSongDuration: TimeInterval { get }
 }

@@ -9,6 +9,9 @@ final class MockMusicService: MusicService, @unchecked Sendable {
         }
     }
 
+    var currentPlaybackTime: TimeInterval { 0 }
+    var currentSongDuration: TimeInterval { 180 }
+
     func requestAuthorization() async -> Bool { true }
 
     func prefetchLibrary() async {}
@@ -29,4 +32,5 @@ final class MockMusicService: MusicService, @unchecked Sendable {
     func play() async throws {}
     func pause() async {}
     func skipToNext() async throws {}
+    func restartCurrentSong() async throws {}
 }

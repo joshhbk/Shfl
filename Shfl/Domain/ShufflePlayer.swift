@@ -80,6 +80,10 @@ final class ShufflePlayer: ObservableObject {
         try await musicService.skipToNext()
     }
 
+    func restartCurrentSong() async throws {
+        try await musicService.restartCurrentSong()
+    }
+
     func togglePlayback() async throws {
         switch playbackState {
         case .empty, .stopped:
