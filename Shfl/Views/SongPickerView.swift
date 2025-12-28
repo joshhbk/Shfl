@@ -81,7 +81,10 @@ struct SongPickerView: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDismiss)
+                    Button("Clear") {
+                        player.removeAllSongs()
+                    }
+                    .disabled(player.songCount == 0)
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search your library")

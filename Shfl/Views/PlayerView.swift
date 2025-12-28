@@ -42,7 +42,8 @@ struct PlayerView: View {
                     baseColor: currentTheme.bodyGradientTop,
                     intensity: currentTheme.brushedMetalIntensity,
                     highlightOffset: highlightOffset,
-                    motionEnabled: currentTheme.motionEnabled
+                    motionEnabled: currentTheme.motionEnabled,
+                    highlightColor: currentTheme.wheelStyle == .dark ? .black : .white
                 )
 
                 // Content
@@ -262,7 +263,7 @@ struct PlayerView: View {
             pitch: manager.pitch,
             roll: manager.roll,
             sensitivity: currentTheme.motionSensitivity,
-            maxOffset: 150
+            maxOffset: 220
         )
     }
 }
