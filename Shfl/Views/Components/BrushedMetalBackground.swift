@@ -52,11 +52,12 @@ struct BrushedMetalBackground: View {
                     }
                 }
 
-                // Highlight gradient - subtle sheen like anodized aluminum
+                // Specular highlight - tight glint that moves with tilt
                 RadialGradient(
                     colors: [
-                        Color.white.opacity(0.18 * intensity),
-                        Color.white.opacity(0.06 * intensity),
+                        Color.white.opacity(0.35 * intensity),
+                        Color.white.opacity(0.20 * intensity),
+                        Color.white.opacity(0.05 * intensity),
                         Color.clear
                     ],
                     center: UnitPoint(
@@ -64,7 +65,7 @@ struct BrushedMetalBackground: View {
                         y: highlightCenter.y / geometry.size.height
                     ),
                     startRadius: 0,
-                    endRadius: maxRadius * 0.6
+                    endRadius: maxRadius * 0.35
                 )
             }
         }
