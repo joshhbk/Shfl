@@ -52,11 +52,11 @@ struct BrushedMetalBackground: View {
                     }
                 }
 
-                // Highlight gradient
+                // Highlight gradient - subtle sheen like anodized aluminum
                 RadialGradient(
                     colors: [
-                        Color.white.opacity(0.4 * intensity),
-                        Color.white.opacity(0.15 * intensity),
+                        Color.white.opacity(0.18 * intensity),
+                        Color.white.opacity(0.06 * intensity),
                         Color.clear
                     ],
                     center: UnitPoint(
@@ -64,7 +64,7 @@ struct BrushedMetalBackground: View {
                         y: highlightCenter.y / geometry.size.height
                     ),
                     startRadius: 0,
-                    endRadius: maxRadius * 0.5
+                    endRadius: maxRadius * 0.6
                 )
             }
         }
@@ -78,7 +78,7 @@ struct BrushedMetalBackground: View {
 
     static func ringOpacity(at index: Int, intensity: CGFloat) -> CGFloat {
         guard intensity > 0 else { return 0 }
-        let baseOpacity: CGFloat = index.isMultiple(of: 2) ? 0.15 : 0.08
+        let baseOpacity: CGFloat = index.isMultiple(of: 2) ? 0.06 : 0.03
         return baseOpacity * intensity
     }
 

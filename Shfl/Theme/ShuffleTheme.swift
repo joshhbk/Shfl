@@ -62,8 +62,8 @@ extension ShuffleTheme {
     static let blue = ShuffleTheme(
         id: "blue",
         name: "Blue",
-        bodyGradientTop: Color(red: 0.29, green: 0.61, blue: 0.85),
-        bodyGradientBottom: Color(red: 0.23, green: 0.48, blue: 0.69),
+        bodyGradientTop: Color(red: 0.18, green: 0.58, blue: 0.96),
+        bodyGradientBottom: Color(red: 0.12, green: 0.46, blue: 0.82),
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
@@ -74,8 +74,8 @@ extension ShuffleTheme {
     static let green = ShuffleTheme(
         id: "green",
         name: "Green",
-        bodyGradientTop: Color(red: 0.48, green: 0.71, blue: 0.28),
-        bodyGradientBottom: Color(red: 0.35, green: 0.59, blue: 0.19),
+        bodyGradientTop: Color(red: 0.30, green: 0.78, blue: 0.25),
+        bodyGradientBottom: Color(red: 0.22, green: 0.66, blue: 0.18),
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
@@ -86,8 +86,8 @@ extension ShuffleTheme {
     static let orange = ShuffleTheme(
         id: "orange",
         name: "Orange",
-        bodyGradientTop: Color(red: 0.96, green: 0.65, blue: 0.14),
-        bodyGradientBottom: Color(red: 0.83, green: 0.53, blue: 0.04),
+        bodyGradientTop: Color(red: 0.98, green: 0.55, blue: 0.05),
+        bodyGradientBottom: Color(red: 0.88, green: 0.44, blue: 0.02),
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
@@ -98,8 +98,8 @@ extension ShuffleTheme {
     static let pink = ShuffleTheme(
         id: "pink",
         name: "Pink",
-        bodyGradientTop: Color(red: 0.91, green: 0.35, blue: 0.44),
-        bodyGradientBottom: Color(red: 0.77, green: 0.29, blue: 0.38),
+        bodyGradientTop: Color(red: 0.96, green: 0.26, blue: 0.48),
+        bodyGradientBottom: Color(red: 0.84, green: 0.18, blue: 0.40),
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
