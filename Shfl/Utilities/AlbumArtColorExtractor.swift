@@ -39,8 +39,14 @@ final class AlbumArtColorExtractor: ObservableObject {
 
                 guard !Task.isCancelled, currentSongId == songId else { return }
 
-                guard let song = response.items.first,
-                      let artwork = song.artwork,
+                guard let song = response.items.first else {
+                    print("[ColorExtractor] No song found in catalog for songId: \(songId)")
+                    return
+                }
+
+                print("[ColorExtractor] Artwork object: \(String(describing: song.artwork))")
+
+                guard let artwork = song.artwork,
                       let bgColor = artwork.backgroundColor else {
                     print("[ColorExtractor] No backgroundColor available from catalog for songId: \(songId)")
                     return
