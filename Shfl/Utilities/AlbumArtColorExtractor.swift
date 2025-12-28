@@ -1,10 +1,8 @@
 import Combine
-import MusicKit
 import SwiftUI
 import UIKit
 
-/// Extracts colors from album artwork, using MusicKit's backgroundColor when available,
-/// falling back to image analysis when needed
+/// Extracts dominant colors from album artwork by analyzing the image
 @MainActor
 final class AlbumArtColorExtractor: ObservableObject {
     @Published private(set) var extractedColor: Color?
@@ -21,7 +19,6 @@ final class AlbumArtColorExtractor: ObservableObject {
             return
         }
         currentSongId = songId
-        print("[ColorExtractor] Updating color for songId: \(songId)")
 
         // Check cache first
         if let cached = colorCache[songId] {
@@ -35,26 +32,12 @@ final class AlbumArtColorExtractor: ObservableObject {
         // Cancel any existing task
         currentTask?.cancel()
 
-        // Try MusicKit's backgroundColor first
-        ArtworkLoader.shared.requestArtwork(for: songId)
-        if let artwork = ArtworkLoader.shared.artwork(for: songId),
-           let bgColor = artwork.backgroundColor {
-            let color = boostColorIfNeeded(Color(cgColor: bgColor))
-            colorCache[songId] = color
-            print("[ColorExtractor] Got MusicKit backgroundColor for songId: \(songId)")
-            withAnimation(.easeInOut(duration: 0.5)) {
-                extractedColor = color
-            }
-            return
-        }
-
-        // Fall back to downloading and analyzing the image
         guard let url = artworkURL else {
             print("[ColorExtractor] No artworkURL available for songId: \(songId)")
             return
         }
 
-        print("[ColorExtractor] Downloading image for songId: \(songId), url: \(url)")
+        print("[ColorExtractor] Downloading image for songId: \(songId)")
         currentTask = Task {
             do {
                 let color = try await extractColorFromImage(url: url)
@@ -67,24 +50,6 @@ final class AlbumArtColorExtractor: ObservableObject {
                 }
             } catch {
                 print("[ColorExtractor] Failed to extract color: \(error)")
-            }
-        }
-    }
-
-    /// Called when artwork loader updates - checks if our song's artwork is now available
-    func refreshFromLoader() {
-        guard let songId = currentSongId else { return }
-
-        // Check if we already have a color for this song
-        if colorCache[songId] != nil { return }
-
-        if let artwork = ArtworkLoader.shared.artwork(for: songId),
-           let bgColor = artwork.backgroundColor {
-            let color = boostColorIfNeeded(Color(cgColor: bgColor))
-            colorCache[songId] = color
-            print("[ColorExtractor] refreshFromLoader: Got MusicKit backgroundColor for songId: \(songId)")
-            withAnimation(.easeInOut(duration: 0.5)) {
-                extractedColor = color
             }
         }
     }
@@ -140,6 +105,7 @@ final class AlbumArtColorExtractor: ObservableObject {
                 guard a > 0.5 else { continue }
 
                 let (_, saturation, brightness) = rgbToHSB(r: r, g: g, b: b)
+                // Prefer saturated colors with mid-range brightness
                 let vibrancy = saturation * (1.0 - abs(brightness - 0.6) * 0.5)
 
                 if vibrancy > bestVibrancy {

@@ -1,4 +1,3 @@
-import MusicKit
 import SwiftUI
 
 struct PlayerView: View {
@@ -9,7 +8,6 @@ struct PlayerView: View {
 
     @Environment(\.motionManager) private var motionManager
     @StateObject private var colorExtractor = AlbumArtColorExtractor()
-    @ObservedObject private var artworkLoader = ArtworkLoader.shared
     @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""
@@ -133,10 +131,6 @@ struct PlayerView: View {
             }
             .onChange(of: motionManager?.roll) { _, _ in
                 updateHighlightOffset()
-            }
-            .onChange(of: artworkLoader.artwork(for: player.playbackState.currentSongId ?? "")?.backgroundColor) { _, _ in
-                // Refresh color when artwork loads
-                colorExtractor.refreshFromLoader()
             }
         }
     }
