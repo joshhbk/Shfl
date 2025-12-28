@@ -16,11 +16,16 @@ final class AlbumArtColorExtractor: ObservableObject {
     /// Updates the extracted color for the given song
     func updateColor(for songId: String, artworkURL: URL?) {
         // Skip if already processing this song
-        guard songId != currentSongId else { return }
+        guard songId != currentSongId else {
+            print("[ColorExtractor] Skipping - already processing songId: \(songId)")
+            return
+        }
         currentSongId = songId
+        print("[ColorExtractor] Updating color for songId: \(songId)")
 
         // Check cache first
         if let cached = colorCache[songId] {
+            print("[ColorExtractor] Using cached color for songId: \(songId)")
             withAnimation(.easeInOut(duration: 0.5)) {
                 extractedColor = cached
             }
@@ -36,6 +41,7 @@ final class AlbumArtColorExtractor: ObservableObject {
            let bgColor = artwork.backgroundColor {
             let color = boostColorIfNeeded(Color(cgColor: bgColor))
             colorCache[songId] = color
+            print("[ColorExtractor] Got MusicKit backgroundColor for songId: \(songId)")
             withAnimation(.easeInOut(duration: 0.5)) {
                 extractedColor = color
             }
@@ -44,20 +50,23 @@ final class AlbumArtColorExtractor: ObservableObject {
 
         // Fall back to downloading and analyzing the image
         guard let url = artworkURL else {
+            print("[ColorExtractor] No artworkURL available for songId: \(songId)")
             return
         }
 
+        print("[ColorExtractor] Downloading image for songId: \(songId), url: \(url)")
         currentTask = Task {
             do {
                 let color = try await extractColorFromImage(url: url)
                 guard !Task.isCancelled, currentSongId == songId else { return }
 
                 colorCache[songId] = color
+                print("[ColorExtractor] Extracted color from image for songId: \(songId)")
                 withAnimation(.easeInOut(duration: 0.5)) {
                     extractedColor = color
                 }
             } catch {
-                // Silently fail - will use fallback color
+                print("[ColorExtractor] Failed to extract color: \(error)")
             }
         }
     }
@@ -73,6 +82,7 @@ final class AlbumArtColorExtractor: ObservableObject {
            let bgColor = artwork.backgroundColor {
             let color = boostColorIfNeeded(Color(cgColor: bgColor))
             colorCache[songId] = color
+            print("[ColorExtractor] refreshFromLoader: Got MusicKit backgroundColor for songId: \(songId)")
             withAnimation(.easeInOut(duration: 0.5)) {
                 extractedColor = color
             }
