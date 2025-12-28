@@ -115,43 +115,6 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("🎵 setQueue() completed")
     }
 
-    func setInitialQueue(songs: [Song]) async throws {
-        print("🎵 setInitialQueue() called with \(songs.count) songs")
-        let ids = songs.map { MusicItemID($0.id) }
-
-        var request = MusicLibraryRequest<MusicKit.Song>()
-        request.filter(matching: \.id, memberOf: ids)
-        let response = try await request.response()
-
-        guard !response.items.isEmpty else {
-            print("🎵 No songs found for initial queue")
-            return
-        }
-
-        let queue = ApplicationMusicPlayer.Queue(for: response.items, startingAt: nil)
-        player.queue = queue
-        player.state.shuffleMode = .songs
-        print("🎵 setInitialQueue() completed")
-    }
-
-    func appendToQueue(songs: [Song]) async throws {
-        print("🎵 appendToQueue() called with \(songs.count) songs")
-        for song in songs {
-            let id = MusicItemID(song.id)
-            var request = MusicLibraryRequest<MusicKit.Song>()
-            request.filter(matching: \.id, memberOf: [id])
-            let response = try await request.response()
-
-            guard let musicKitSong = response.items.first else {
-                print("🎵 Song not found: \(song.id)")
-                continue
-            }
-            try await player.queue.insert(musicKitSong, position: .tail)
-            print("🎵 Appended song: \(song.title)")
-        }
-        print("🎵 appendToQueue() completed")
-    }
-
     func play() async throws {
         print("▶️ play() called")
         try await player.play()

@@ -19,12 +19,10 @@ final class ShufflePlayer: ObservableObject {
 
     private var playedSongIds: Set<String> = []
     private var lastObservedSongId: String?
-    private var initialQueueSongIds: Set<String> = []
+    private var preparedSongIds: Set<String> = []
 
-    private var isReadyToPlay: Bool {
-        let currentIds = Set(songs.map(\.id))
-        return !initialQueueSongIds.isEmpty &&
-               initialQueueSongIds.isSubset(of: currentIds)
+    private var isQueuePrepared: Bool {
+        Set(songs.map(\.id)) == preparedSongIds
     }
 
     var songCount: Int { songs.count }
@@ -117,19 +115,8 @@ final class ShufflePlayer: ObservableObject {
 
     func prepareQueue() async throws {
         guard !songs.isEmpty else { return }
-
-        // 1. Set initial queue with first 2 songs (fast)
-        let initialSongs = Array(songs.prefix(2))
-        try await musicService.setInitialQueue(songs: initialSongs)
-        initialQueueSongIds = Set(initialSongs.map(\.id))
-
-        // 2. Background: append remaining songs
-        let remainingSongs = Array(songs.dropFirst(2))
-        if !remainingSongs.isEmpty {
-            Task {
-                try? await musicService.appendToQueue(songs: remainingSongs)
-            }
-        }
+        try await musicService.setQueue(songs: songs)
+        preparedSongIds = Set(songs.map(\.id))
     }
 
     // MARK: - Playback Control
@@ -139,8 +126,9 @@ final class ShufflePlayer: ObservableObject {
         playedSongIds.removeAll()
         lastObservedSongId = nil
 
-        if !isReadyToPlay {
-            try await prepareQueue()
+        if !isQueuePrepared {
+            try await musicService.setQueue(songs: songs)
+            preparedSongIds = Set(songs.map(\.id))
         }
         try await musicService.play()
     }
