@@ -1,7 +1,7 @@
 import Foundation
 
 /// Algorithm options for autofill behavior
-enum AutofillAlgorithm: String, CaseIterable, Sendable {
+enum AutofillAlgorithm: String, CaseIterable, Sendable, Hashable {
     case random = "random"
     case recentlyAdded = "recentlyAdded"
 

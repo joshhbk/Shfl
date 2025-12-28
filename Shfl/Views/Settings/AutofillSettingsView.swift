@@ -10,12 +10,21 @@ struct AutofillSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Algorithm", selection: $algorithmRaw) {
-                    ForEach(AutofillAlgorithm.allCases, id: \.rawValue) { algo in
-                        Text(algo.displayName).tag(algo.rawValue)
+                ForEach(Array(AutofillAlgorithm.allCases), id: \.self) { algo in
+                    Button {
+                        algorithmRaw = algo.rawValue
+                    } label: {
+                        HStack {
+                            Text(algo.displayName)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if algorithm == algo {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
             } footer: {
                 Text(algorithmDescription)
             }
