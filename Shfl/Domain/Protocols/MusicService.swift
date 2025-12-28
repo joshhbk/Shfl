@@ -19,9 +19,6 @@ protocol MusicService: Sendable {
     /// Check current authorization status
     var isAuthorized: Bool { get async }
 
-    /// Prefetch library songs in background for faster access later
-    func prefetchLibrary() async
-
     /// Fetch songs from user's library with sorting and pagination
     func fetchLibrarySongs(
         sortedBy: SortOption,

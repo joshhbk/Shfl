@@ -39,8 +39,6 @@ actor MockMusicService: MusicService {
         authorizationResult
     }
 
-    func prefetchLibrary() async {}
-
     func fetchLibrarySongs(
         sortedBy: SortOption,
         limit: Int,
