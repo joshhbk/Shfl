@@ -49,6 +49,9 @@ final class AppViewModel: ObservableObject {
         } catch {
             print("Failed to load songs: \(error)")
         }
+
+        // Prepare queue in background for instant playback
+        Task { try? await player.prepareQueue() }
     }
 
     func requestAuthorization() async {

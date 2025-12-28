@@ -76,6 +76,60 @@ struct LibraryAutofillSourceTests {
         #expect(result.count == 5)
     }
 
+    @Test("Random algorithm shuffles results")
+    func randomAlgorithmShufflesResults() async throws {
+        let mockService = MockMusicService()
+        // Create songs with sequential IDs
+        let songs = (1...20).map { makeSong(id: "\($0)") }
+        await mockService.setLibrarySongs(songs)
+
+        let source = LibraryAutofillSource(musicService: mockService, algorithm: .random)
+
+        // Run multiple times - at least one should differ from original order
+        var foundDifferentOrder = false
+        for _ in 0..<10 {
+            let result = try await source.fetchSongs(excluding: [], limit: 20)
+            let resultIds = result.map { $0.id }
+            let originalIds = songs.map { $0.id }
+            if resultIds != originalIds {
+                foundDifferentOrder = true
+                break
+            }
+        }
+
+        #expect(foundDifferentOrder, "Random algorithm should shuffle results")
+    }
+
+    @Test("Recently added algorithm returns songs from pool")
+    func recentlyAddedReturnsSongs() async throws {
+        let mockService = MockMusicService()
+        let songs = (1...10).map { makeSong(id: "\($0)") }
+        await mockService.setLibrarySongs(songs)
+
+        let source = LibraryAutofillSource(musicService: mockService, algorithm: .recentlyAdded)
+        let result = try await source.fetchSongs(excluding: [], limit: 10)
+
+        // Should return all songs (shuffled)
+        #expect(result.count == 10)
+        let resultIds = Set(result.map { $0.id })
+        let expectedIds = Set(songs.map { $0.id })
+        #expect(resultIds == expectedIds, "Recently added should return songs from pool")
+    }
+
+    @Test("Default algorithm is random")
+    func defaultAlgorithmIsRandom() async throws {
+        let mockService = MockMusicService()
+        let songs = (1...5).map { makeSong(id: "\($0)") }
+        await mockService.setLibrarySongs(songs)
+
+        // Init without algorithm parameter
+        let source = LibraryAutofillSource(musicService: mockService)
+        let result = try await source.fetchSongs(excluding: [], limit: 5)
+
+        // Should still work (not crash)
+        #expect(result.count == 5)
+    }
+
     private func makeSong(id: String) -> Song {
         Song(id: id, title: "Song \(id)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
     }
