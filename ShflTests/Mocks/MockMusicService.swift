@@ -85,17 +85,6 @@ actor MockMusicService: MusicService {
         }
     }
 
-    func setInitialQueue(songs: [Song]) async throws {
-        // For testing, behaves like setQueue with a subset
-        try await setQueue(songs: songs)
-    }
-
-    func appendToQueue(songs: [Song]) async throws {
-        // For testing, append to existing queue
-        queuedSongs.append(contentsOf: songs)
-        lastQueuedSongs.append(contentsOf: songs)
-    }
-
     func play() async throws {
         if let error = shouldThrowOnPlay {
             throw error

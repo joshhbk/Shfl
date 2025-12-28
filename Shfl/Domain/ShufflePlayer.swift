@@ -24,12 +24,10 @@ final class ShufflePlayer: ObservableObject {
 
     private var playedSongIds: Set<String> = []
     private var lastObservedSongId: String?
-    private var initialQueueSongIds: Set<String> = []
+    private var preparedSongIds: Set<String> = []
 
-    private var isReadyToPlay: Bool {
-        let currentIds = Set(songs.map(\.id))
-        return !initialQueueSongIds.isEmpty &&
-               initialQueueSongIds.isSubset(of: currentIds)
+    private var isQueuePrepared: Bool {
+        Set(songs.map(\.id)) == preparedSongIds
     }
 
     var songCount: Int { songs.count }
@@ -182,32 +180,19 @@ final class ShufflePlayer: ObservableObject {
     func prepareQueue() async throws {
         guard !songs.isEmpty else { return }
 
-    func prepareQueue() async throws {
-        guard !songs.isEmpty else { return }
-
         // Upstream: Shuffle Logic
         let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
         let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
         let shuffler = QueueShuffler(algorithm: algorithm)
         let shuffledSongs = shuffler.shuffle(songs)
         lastShuffledQueue = shuffledSongs
-
-        // Local: Progressive Loading (using shuffledSongs)
-        // 1. Set initial queue with first 2 songs (fast)
-        let initialSongs = Array(shuffledSongs.prefix(2))
-        try await musicService.setInitialQueue(songs: initialSongs)
-        initialQueueSongIds = Set(initialSongs.map(\.id))
-
-        // 2. Background: append remaining songs
-        let remainingSongs = Array(shuffledSongs.dropFirst(2))
-        if !remainingSongs.isEmpty {
-            Task {
-                try? await musicService.appendToQueue(songs: remainingSongs)
-            }
-        }
         
         lastUsedAlgorithm = algorithm
         print("🎲 Prepared queue with algorithm: \(algorithm.displayName)")
+
+        // Revert: Simple blocking setQueue (but using shuffledSongs)
+        try await musicService.setQueue(songs: shuffledSongs)
+        preparedSongIds = Set(songs.map(\.id))
     }
 
     // MARK: - Playback Control
@@ -217,13 +202,12 @@ final class ShufflePlayer: ObservableObject {
         playedSongIds.removeAll()
         lastObservedSongId = nil
 
-        if !isReadyToPlay {
+        if !isQueuePrepared {
             try await prepareQueue()
         }
         
         try await musicService.play()
     }
-
 
     func pause() async {
         await musicService.pause()
