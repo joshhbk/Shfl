@@ -98,6 +98,8 @@ final class ShufflePlayer: ObservableObject {
 
     func removeAllSongs() {
         songs.removeAll()
+        playedSongIds.removeAll()
+        lastObservedSongId = nil
     }
 
     func containsSong(id: String) -> Bool {
