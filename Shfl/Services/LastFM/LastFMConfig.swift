@@ -1,8 +1,6 @@
 import Foundation
 
 enum LastFMConfig {
-    // TODO: Replace with your actual Last.fm API credentials
-    // Get them from: https://www.last.fm/api/account/create
-    static let apiKey = "YOUR_API_KEY_HERE"
-    static let sharedSecret = "YOUR_SHARED_SECRET_HERE"
+    static let apiKey = "188acc7c82ee1b86a3390faa14a280b8"
+    static let sharedSecret = "3c3645b6c964a601bf9ec3986d38b2dc"
 }
