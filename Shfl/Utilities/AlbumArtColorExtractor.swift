@@ -44,7 +44,10 @@ final class AlbumArtColorExtractor: ObservableObject {
                 guard !Task.isCancelled, currentSongId == songId else { return }
 
                 colorCache[songId] = color
-                print("[ColorExtractor] Extracted color from image for songId: \(songId)")
+                let uiColor = UIColor(color)
+                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
+                uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+                print("[ColorExtractor] Extracted color - hue: \(h), sat: \(s), bright: \(b)")
                 withAnimation(.easeInOut(duration: 0.5)) {
                     extractedColor = color
                 }
