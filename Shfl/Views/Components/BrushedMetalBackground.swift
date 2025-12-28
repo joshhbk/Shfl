@@ -5,24 +5,20 @@ struct BrushedMetalBackground: View {
     let intensity: CGFloat
     let highlightOffset: CGPoint
     let motionEnabled: Bool
-    let useDarkHighlight: Bool
+    let highlightColor: Color
 
     init(
         baseColor: Color,
         intensity: CGFloat = 0.5,
         highlightOffset: CGPoint = .zero,
         motionEnabled: Bool = true,
-        useDarkHighlight: Bool = false
+        highlightColor: Color = .white
     ) {
         self.baseColor = baseColor
         self.intensity = intensity
         self.highlightOffset = motionEnabled ? highlightOffset : .zero
         self.motionEnabled = motionEnabled
-        self.useDarkHighlight = useDarkHighlight
-    }
-
-    private var highlightColor: Color {
-        useDarkHighlight ? .black : .white
+        self.highlightColor = highlightColor
     }
 
     var body: some View {

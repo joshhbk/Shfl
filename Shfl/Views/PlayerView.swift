@@ -43,7 +43,7 @@ struct PlayerView: View {
                     intensity: currentTheme.brushedMetalIntensity,
                     highlightOffset: highlightOffset,
                     motionEnabled: currentTheme.motionEnabled,
-                    useDarkHighlight: currentTheme.wheelStyle == .dark
+                    highlightColor: currentTheme.wheelStyle == .dark ? .black : .white
                 )
 
                 // Content
