@@ -119,7 +119,7 @@ struct PlayerView: View {
                 motionManager?.start()
                 // Extract color if there's already a song playing
                 if let song = player.playbackState.currentSong {
-                    colorExtractor.updateColor(for: song.id, artworkURL: song.artworkURL)
+                    colorExtractor.updateColor(for: song.id)
                 }
             }
             .onDisappear {
@@ -258,7 +258,7 @@ struct PlayerView: View {
 
         // Extract color from album artwork
         if let song = newState.currentSong {
-            colorExtractor.updateColor(for: song.id, artworkURL: song.artworkURL)
+            colorExtractor.updateColor(for: song.id)
         } else {
             colorExtractor.clear()
         }
