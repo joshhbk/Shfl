@@ -5,6 +5,7 @@ struct PlayerView: View {
     let musicService: MusicService
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
+    let onSettingsTapped: () -> Void
 
     @Environment(\.motionManager) private var motionManager
     @StateObject private var colorExtractor = AlbumArtColorExtractor()
@@ -37,12 +38,14 @@ struct PlayerView: View {
         player: ShufflePlayer,
         musicService: MusicService,
         onManageTapped: @escaping () -> Void,
-        onAddTapped: @escaping () -> Void = {}
+        onAddTapped: @escaping () -> Void = {},
+        onSettingsTapped: @escaping () -> Void = {}
     ) {
         self.player = player
         self.musicService = musicService
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
+        self.onSettingsTapped = onSettingsTapped
     }
 
     var body: some View {
@@ -148,7 +151,11 @@ struct PlayerView: View {
                 .foregroundStyle(currentTheme.textColor)
             }
             Spacer()
-            CapacityIndicator(current: player.songCount, maximum: player.capacity)
+            Button(action: onSettingsTapped) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(currentTheme.textColor)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
@@ -321,7 +328,8 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
         player: player,
         musicService: mockService,
         onManageTapped: {},
-        onAddTapped: {}
+        onAddTapped: {},
+        onSettingsTapped: {}
     )
 }
 
@@ -332,6 +340,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
         player: player,
         musicService: mockService,
         onManageTapped: {},
-        onAddTapped: {}
+        onAddTapped: {},
+        onSettingsTapped: {}
     )
 }
