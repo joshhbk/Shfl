@@ -42,7 +42,8 @@ struct PlayerView: View {
                     baseColor: currentTheme.bodyGradientTop,
                     intensity: currentTheme.brushedMetalIntensity,
                     highlightOffset: highlightOffset,
-                    motionEnabled: currentTheme.motionEnabled
+                    motionEnabled: currentTheme.motionEnabled,
+                    useDarkHighlight: currentTheme.wheelStyle == .dark
                 )
 
                 // Content

@@ -5,17 +5,24 @@ struct BrushedMetalBackground: View {
     let intensity: CGFloat
     let highlightOffset: CGPoint
     let motionEnabled: Bool
+    let useDarkHighlight: Bool
 
     init(
         baseColor: Color,
         intensity: CGFloat = 0.5,
         highlightOffset: CGPoint = .zero,
-        motionEnabled: Bool = true
+        motionEnabled: Bool = true,
+        useDarkHighlight: Bool = false
     ) {
         self.baseColor = baseColor
         self.intensity = intensity
         self.highlightOffset = motionEnabled ? highlightOffset : .zero
         self.motionEnabled = motionEnabled
+        self.useDarkHighlight = useDarkHighlight
+    }
+
+    private var highlightColor: Color {
+        useDarkHighlight ? .black : .white
     }
 
     var body: some View {
@@ -36,7 +43,7 @@ struct BrushedMetalBackground: View {
                     for i in 0..<rings {
                         let radius = CGFloat(i) * ringSpacing
                         let opacity = Self.ringOpacity(at: i, intensity: intensity)
-                        let ringColor = Color.white.opacity(opacity)
+                        let ringColor = highlightColor.opacity(opacity)
 
                         let path = Path { p in
                             p.addArc(
@@ -55,9 +62,9 @@ struct BrushedMetalBackground: View {
                 // Specular highlight - tight glint that moves with tilt
                 RadialGradient(
                     colors: [
-                        Color.white.opacity(0.35 * intensity),
-                        Color.white.opacity(0.20 * intensity),
-                        Color.white.opacity(0.05 * intensity),
+                        highlightColor.opacity(0.35 * intensity),
+                        highlightColor.opacity(0.20 * intensity),
+                        highlightColor.opacity(0.05 * intensity),
                         Color.clear
                     ],
                     center: UnitPoint(
