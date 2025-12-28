@@ -52,7 +52,8 @@ final class AlbumArtColorExtractor: ObservableObject {
                     return
                 }
 
-                let color = boostColorIfNeeded(Color(cgColor: bgColor))
+                // let color = boostColorIfNeeded(Color(cgColor: bgColor))
+                let color = Color(cgColor: bgColor) // raw, no boost
                 colorCache[songId] = color
 
                 let uiColor = UIColor(color)
