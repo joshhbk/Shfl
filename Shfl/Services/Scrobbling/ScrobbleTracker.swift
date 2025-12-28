@@ -10,10 +10,15 @@ final class ScrobbleTracker {
     private var accumulatedPlayTime: TimeInterval = 0
     private var hasScrobbledCurrentSong = false
     private var isPlaying = false
+    private var checkTimer: Timer?
 
     init(scrobbleManager: ScrobbleManager, musicService: any MusicService) {
         self.scrobbleManager = scrobbleManager
         self.musicService = musicService
+    }
+
+    deinit {
+        checkTimer?.invalidate()
     }
 
     // MARK: - Threshold Calculation (nonisolated static for testability)
@@ -58,6 +63,7 @@ final class ScrobbleTracker {
         guard !isPlaying else { return }
         isPlaying = true
         playStartTime = Date()
+        startTimer()
     }
 
     private func pauseTracking() {
@@ -65,6 +71,21 @@ final class ScrobbleTracker {
         isPlaying = false
         accumulatedPlayTime += Date().timeIntervalSince(startTime)
         playStartTime = nil
+        stopTimer()
+    }
+
+    private func startTimer() {
+        stopTimer()
+        checkTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.checkAndScrobble()
+            }
+        }
+    }
+
+    private func stopTimer() {
+        checkTimer?.invalidate()
+        checkTimer = nil
     }
 
     private func resetTracking() {
@@ -73,10 +94,12 @@ final class ScrobbleTracker {
         accumulatedPlayTime = 0
         hasScrobbledCurrentSong = false
         isPlaying = false
+        stopTimer()
     }
 
     private func sendNowPlaying(_ song: Song) {
         let durationSeconds = Int(musicService.currentSongDuration)
+        print("[Scrobble] 🎵 Now playing: \(song.title) by \(song.artist) (\(durationSeconds)s)")
         let event = ScrobbleEvent(
             track: song.title,
             artist: song.artist,
@@ -99,8 +122,11 @@ final class ScrobbleTracker {
         let threshold = Self.scrobbleThreshold(forDurationSeconds: durationSeconds)
         let totalPlayTime = totalElapsedPlayTime()
 
+        print("[Scrobble] ⏱️ Progress: \(Int(totalPlayTime))s / \(threshold)s threshold")
+
         if Int(totalPlayTime) >= threshold {
             hasScrobbledCurrentSong = true
+            print("[Scrobble] ✅ Threshold reached! Scrobbling...")
             scrobble(song, durationSeconds: durationSeconds)
         }
     }
