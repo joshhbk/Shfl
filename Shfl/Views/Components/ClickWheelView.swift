@@ -13,32 +13,35 @@ struct ClickWheelView: View {
     let onVolumeDown: () -> Void
 
     private let wheelSize: CGFloat = 280
-    private let centerButtonSize: CGFloat = 80
+    private let centerButtonSize: CGFloat = 150
 
-    private var wheelGradient: LinearGradient {
+    // Position buttons at the midpoint of the ring
+    // Ring spans from centerButtonSize/2 to wheelSize/2
+    // Midpoint = (centerButtonSize/2 + wheelSize/2) / 2 = (centerButtonSize + wheelSize) / 4
+    // Button center should be at this distance from wheel center
+    // With VStack { Button; Spacer }, button center = frame/2 - 30 (button is 60pt tall)
+    // So frame = 2 * (midpoint + 30)
+    private var buttonContainerSize: CGFloat {
+        let ringMidpoint = (centerButtonSize + wheelSize) / 4
+        return 2 * (ringMidpoint + 30)
+    }
+
+    private var wheelColor: Color {
         switch theme.wheelStyle {
         case .light:
-            return LinearGradient(
-                colors: [Color(white: 0.95), Color(white: 0.88)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            return Color(white: 0.95)
         case .dark:
-            return LinearGradient(
-                colors: [Color(white: 0.25), Color(white: 0.15)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            return Color(white: 0.08)
         }
     }
 
     var body: some View {
         ZStack {
-            // Outer wheel background
+            // Outer wheel - clean and simple
             Circle()
-                .fill(wheelGradient)
+                .fill(wheelColor)
                 .frame(width: wheelSize, height: wheelSize)
-                .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 6)
 
             // Control buttons positioned around the wheel
             VStack {
@@ -50,7 +53,7 @@ struct ClickWheelView: View {
                 )
                 Spacer()
             }
-            .frame(height: wheelSize - 40)
+            .frame(height: buttonContainerSize)
 
             VStack {
                 Spacer()
@@ -61,7 +64,7 @@ struct ClickWheelView: View {
                     wheelStyle: theme.wheelStyle
                 )
             }
-            .frame(height: wheelSize - 40)
+            .frame(height: buttonContainerSize)
 
             HStack {
                 ClickWheelButton(
@@ -72,7 +75,7 @@ struct ClickWheelView: View {
                 )
                 Spacer()
             }
-            .frame(width: wheelSize - 40)
+            .frame(width: buttonContainerSize)
 
             HStack {
                 Spacer()
@@ -83,10 +86,10 @@ struct ClickWheelView: View {
                     wheelStyle: theme.wheelStyle
                 )
             }
-            .frame(width: wheelSize - 40)
+            .frame(width: buttonContainerSize)
 
             // Center play/pause button
-            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, wheelStyle: theme.wheelStyle)
+            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, theme: theme)
         }
         .compositingGroup()
         .scaleEffect(pressPosition != .none ? ClickWheelFeedback.wheelPressScale : 1.0)
