@@ -43,14 +43,37 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         limit: Int,
         offset: Int
     ) async throws -> LibraryPage {
-        let allSongs = try await fetchAllLibrarySongs(sortedBy: sortedBy)
+        var request = MusicLibraryRequest<MusicKit.Song>()
+        request.limit = limit
+        request.offset = offset
 
-        let startIndex = min(offset, allSongs.count)
-        let endIndex = min(offset + limit, allSongs.count)
-        let pageItems = Array(allSongs[startIndex..<endIndex])
-        let hasMore = endIndex < allSongs.count
+        switch sortedBy {
+        case .mostPlayed:
+            request.sort(by: \.playCount, ascending: false)
+        case .recentlyPlayed:
+            request.sort(by: \.lastPlayedDate, ascending: false)
+        case .recentlyAdded:
+            request.sort(by: \.libraryAddedDate, ascending: false)
+        case .alphabetical:
+            request.sort(by: \.title, ascending: true)
+        }
 
-        return LibraryPage(songs: pageItems, hasMore: hasMore)
+        let response = try await request.response()
+
+        let songs = response.items.map { musicKitSong in
+            Song(
+                id: musicKitSong.id.rawValue,
+                title: musicKitSong.title,
+                artist: musicKitSong.artistName,
+                albumTitle: musicKitSong.albumTitle ?? "",
+                artworkURL: nil
+            )
+        }
+
+        // hasMore is true if we got a full page (might be more)
+        let hasMore = response.items.count == limit
+
+        return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
     func searchLibrarySongs(query: String) async throws -> [Song] {
