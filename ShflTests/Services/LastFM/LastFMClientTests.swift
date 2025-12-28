@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Shfl
 
@@ -45,5 +46,50 @@ struct LastFMClientTests {
         let sig2 = LastFMClient.generateSignature(params: params2, secret: secret)
 
         #expect(sig1 != sig2)
+    }
+
+    @Test("Scrobble request includes required parameters")
+    func scrobbleRequestParams() async throws {
+        let client = LastFMClient(apiKey: "testkey", sharedSecret: "testsecret")
+        await client.setSessionKey("testsession")
+
+        let event = ScrobbleEvent(
+            track: "Test Track",
+            artist: "Test Artist",
+            album: "Test Album",
+            timestamp: Date(timeIntervalSince1970: 1234567890),
+            durationSeconds: 180
+        )
+
+        let request = await client.buildScrobbleRequest(event)
+
+        #expect(request.httpMethod == "POST")
+
+        let body = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+        #expect(body.contains("method=track.scrobble"))
+        #expect(body.contains("track[0]=Test%20Track"))
+        #expect(body.contains("artist[0]=Test%20Artist"))
+        #expect(body.contains("api_sig="))
+    }
+
+    @Test("Now playing request includes required parameters")
+    func nowPlayingRequestParams() async throws {
+        let client = LastFMClient(apiKey: "testkey", sharedSecret: "testsecret")
+        await client.setSessionKey("testsession")
+
+        let event = ScrobbleEvent(
+            track: "Test Track",
+            artist: "Test Artist",
+            album: "Test Album",
+            timestamp: Date(),
+            durationSeconds: 180
+        )
+
+        let request = await client.buildNowPlayingRequest(event)
+
+        #expect(request.httpMethod == "POST")
+
+        let body = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+        #expect(body.contains("method=track.updateNowPlaying"))
     }
 }
