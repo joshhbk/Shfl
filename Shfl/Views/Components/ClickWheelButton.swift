@@ -42,7 +42,7 @@ struct ClickWheelButton: View {
                         }
                     }
             )
-            .sensoryFeedback(.impact(weight: .light), trigger: tapCount)
+            .sensoryFeedback(.impact(weight: .heavy, intensity: 0.8), trigger: tapCount)
     }
 }
 

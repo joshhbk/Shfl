@@ -7,11 +7,14 @@ struct ClickWheelFeedback {
     /// Rotation angle in degrees when a button is pressed (exaggerated = 10)
     static let tiltAngle: Double = 10
 
-    /// Spring animation response time
-    static let springResponse: Double = 0.3
+    /// Scale when wheel is pressed (0.98 = slight shrink to simulate sinking in)
+    static let wheelPressScale: Double = 0.98
 
-    /// Spring animation damping (0.6 = slight bounce)
-    static let springDampingFraction: Double = 0.6
+    /// Spring animation response time (higher = slower/heavier feel)
+    static let springResponse: Double = 0.5
+
+    /// Spring animation damping (0.7 = less bounce, more deliberate)
+    static let springDampingFraction: Double = 0.7
 
     /// 3D perspective for rotation effect
     static let perspective: CGFloat = 0.3

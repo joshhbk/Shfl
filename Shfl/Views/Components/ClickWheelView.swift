@@ -89,6 +89,7 @@ struct ClickWheelView: View {
             PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, wheelStyle: theme.wheelStyle)
         }
         .compositingGroup()
+        .scaleEffect(pressPosition != .none ? ClickWheelFeedback.wheelPressScale : 1.0)
         .rotation3DEffect(
             .degrees(pressPosition != .none ? ClickWheelFeedback.tiltAngle : 0),
             axis: pressPosition.rotationAxis,
