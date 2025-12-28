@@ -42,3 +42,18 @@ enum PlaybackState: Equatable, Sendable {
         }
     }
 }
+
+extension PlaybackState {
+    var isActive: Bool {
+        switch self {
+        case .playing, .paused, .loading:
+            return true
+        case .empty, .stopped, .error:
+            return false
+        }
+    }
+
+    var currentSongId: String? {
+        currentSong?.id
+    }
+}

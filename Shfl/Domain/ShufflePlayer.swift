@@ -17,10 +17,16 @@ final class ShufflePlayer: ObservableObject {
 
     @Published private(set) var playbackState: PlaybackState = .empty
 
+    private var playedSongIds: Set<String> = []
+    private var lastObservedSongId: String?
+
     var songCount: Int { songs.count }
     var allSongs: [Song] { songs }
     var capacity: Int { Self.maxSongs }
     var remainingCapacity: Int { Self.maxSongs - songs.count }
+
+    /// Exposed for testing only
+    var playedSongIdsForTesting: Set<String> { playedSongIds }
 
     init(musicService: MusicService) {
         self.musicService = musicService
@@ -35,8 +41,40 @@ final class ShufflePlayer: ObservableObject {
         stateTask = Task { [weak self] in
             guard let self else { return }
             for await state in musicService.playbackStateStream {
-                self.playbackState = state
+                self.handlePlaybackStateChange(state)
             }
+        }
+    }
+
+    private func handlePlaybackStateChange(_ newState: PlaybackState) {
+        let newSongId = newState.currentSongId
+
+        // Song changed - add previous to history
+        if let lastId = lastObservedSongId, lastId != newSongId {
+            playedSongIds.insert(lastId)
+        }
+        lastObservedSongId = newSongId
+
+        // Clear history on stop/empty/error
+        switch newState {
+        case .stopped, .empty, .error:
+            playedSongIds.removeAll()
+            lastObservedSongId = nil
+        default:
+            break
+        }
+
+        playbackState = newState
+    }
+
+    private func rebuildQueueIfPlaying() {
+        guard playbackState.isActive else { return }
+
+        let upcomingSongs = songs.filter { !playedSongIds.contains($0.id) }
+        guard !upcomingSongs.isEmpty else { return }
+
+        Task {
+            try? await musicService.setQueue(songs: upcomingSongs)
         }
     }
 
@@ -50,10 +88,12 @@ final class ShufflePlayer: ObservableObject {
             return // Already added
         }
         songs.append(song)
+        rebuildQueueIfPlaying()
     }
 
     func removeSong(id: String) {
         songs.removeAll { $0.id == id }
+        rebuildQueueIfPlaying()
     }
 
     func removeAllSongs() {
@@ -68,6 +108,8 @@ final class ShufflePlayer: ObservableObject {
 
     func play() async throws {
         guard !songs.isEmpty else { return }
+        playedSongIds.removeAll()
+        lastObservedSongId = nil
         try await musicService.setQueue(songs: songs)
         try await musicService.play()
     }

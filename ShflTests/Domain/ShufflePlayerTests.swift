@@ -140,4 +140,213 @@ final class ShufflePlayerTests: XCTestCase {
         state = await player.playbackState
         XCTAssertTrue(state.isPlaying)
     }
+
+    // MARK: - Play History Tracking
+
+    func testSongTransitionAddsToHistory() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Determine which song is currently playing (mock shuffles the queue)
+        let state = await player.playbackState
+        guard let currentSong = state.currentSong else {
+            XCTFail("Expected a song to be playing")
+            return
+        }
+        let otherSong = currentSong.id == song1.id ? song2 : song1
+
+        // Simulate song transition to the other song
+        await mockService.simulatePlaybackState(.playing(otherSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let playedIds = await player.playedSongIdsForTesting
+        XCTAssertTrue(playedIds.contains(currentSong.id), "First song should be in history after transition")
+        XCTAssertFalse(playedIds.contains(otherSong.id), "Current song should not be in history yet")
+    }
+
+    func testHistoryClearedOnStop() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Determine which song is currently playing (mock shuffles the queue)
+        let state = await player.playbackState
+        guard let currentSong = state.currentSong else {
+            XCTFail("Expected a song to be playing")
+            return
+        }
+        let otherSong = currentSong.id == song1.id ? song2 : song1
+
+        // Simulate song transition then stop
+        await mockService.simulatePlaybackState(.playing(otherSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let playedIds = await player.playedSongIdsForTesting
+        XCTAssertTrue(playedIds.isEmpty)
+    }
+
+    func testHistoryClearedOnEmpty() async throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.simulatePlaybackState(.empty)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let playedIds = await player.playedSongIdsForTesting
+        XCTAssertTrue(playedIds.isEmpty)
+    }
+
+    // MARK: - Dynamic Queue Updates
+
+    func testAddSongDuringPlaybackRebuildsQueue() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song2)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let callCount = await mockService.setQueueCallCount
+        XCTAssertEqual(callCount, 1, "setQueue should be called when adding song during playback")
+    }
+
+    func testAddSongWhileStoppedDoesNotRebuildQueue() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+
+        await mockService.resetQueueTracking()
+
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song2)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let callCount = await mockService.setQueueCallCount
+        XCTAssertEqual(callCount, 0, "setQueue should NOT be called when not playing")
+    }
+
+    func testPlayedSongsExcludedFromRebuild() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Determine which song is currently playing (mock shuffles the queue)
+        let state = await player.playbackState
+        guard let firstSong = state.currentSong else {
+            XCTFail("Expected a song to be playing")
+            return
+        }
+        let secondSong = firstSong.id == song1.id ? song2 : song1
+
+        // Simulate transition: first song finished, now playing second song
+        await mockService.simulatePlaybackState(.playing(secondSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        // Add new song
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song3)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let lastQueued = await mockService.lastQueuedSongs
+        let queuedIds = Set(lastQueued.map { $0.id })
+
+        XCTAssertFalse(queuedIds.contains(firstSong.id), "Played song should be excluded")
+        XCTAssertTrue(queuedIds.contains(secondSong.id), "Current song should be included")
+        XCTAssertTrue(queuedIds.contains("3"), "New song3 should be included")
+    }
+
+    func testRemoveSongDuringPlaybackRebuildsQueue() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        await player.removeSong(id: "2")
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let callCount = await mockService.setQueueCallCount
+        XCTAssertEqual(callCount, 1, "setQueue should be called when removing song during playback")
+
+        let lastQueued = await mockService.lastQueuedSongs
+        let queuedIds = lastQueued.map { $0.id }
+        XCTAssertFalse(queuedIds.contains("2"), "Removed song should not be in queue")
+    }
+
+    func testRemoveCurrentlyPlayingSongContinuesPlayback() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Remove currently playing song
+        let currentSongId = await player.playbackState.currentSongId
+        await player.removeSong(id: currentSongId!)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Playback should still be active (song finishes naturally)
+        let state = await player.playbackState
+        XCTAssertTrue(state.isActive, "Playback should continue after removing current song")
+
+        // Song should be removed from songs list
+        let containsSong = await player.containsSong(id: currentSongId!)
+        XCTAssertFalse(containsSong, "Removed song should not be in songs list")
+    }
+
+    func testPlayClearsHistory() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Determine which song is currently playing (mock shuffles the queue)
+        let state = await player.playbackState
+        guard let currentSong = state.currentSong else {
+            XCTFail("Expected a song to be playing")
+            return
+        }
+        let otherSong = currentSong.id == song1.id ? song2 : song1
+
+        // Simulate song transition to build history
+        await mockService.simulatePlaybackState(.playing(otherSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        var playedIds = await player.playedSongIdsForTesting
+        XCTAssertTrue(playedIds.contains(currentSong.id), "History should contain played song")
+
+        // Pause and play again - should clear history
+        await player.pause()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        playedIds = await player.playedSongIdsForTesting
+        XCTAssertTrue(playedIds.isEmpty, "History should be cleared on fresh play")
+    }
 }

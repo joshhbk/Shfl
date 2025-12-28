@@ -70,4 +70,86 @@ struct PlaybackStateTests {
         let song2 = Song(id: "2", title: "Other", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         #expect(PlaybackState.playing(song) != PlaybackState.playing(song2))
     }
+
+    // MARK: - isActive Tests
+
+    @Test("isActive returns true for playing state")
+    func isActive_returnsTrue_forPlayingState() {
+        let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let state = PlaybackState.playing(song)
+        #expect(state.isActive)
+    }
+
+    @Test("isActive returns true for paused state")
+    func isActive_returnsTrue_forPausedState() {
+        let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let state = PlaybackState.paused(song)
+        #expect(state.isActive)
+    }
+
+    @Test("isActive returns true for loading state")
+    func isActive_returnsTrue_forLoadingState() {
+        let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let state = PlaybackState.loading(song)
+        #expect(state.isActive)
+    }
+
+    @Test("isActive returns false for empty state")
+    func isActive_returnsFalse_forEmptyState() {
+        let state = PlaybackState.empty
+        #expect(!state.isActive)
+    }
+
+    @Test("isActive returns false for stopped state")
+    func isActive_returnsFalse_forStoppedState() {
+        let state = PlaybackState.stopped
+        #expect(!state.isActive)
+    }
+
+    @Test("isActive returns false for error state")
+    func isActive_returnsFalse_forErrorState() {
+        let state = PlaybackState.error(NSError(domain: "test", code: 1))
+        #expect(!state.isActive)
+    }
+
+    // MARK: - currentSongId Tests
+
+    @Test("currentSongId returns id for playing state")
+    func currentSongId_returnsId_forPlayingState() {
+        let song = Song(id: "abc123", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let state = PlaybackState.playing(song)
+        #expect(state.currentSongId == "abc123")
+    }
+
+    @Test("currentSongId returns nil for empty state")
+    func currentSongId_returnsNil_forEmptyState() {
+        let state = PlaybackState.empty
+        #expect(state.currentSongId == nil)
+    }
+
+    @Test("currentSongId returns nil for stopped state")
+    func currentSongId_returnsNil_forStoppedState() {
+        let state = PlaybackState.stopped
+        #expect(state.currentSongId == nil)
+    }
+
+    @Test("currentSongId returns id for paused state")
+    func currentSongId_returnsId_forPausedState() {
+        let song = Song(id: "paused123", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let state = PlaybackState.paused(song)
+        #expect(state.currentSongId == "paused123")
+    }
+
+    @Test("currentSongId returns id for loading state")
+    func currentSongId_returnsId_forLoadingState() {
+        let song = Song(id: "loading456", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let state = PlaybackState.loading(song)
+        #expect(state.currentSongId == "loading456")
+    }
+
+    @Test("currentSongId returns nil for error state")
+    func currentSongId_returnsNil_forErrorState() {
+        let state = PlaybackState.error(NSError(domain: "test", code: 1))
+        #expect(state.currentSongId == nil)
+    }
 }
