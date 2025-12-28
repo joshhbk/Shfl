@@ -8,6 +8,7 @@ struct PlayerView: View {
 
     @Environment(\.motionManager) private var motionManager
     @StateObject private var colorExtractor = AlbumArtColorExtractor()
+    @ObservedObject private var artworkLoader = ArtworkLoader.shared
     @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""
@@ -119,7 +120,7 @@ struct PlayerView: View {
                 motionManager?.start()
                 // Extract color if there's already a song playing
                 if let song = player.playbackState.currentSong {
-                    colorExtractor.extractColor(from: song.artworkURL, songId: song.id)
+                    colorExtractor.updateColor(for: song.id)
                 }
             }
             .onDisappear {
@@ -131,6 +132,10 @@ struct PlayerView: View {
             }
             .onChange(of: motionManager?.roll) { _, _ in
                 updateHighlightOffset()
+            }
+            .onChange(of: artworkLoader.artwork(for: player.playbackState.currentSongId ?? "")?.backgroundColor) { _, _ in
+                // Refresh color when artwork loads
+                colorExtractor.refreshFromLoader()
             }
         }
     }
@@ -258,7 +263,7 @@ struct PlayerView: View {
 
         // Extract color from album artwork
         if let song = newState.currentSong {
-            colorExtractor.extractColor(from: song.artworkURL, songId: song.id)
+            colorExtractor.updateColor(for: song.id)
         } else {
             colorExtractor.clear()
         }
