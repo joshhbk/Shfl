@@ -9,8 +9,8 @@ struct LibraryAutofillSource: AutofillSource {
     }
 
     func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
-        // Fetch more than we need to account for exclusions and randomization
-        let fetchLimit = min(limit * 3, 500)
+        // Fetch enough to account for exclusions - need at least excluded count + desired limit
+        let fetchLimit = min(excluding.count + limit * 3, 500)
         let page = try await musicService.fetchLibrarySongs(
             sortedBy: .recentlyAdded,
             limit: fetchLimit,
