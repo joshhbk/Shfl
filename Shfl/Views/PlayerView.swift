@@ -7,6 +7,7 @@ struct PlayerView: View {
     let onAddTapped: () -> Void
 
     @Environment(\.motionManager) private var motionManager
+    @StateObject private var colorExtractor = AlbumArtColorExtractor()
     @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""
@@ -18,6 +19,16 @@ struct PlayerView: View {
 
     private var currentTheme: ShuffleTheme {
         ShuffleTheme.allThemes[currentThemeIndex]
+    }
+
+    /// Dynamic highlight color from album art, with fallback to theme-based color
+    private var dynamicHighlightColor: Color {
+        // Use extracted color if available
+        if let extractedColor = colorExtractor.extractedColor {
+            return extractedColor
+        }
+        // Fall back to theme-based color (white for colored themes, black for silver)
+        return currentTheme.wheelStyle == .dark ? .black : .white
     }
 
     private let swipeThreshold: CGFloat = 100
@@ -43,8 +54,9 @@ struct PlayerView: View {
                     intensity: currentTheme.brushedMetalIntensity,
                     highlightOffset: highlightOffset,
                     motionEnabled: currentTheme.motionEnabled,
-                    highlightColor: currentTheme.wheelStyle == .dark ? .black : .white
+                    highlightColor: dynamicHighlightColor
                 )
+                .animation(.easeInOut(duration: 0.5), value: colorExtractor.extractedColor?.description)
 
                 // Content
                 VStack(spacing: 0) {
@@ -105,6 +117,10 @@ struct PlayerView: View {
             .onAppear {
                 startProgressTimer()
                 motionManager?.start()
+                // Extract color if there's already a song playing
+                if let song = player.playbackState.currentSong {
+                    colorExtractor.extractColor(from: song.artworkURL, songId: song.id)
+                }
             }
             .onDisappear {
                 stopProgressTimer()
@@ -239,6 +255,13 @@ struct PlayerView: View {
 
         // Update duration when song changes
         duration = musicService.currentSongDuration
+
+        // Extract color from album artwork
+        if let song = newState.currentSong {
+            colorExtractor.extractColor(from: song.artworkURL, songId: song.id)
+        } else {
+            colorExtractor.clear()
+        }
     }
 
     // MARK: - Progress Timer
