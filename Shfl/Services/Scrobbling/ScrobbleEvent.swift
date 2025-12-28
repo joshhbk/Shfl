@@ -1,6 +1,6 @@
 import Foundation
 
-struct ScrobbleEvent: Sendable, Equatable {
+struct ScrobbleEvent: Sendable, Equatable, Codable {
     let track: String
     let artist: String
     let album: String
