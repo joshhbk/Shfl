@@ -19,6 +19,11 @@ final class ShufflePlayer: ObservableObject {
 
     private var playedSongIds: Set<String> = []
     private var lastObservedSongId: String?
+    private var preparedSongIds: Set<String> = []
+
+    private var isQueuePrepared: Bool {
+        Set(songs.map(\.id)) == preparedSongIds
+    }
 
     var songCount: Int { songs.count }
     var allSongs: [Song] { songs }
@@ -106,13 +111,25 @@ final class ShufflePlayer: ObservableObject {
         songs.contains { $0.id == id }
     }
 
+    // MARK: - Queue Preparation
+
+    func prepareQueue() async throws {
+        guard !songs.isEmpty else { return }
+        try await musicService.setQueue(songs: songs)
+        preparedSongIds = Set(songs.map(\.id))
+    }
+
     // MARK: - Playback Control
 
     func play() async throws {
         guard !songs.isEmpty else { return }
         playedSongIds.removeAll()
         lastObservedSongId = nil
-        try await musicService.setQueue(songs: songs)
+
+        if !isQueuePrepared {
+            try await musicService.setQueue(songs: songs)
+            preparedSongIds = Set(songs.map(\.id))
+        }
         try await musicService.play()
     }
 
