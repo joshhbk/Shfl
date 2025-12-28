@@ -12,6 +12,9 @@ actor MockMusicService: MusicService {
     var lastQueuedSongs: [Song] = []
     var shouldThrowOnFetch: Error?
 
+    /// Configurable duration for testing. Access via currentSongDuration.
+    nonisolated(unsafe) var mockDuration: TimeInterval = 180
+
     private var currentState: PlaybackState = .empty
     private var continuation: AsyncStream<PlaybackState>.Continuation?
     private var queuedSongs: [Song] = []
@@ -24,7 +27,7 @@ actor MockMusicService: MusicService {
     }
 
     nonisolated var currentPlaybackTime: TimeInterval { 0 }
-    nonisolated var currentSongDuration: TimeInterval { 180 }
+    nonisolated var currentSongDuration: TimeInterval { mockDuration }
 
     private func setContinuation(_ cont: AsyncStream<PlaybackState>.Continuation) {
         self.continuation = cont
