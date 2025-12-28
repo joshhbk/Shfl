@@ -247,8 +247,16 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        // Simulate song1 finished, now playing song2
-        await mockService.simulatePlaybackState(.playing(song2))
+        // Determine which song is currently playing (mock shuffles the queue)
+        let state = await player.playbackState
+        guard let firstSong = state.currentSong else {
+            XCTFail("Expected a song to be playing")
+            return
+        }
+        let secondSong = firstSong.id == song1.id ? song2 : song1
+
+        // Simulate transition: first song finished, now playing second song
+        await mockService.simulatePlaybackState(.playing(secondSong))
         try await Task.sleep(nanoseconds: 100_000_000)
 
         await mockService.resetQueueTracking()
@@ -261,8 +269,8 @@ final class ShufflePlayerTests: XCTestCase {
         let lastQueued = await mockService.lastQueuedSongs
         let queuedIds = Set(lastQueued.map { $0.id })
 
-        XCTAssertFalse(queuedIds.contains("1"), "Played song1 should be excluded")
-        XCTAssertTrue(queuedIds.contains("2"), "Current song2 should be included")
+        XCTAssertFalse(queuedIds.contains(firstSong.id), "Played song should be excluded")
+        XCTAssertTrue(queuedIds.contains(secondSong.id), "Current song should be included")
         XCTAssertTrue(queuedIds.contains("3"), "New song3 should be included")
     }
 
@@ -307,5 +315,38 @@ final class ShufflePlayerTests: XCTestCase {
         // Song should be removed from songs list
         let containsSong = await player.containsSong(id: currentSongId!)
         XCTAssertFalse(containsSong, "Removed song should not be in songs list")
+    }
+
+    func testPlayClearsHistory() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Determine which song is currently playing (mock shuffles the queue)
+        let state = await player.playbackState
+        guard let currentSong = state.currentSong else {
+            XCTFail("Expected a song to be playing")
+            return
+        }
+        let otherSong = currentSong.id == song1.id ? song2 : song1
+
+        // Simulate song transition to build history
+        await mockService.simulatePlaybackState(.playing(otherSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        var playedIds = await player.playedSongIdsForTesting
+        XCTAssertTrue(playedIds.contains(currentSong.id), "History should contain played song")
+
+        // Pause and play again - should clear history
+        await player.pause()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        playedIds = await player.playedSongIdsForTesting
+        XCTAssertTrue(playedIds.isEmpty, "History should be cleared on fresh play")
     }
 }

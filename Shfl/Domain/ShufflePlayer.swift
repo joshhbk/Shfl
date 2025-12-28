@@ -108,6 +108,8 @@ final class ShufflePlayer: ObservableObject {
 
     func play() async throws {
         guard !songs.isEmpty else { return }
+        playedSongIds.removeAll()
+        lastObservedSongId = nil
         try await musicService.setQueue(songs: songs)
         try await musicService.play()
     }
