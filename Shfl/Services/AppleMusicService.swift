@@ -77,23 +77,20 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     }
 
     func searchLibrarySongs(query: String) async throws -> [Song] {
-        print("🔍 Searching for: '\(query)'")
+        var request = MusicLibrarySearchRequest(term: query, types: [MusicKit.Song.self])
+        request.limit = 50
 
-        // Search directly against cached library - no async fetch needed
-        guard let allSongs = cachedLibrary[.mostPlayed] else {
-            print("🔍 Cache miss - no songs cached yet")
-            return []
+        let response = try await request.response()
+
+        return response.songs.map { musicKitSong in
+            Song(
+                id: musicKitSong.id.rawValue,
+                title: musicKitSong.title,
+                artist: musicKitSong.artistName,
+                albumTitle: musicKitSong.albumTitle ?? "",
+                artworkURL: nil
+            )
         }
-
-        let lowercasedQuery = query.lowercased()
-        let results = allSongs.filter { song in
-            song.title.lowercased().contains(lowercasedQuery) ||
-            song.artist.lowercased().contains(lowercasedQuery) ||
-            song.albumTitle.lowercased().contains(lowercasedQuery)
-        }
-
-        print("🔍 Found \(results.count) results for '\(query)'")
-        return results
     }
 
     func setQueue(songs: [Song]) async throws {
