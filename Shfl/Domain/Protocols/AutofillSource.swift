@@ -1,5 +1,18 @@
 import Foundation
 
+/// Algorithm options for autofill behavior
+enum AutofillAlgorithm: String, CaseIterable, Sendable {
+    case random = "random"
+    case recentlyAdded = "recentlyAdded"
+
+    var displayName: String {
+        switch self {
+        case .random: return "Random"
+        case .recentlyAdded: return "Recently Added"
+        }
+    }
+}
+
 /// Protocol for sources that can provide songs for autofill
 /// Uses the strategy pattern to allow different sources (library, playlist) to provide songs
 protocol AutofillSource: Sendable {
