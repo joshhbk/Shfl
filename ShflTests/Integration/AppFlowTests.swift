@@ -132,7 +132,7 @@ final class AppFlowTests: XCTestCase {
     }
 
     func testDirectAddFromPlayerView() async throws {
-        // This tests the navigation flow: PlayerView -> "+" -> SongPickerView -> Done
+        // This tests the navigation flow: PlayerView -> "+" -> SongPickerView
         // The actual UI navigation is tested via UI tests, but we can verify the state management
 
         let mockService = MockMusicService()
