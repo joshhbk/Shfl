@@ -5,8 +5,10 @@ struct PlayerView: View {
     let musicService: MusicService
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
+    let onSettingsTapped: () -> Void
 
     @Environment(\.motionManager) private var motionManager
+    @StateObject private var colorExtractor = AlbumArtColorExtractor()
     @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""
@@ -20,18 +22,30 @@ struct PlayerView: View {
         ShuffleTheme.allThemes[currentThemeIndex]
     }
 
+    /// Dynamic highlight color from album art, with fallback to theme-based color
+    private var dynamicHighlightColor: Color {
+        // Use extracted color if available
+        if let extractedColor = colorExtractor.extractedColor {
+            return extractedColor
+        }
+        // Fall back to theme-based color (white for colored themes, black for silver)
+        return currentTheme.wheelStyle == .dark ? .black : .white
+    }
+
     private let swipeThreshold: CGFloat = 100
 
     init(
         player: ShufflePlayer,
         musicService: MusicService,
         onManageTapped: @escaping () -> Void,
-        onAddTapped: @escaping () -> Void = {}
+        onAddTapped: @escaping () -> Void = {},
+        onSettingsTapped: @escaping () -> Void = {}
     ) {
         self.player = player
         self.musicService = musicService
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
+        self.onSettingsTapped = onSettingsTapped
     }
 
     var body: some View {
@@ -43,8 +57,9 @@ struct PlayerView: View {
                     intensity: currentTheme.brushedMetalIntensity,
                     highlightOffset: highlightOffset,
                     motionEnabled: currentTheme.motionEnabled,
-                    highlightColor: currentTheme.wheelStyle == .dark ? .black : .white
+                    highlightColor: dynamicHighlightColor
                 )
+                .animation(.easeInOut(duration: 0.5), value: colorExtractor.extractedColor?.description)
 
                 // Content
                 VStack(spacing: 0) {
@@ -105,6 +120,10 @@ struct PlayerView: View {
             .onAppear {
                 startProgressTimer()
                 motionManager?.start()
+                // Extract color if there's already a song playing
+                if let song = player.playbackState.currentSong {
+                    colorExtractor.updateColor(for: song.id)
+                }
             }
             .onDisappear {
                 stopProgressTimer()
@@ -132,7 +151,11 @@ struct PlayerView: View {
                 .foregroundStyle(currentTheme.textColor)
             }
             Spacer()
-            CapacityIndicator(current: player.songCount, maximum: player.capacity)
+            Button(action: onSettingsTapped) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(currentTheme.textColor)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
@@ -239,6 +262,13 @@ struct PlayerView: View {
 
         // Update duration when song changes
         duration = musicService.currentSongDuration
+
+        // Extract color from album artwork
+        if let song = newState.currentSong {
+            colorExtractor.updateColor(for: song.id)
+        } else {
+            colorExtractor.clear()
+        }
     }
 
     // MARK: - Progress Timer
@@ -298,7 +328,8 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
         player: player,
         musicService: mockService,
         onManageTapped: {},
-        onAddTapped: {}
+        onAddTapped: {},
+        onSettingsTapped: {}
     )
 }
 
@@ -309,6 +340,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
         player: player,
         musicService: mockService,
         onManageTapped: {},
-        onAddTapped: {}
+        onAddTapped: {},
+        onSettingsTapped: {}
     )
 }

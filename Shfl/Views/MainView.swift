@@ -18,7 +18,8 @@ struct MainView: View {
                     player: viewModel.player,
                     musicService: viewModel.musicService,
                     onManageTapped: { viewModel.openManage() },
-                    onAddTapped: { viewModel.openPickerDirect() }
+                    onAddTapped: { viewModel.openPickerDirect() },
+                    onSettingsTapped: { viewModel.openSettings() }
                 )
             } else {
                 authorizationView
@@ -47,6 +48,9 @@ struct MainView: View {
                 musicService: viewModel.musicService,
                 onDismiss: { viewModel.closePickerDirect() }
             )
+        }
+        .sheet(isPresented: $viewModel.showingSettings) {
+            SettingsView()
         }
         .alert("Authorization Required", isPresented: .init(
             get: { viewModel.authorizationError != nil },
