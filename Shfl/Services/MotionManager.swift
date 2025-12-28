@@ -43,13 +43,14 @@ final class MotionManager {
     ) -> CGPoint {
         guard sensitivity > 0 else { return .zero }
 
-        // Map pitch/roll (-π to π) to offset (-maxOffset to maxOffset)
-        // Clamp to reasonable range (about ±45 degrees of tilt)
-        let clampedPitch = max(-0.8, min(0.8, pitch))
+        // Map pitch/roll to offset
+        // Roll: ±0.8 rad (~45°) for side-to-side tilt
+        // Pitch: wider range since phone is typically held at an angle
         let clampedRoll = max(-0.8, min(0.8, roll))
+        let clampedPitch = max(-1.2, min(1.2, pitch))
 
         let x = CGFloat(clampedRoll) * maxOffset * sensitivity / 0.8
-        let y = CGFloat(clampedPitch) * maxOffset * sensitivity / 0.8
+        let y = CGFloat(clampedPitch) * maxOffset * sensitivity / 1.2
 
         return CGPoint(x: x, y: -y)  // Invert Y so tilting forward moves highlight up
     }
