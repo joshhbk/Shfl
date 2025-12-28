@@ -34,7 +34,7 @@ final class AlbumArtColorExtractor: ObservableObject {
         currentTask = Task {
             do {
                 // Fetch from catalog to get full artwork metadata
-                let request = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(songId))
+                let request = MusicCatalogResourceRequest<MusicKit.Song>(matching: \.id, equalTo: MusicItemID(songId))
                 let response = try await request.response()
 
                 guard !Task.isCancelled, currentSongId == songId else { return }
