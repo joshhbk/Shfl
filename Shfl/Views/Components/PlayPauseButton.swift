@@ -7,8 +7,8 @@ struct PlayPauseButton: View {
 
     @State private var isPressed = false
 
-    private let buttonSize: CGFloat = 130
-    private let iconSize: CGFloat = 52
+    private let buttonSize: CGFloat = 150
+    private let iconSize: CGFloat = 40
 
     private var buttonBackgroundColor: Color {
         theme.bodyGradientTop

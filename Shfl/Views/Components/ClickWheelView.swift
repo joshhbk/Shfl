@@ -13,7 +13,7 @@ struct ClickWheelView: View {
     let onVolumeDown: () -> Void
 
     private let wheelSize: CGFloat = 280
-    private let centerButtonSize: CGFloat = 130
+    private let centerButtonSize: CGFloat = 150
 
     // Position buttons at the midpoint of the ring
     // Ring spans from centerButtonSize/2 to wheelSize/2
@@ -26,35 +26,22 @@ struct ClickWheelView: View {
         return 2 * (ringMidpoint + 30)
     }
 
-    private var wheelBaseColor: Color {
+    private var wheelColor: Color {
         switch theme.wheelStyle {
         case .light:
-            return .white
+            return Color(white: 0.95)
         case .dark:
             return Color(white: 0.08)
         }
     }
 
-    private var glossyOverlay: LinearGradient {
-        let highlightOpacity: CGFloat = theme.wheelStyle == .light ? 0.4 : 0.15
-        return LinearGradient(
-            colors: [Color.white.opacity(highlightOpacity), Color.clear],
-            startPoint: .top,
-            endPoint: .center
-        )
-    }
-
     var body: some View {
         ZStack {
-            // Outer wheel background with glossy overlay
-            ZStack {
-                Circle()
-                    .fill(wheelBaseColor)
-                Circle()
-                    .fill(glossyOverlay)
-            }
-            .frame(width: wheelSize, height: wheelSize)
-            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+            // Outer wheel - clean and simple
+            Circle()
+                .fill(wheelColor)
+                .frame(width: wheelSize, height: wheelSize)
+                .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 6)
 
             // Control buttons positioned around the wheel
             VStack {
