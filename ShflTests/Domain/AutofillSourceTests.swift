@@ -100,19 +100,20 @@ struct LibraryAutofillSourceTests {
         #expect(foundDifferentOrder, "Random algorithm should shuffle results")
     }
 
-    @Test("Recently added algorithm preserves order")
-    func recentlyAddedPreservesOrder() async throws {
+    @Test("Recently added algorithm returns songs from pool")
+    func recentlyAddedReturnsSongs() async throws {
         let mockService = MockMusicService()
-        // Songs are returned in recency order from mock
         let songs = (1...10).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
         let source = LibraryAutofillSource(musicService: mockService, algorithm: .recentlyAdded)
         let result = try await source.fetchSongs(excluding: [], limit: 10)
 
-        let resultIds = result.map { $0.id }
-        let expectedIds = songs.map { $0.id }
-        #expect(resultIds == expectedIds, "Recently added should preserve order")
+        // Should return all songs (shuffled)
+        #expect(result.count == 10)
+        let resultIds = Set(result.map { $0.id })
+        let expectedIds = Set(songs.map { $0.id })
+        #expect(resultIds == expectedIds, "Recently added should return songs from pool")
     }
 
     @Test("Default algorithm is random")

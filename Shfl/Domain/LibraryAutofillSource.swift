@@ -22,12 +22,8 @@ struct LibraryAutofillSource: AutofillSource {
         // Filter out excluded songs
         let available = page.songs.filter { !excluding.contains($0.id) }
 
-        // Apply algorithm
-        switch algorithm {
-        case .random:
-            return Array(available.shuffled().prefix(limit))
-        case .recentlyAdded:
-            return Array(available.prefix(limit))
-        }
+        // Both algorithms shuffle - the difference is the source pool
+        // (Currently both use recentlyAdded, but Random could use a different sort later)
+        return Array(available.shuffled().prefix(limit))
     }
 }
