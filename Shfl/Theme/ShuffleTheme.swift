@@ -70,7 +70,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.00, green: 0.48, blue: 0.78), // #007AC7 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: Color(white: 0.3),
+        centerButtonIconColor: .white,
         brushedMetalIntensity: 1.0,
         motionEnabled: true,
         motionSensitivity: 1.0
@@ -84,7 +84,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.53, green: 0.70, blue: 0.16), // #87B329 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: Color(white: 0.3),
+        centerButtonIconColor: .white,
         brushedMetalIntensity: 1.0,
         motionEnabled: true,
         motionSensitivity: 1.0
@@ -98,7 +98,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.90, green: 0.62, blue: 0.05), // #E69E0D - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: Color(white: 0.3),
+        centerButtonIconColor: .white,
         brushedMetalIntensity: 1.0,
         motionEnabled: true,
         motionSensitivity: 1.0
@@ -112,7 +112,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.83, green: 0.24, blue: 0.50), // #D43D80 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: Color(white: 0.3),
+        centerButtonIconColor: .white,
         brushedMetalIntensity: 1.0,
         motionEnabled: true,
         motionSensitivity: 1.0
