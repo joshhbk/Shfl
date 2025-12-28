@@ -12,6 +12,7 @@ final class AppViewModel: ObservableObject {
     @Published var showingManage = false
     @Published var showingPicker = false
     @Published var showingPickerDirect = false
+    @Published var showingSettings = false
     @Published var authorizationError: String?
 
     init(musicService: MusicService, modelContext: ModelContext) {
@@ -78,5 +79,13 @@ final class AppViewModel: ObservableObject {
     func closePickerDirect() {
         showingPickerDirect = false
         persistSongs()
+    }
+
+    func openSettings() {
+        showingSettings = true
+    }
+
+    func closeSettings() {
+        showingSettings = false
     }
 }
