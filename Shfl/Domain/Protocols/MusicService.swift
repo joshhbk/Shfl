@@ -32,6 +32,12 @@ protocol MusicService: Sendable {
     /// Set the playback queue with songs and shuffle them
     func setQueue(songs: [Song]) async throws
 
+    /// Set initial queue with a small subset of songs (for fast startup)
+    func setInitialQueue(songs: [Song]) async throws
+
+    /// Append songs to the existing queue
+    func appendToQueue(songs: [Song]) async throws
+
     /// Start playback
     func play() async throws
 
