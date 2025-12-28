@@ -3,9 +3,14 @@ import Testing
 @testable import Shfl
 
 actor MockScrobbleTransport: ScrobbleTransport {
-    var isAuthenticated: Bool = true
+    private var _isAuthenticated: Bool = true
+    var isAuthenticated: Bool { _isAuthenticated }
     private(set) var scrobbledEvents: [ScrobbleEvent] = []
     private(set) var nowPlayingEvents: [ScrobbleEvent] = []
+
+    func setAuthenticated(_ value: Bool) {
+        _isAuthenticated = value
+    }
 
     func scrobble(_ event: ScrobbleEvent) async {
         scrobbledEvents.append(event)
