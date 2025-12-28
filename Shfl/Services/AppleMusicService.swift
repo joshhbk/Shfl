@@ -7,10 +7,6 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     private var stateObservationTask: Task<Void, Never>?
     private var continuation: AsyncStream<PlaybackState>.Continuation?
 
-    // Library cache
-    private var cachedLibrary: [SortOption: [Song]] = [:]
-    private var prefetchTask: Task<Void, Never>?
-
     var playbackStateStream: AsyncStream<PlaybackState> {
         AsyncStream { [weak self] continuation in
             self?.continuation = continuation
@@ -40,58 +36,6 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     func requestAuthorization() async -> Bool {
         let status = await MusicAuthorization.request()
         return status == .authorized
-    }
-
-    /// Prefetch library songs in background for faster access later
-    func prefetchLibrary() async {
-        // Prefetch most common sort option
-        _ = try? await fetchAllLibrarySongs(sortedBy: .mostPlayed)
-    }
-
-    private func fetchAllLibrarySongs(sortedBy: SortOption) async throws -> [Song] {
-        // Return cached if available
-        if let cached = cachedLibrary[sortedBy] {
-            print("📚 Returning \(cached.count) cached songs for \(sortedBy)")
-            return cached
-        }
-
-        print("📚 Fetching library songs for \(sortedBy)...")
-        var request = MusicLibraryRequest<MusicKit.Song>()
-
-        // Limit for faster loading during development
-        request.limit = 1000
-
-        switch sortedBy {
-        case .mostPlayed:
-            request.sort(by: \.playCount, ascending: false)
-        case .recentlyPlayed:
-            request.sort(by: \.lastPlayedDate, ascending: false)
-        case .recentlyAdded:
-            request.sort(by: \.libraryAddedDate, ascending: false)
-        case .alphabetical:
-            request.sort(by: \.title, ascending: true)
-        }
-
-        let response = try await request.response()
-        print("📚 Got \(response.items.count) songs from MusicKit")
-
-        // Map songs (artwork loaded lazily by ArtworkLoader)
-        let allSongs = response.items.map { musicKitSong in
-            Song(
-                id: musicKitSong.id.rawValue,
-                title: musicKitSong.title,
-                artist: musicKitSong.artistName,
-                albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil
-            )
-        }
-
-        // Only cache if we got results
-        if !allSongs.isEmpty {
-            cachedLibrary[sortedBy] = allSongs
-        }
-        print("📚 Processed \(allSongs.count) songs")
-        return allSongs
     }
 
     func fetchLibrarySongs(
