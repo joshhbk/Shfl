@@ -59,11 +59,12 @@ extension ShuffleTheme {
         motionSensitivity: 1.0
     )
 
+    // iPod Shuffle 4th gen: bright aqua blue
     static let blue = ShuffleTheme(
         id: "blue",
         name: "Blue",
-        bodyGradientTop: Color(red: 0.18, green: 0.58, blue: 0.96),
-        bodyGradientBottom: Color(red: 0.12, green: 0.46, blue: 0.82),
+        bodyGradientTop: Color(red: 0.00, green: 0.68, blue: 0.94),    // #00ADEF - bright cyan-blue
+        bodyGradientBottom: Color(red: 0.00, green: 0.58, blue: 0.84), // #0094D6 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
@@ -71,11 +72,12 @@ extension ShuffleTheme {
         motionSensitivity: 1.0
     )
 
+    // iPod Shuffle 4th gen: vibrant lime green
     static let green = ShuffleTheme(
         id: "green",
         name: "Green",
-        bodyGradientTop: Color(red: 0.30, green: 0.78, blue: 0.25),
-        bodyGradientBottom: Color(red: 0.22, green: 0.66, blue: 0.18),
+        bodyGradientTop: Color(red: 0.55, green: 0.82, blue: 0.22),    // #8CD138 - bright lime
+        bodyGradientBottom: Color(red: 0.45, green: 0.72, blue: 0.15), // #73B826 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
@@ -83,11 +85,12 @@ extension ShuffleTheme {
         motionSensitivity: 1.0
     )
 
+    // iPod Shuffle 4th gen: golden orange
     static let orange = ShuffleTheme(
         id: "orange",
         name: "Orange",
-        bodyGradientTop: Color(red: 0.98, green: 0.55, blue: 0.05),
-        bodyGradientBottom: Color(red: 0.88, green: 0.44, blue: 0.02),
+        bodyGradientTop: Color(red: 1.00, green: 0.62, blue: 0.04),    // #FF9E0A - bright golden orange
+        bodyGradientBottom: Color(red: 0.95, green: 0.52, blue: 0.00), // #F28500 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
@@ -95,11 +98,12 @@ extension ShuffleTheme {
         motionSensitivity: 1.0
     )
 
+    // iPod Shuffle 4th gen: hot pink/magenta
     static let pink = ShuffleTheme(
         id: "pink",
         name: "Pink",
-        bodyGradientTop: Color(red: 0.96, green: 0.26, blue: 0.48),
-        bodyGradientBottom: Color(red: 0.84, green: 0.18, blue: 0.40),
+        bodyGradientTop: Color(red: 0.98, green: 0.22, blue: 0.55),    // #FA388C - hot pink
+        bodyGradientBottom: Color(red: 0.88, green: 0.15, blue: 0.45), // #E02673 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
         brushedMetalIntensity: 1.0,
