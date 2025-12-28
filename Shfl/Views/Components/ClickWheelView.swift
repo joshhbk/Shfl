@@ -3,6 +3,8 @@ import SwiftUI
 struct ClickWheelView: View {
     @Environment(\.shuffleTheme) private var theme
 
+    @State private var pressPosition: WheelPressPosition = .none
+
     let isPlaying: Bool
     let onPlayPause: () -> Void
     let onSkipForward: () -> Void
@@ -40,26 +42,46 @@ struct ClickWheelView: View {
 
             // Control buttons positioned around the wheel
             VStack {
-                ClickWheelButton(systemName: "plus", action: onVolumeUp, wheelStyle: theme.wheelStyle)
+                ClickWheelButton(
+                    systemName: "plus",
+                    action: onVolumeUp,
+                    onPressChanged: { isPressed in pressPosition = isPressed ? .top : .none },
+                    wheelStyle: theme.wheelStyle
+                )
                 Spacer()
             }
             .frame(height: wheelSize - 40)
 
             VStack {
                 Spacer()
-                ClickWheelButton(systemName: "minus", action: onVolumeDown, wheelStyle: theme.wheelStyle)
+                ClickWheelButton(
+                    systemName: "minus",
+                    action: onVolumeDown,
+                    onPressChanged: { isPressed in pressPosition = isPressed ? .bottom : .none },
+                    wheelStyle: theme.wheelStyle
+                )
             }
             .frame(height: wheelSize - 40)
 
             HStack {
-                ClickWheelButton(systemName: "backward.end.fill", action: onSkipBack, wheelStyle: theme.wheelStyle)
+                ClickWheelButton(
+                    systemName: "backward.end.fill",
+                    action: onSkipBack,
+                    onPressChanged: { isPressed in pressPosition = isPressed ? .left : .none },
+                    wheelStyle: theme.wheelStyle
+                )
                 Spacer()
             }
             .frame(width: wheelSize - 40)
 
             HStack {
                 Spacer()
-                ClickWheelButton(systemName: "forward.end.fill", action: onSkipForward, wheelStyle: theme.wheelStyle)
+                ClickWheelButton(
+                    systemName: "forward.end.fill",
+                    action: onSkipForward,
+                    onPressChanged: { isPressed in pressPosition = isPressed ? .right : .none },
+                    wheelStyle: theme.wheelStyle
+                )
             }
             .frame(width: wheelSize - 40)
 
@@ -67,6 +89,16 @@ struct ClickWheelView: View {
             PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, wheelStyle: theme.wheelStyle)
         }
         .compositingGroup()
+        .scaleEffect(pressPosition != .none ? ClickWheelFeedback.wheelPressScale : 1.0)
+        .rotation3DEffect(
+            .degrees(pressPosition != .none ? ClickWheelFeedback.tiltAngle : 0),
+            axis: pressPosition.rotationAxis,
+            perspective: ClickWheelFeedback.perspective
+        )
+        .animation(
+            .spring(response: ClickWheelFeedback.springResponse, dampingFraction: ClickWheelFeedback.springDampingFraction),
+            value: pressPosition
+        )
     }
 }
 
