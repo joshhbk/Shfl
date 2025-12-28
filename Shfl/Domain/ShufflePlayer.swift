@@ -93,6 +93,7 @@ final class ShufflePlayer: ObservableObject {
 
     func removeSong(id: String) {
         songs.removeAll { $0.id == id }
+        rebuildQueueIfPlaying()
     }
 
     func removeAllSongs() {

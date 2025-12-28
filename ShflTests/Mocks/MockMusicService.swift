@@ -71,10 +71,19 @@ actor MockMusicService: MusicService {
         lastQueuedSongs = songs
         queuedSongs = songs.shuffled()
         currentIndex = 0
-        if queuedSongs.isEmpty {
-            updateState(.empty)
-        } else {
-            updateState(.stopped)
+
+        // Only change state if not actively playing/paused
+        // Real Apple Music preserves playback when queue is updated
+        switch currentState {
+        case .playing, .paused:
+            // Keep current playback state - queue update doesn't stop playback
+            break
+        default:
+            if queuedSongs.isEmpty {
+                updateState(.empty)
+            } else {
+                updateState(.stopped)
+            }
         }
     }
 

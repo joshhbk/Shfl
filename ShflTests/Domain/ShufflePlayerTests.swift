@@ -265,4 +265,47 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertTrue(queuedIds.contains("2"), "Current song2 should be included")
         XCTAssertTrue(queuedIds.contains("3"), "New song3 should be included")
     }
+
+    func testRemoveSongDuringPlaybackRebuildsQueue() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        await player.removeSong(id: "2")
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let callCount = await mockService.setQueueCallCount
+        XCTAssertEqual(callCount, 1, "setQueue should be called when removing song during playback")
+
+        let lastQueued = await mockService.lastQueuedSongs
+        let queuedIds = lastQueued.map { $0.id }
+        XCTAssertFalse(queuedIds.contains("2"), "Removed song should not be in queue")
+    }
+
+    func testRemoveCurrentlyPlayingSongContinuesPlayback() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Remove currently playing song
+        let currentSongId = await player.playbackState.currentSongId
+        await player.removeSong(id: currentSongId!)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Playback should still be active (song finishes naturally)
+        let state = await player.playbackState
+        XCTAssertTrue(state.isActive, "Playback should continue after removing current song")
+
+        // Song should be removed from songs list
+        let containsSong = await player.containsSong(id: currentSongId!)
+        XCTAssertFalse(containsSong, "Removed song should not be in songs list")
+    }
 }
