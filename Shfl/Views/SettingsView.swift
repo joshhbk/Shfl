@@ -33,8 +33,7 @@ struct SettingsView: View {
 
                 Section("Connections") {
                     NavigationLink {
-                        Text("Last.fm connection coming soon")
-                            .navigationTitle("Last.fm")
+                        LastFMSettingsView()
                     } label: {
                         Label("Last.fm", systemImage: "antenna.radiowaves.left.and.right")
                     }
