@@ -115,7 +115,13 @@ final class ShufflePlayer: ObservableObject {
 
     func prepareQueue() async throws {
         guard !songs.isEmpty else { return }
-        try await musicService.setQueue(songs: songs)
+
+        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
+        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+        let shuffler = QueueShuffler(algorithm: algorithm)
+        let shuffledSongs = shuffler.shuffle(songs)
+
+        try await musicService.setQueue(songs: shuffledSongs)
         preparedSongIds = Set(songs.map(\.id))
     }
 
@@ -126,10 +132,13 @@ final class ShufflePlayer: ObservableObject {
         playedSongIds.removeAll()
         lastObservedSongId = nil
 
-        if !isQueuePrepared {
-            try await musicService.setQueue(songs: songs)
-            preparedSongIds = Set(songs.map(\.id))
-        }
+        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
+        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+        let shuffler = QueueShuffler(algorithm: algorithm)
+        let shuffledSongs = shuffler.shuffle(songs)
+
+        try await musicService.setQueue(songs: shuffledSongs)
+        preparedSongIds = Set(songs.map(\.id))
         try await musicService.play()
     }
 

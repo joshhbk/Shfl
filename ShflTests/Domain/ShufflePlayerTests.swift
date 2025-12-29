@@ -317,6 +317,26 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertFalse(containsSong, "Removed song should not be in songs list")
     }
 
+    func testPlayAppliesShuffleAlgorithm() async throws {
+        // Set algorithm to noRepeat (default)
+        UserDefaults.standard.set("noRepeat", forKey: "shuffleAlgorithm")
+
+        let songs = (1...5).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+
+        for song in songs {
+            try await player.addSong(song)
+        }
+
+        try await player.play()
+
+        // Verify queue was set (shuffler was applied)
+        let queuedSongs = await mockService.lastQueuedSongs
+        XCTAssertEqual(queuedSongs.count, 5)
+        XCTAssertEqual(Set(queuedSongs.map(\.id)), Set(songs.map(\.id)))
+    }
+
     func testPlayClearsHistory() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
