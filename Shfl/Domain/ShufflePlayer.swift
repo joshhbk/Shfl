@@ -52,9 +52,8 @@ final class ShufflePlayer: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                await self.reshuffleIfNeeded()
+            Task { @MainActor [weak self] in
+                await self?.reshuffleIfNeeded()
             }
         }
     }
