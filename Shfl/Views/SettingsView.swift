@@ -17,8 +17,7 @@ struct SettingsView: View {
 
                 Section("Playback") {
                     NavigationLink {
-                        Text("Shuffle algorithm settings coming soon")
-                            .navigationTitle("Shuffle Algorithm")
+                        ShuffleAlgorithmSettingsView()
                     } label: {
                         Label("Shuffle Algorithm", systemImage: "shuffle")
                     }
