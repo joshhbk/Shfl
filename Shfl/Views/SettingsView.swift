@@ -37,6 +37,16 @@ struct SettingsView: View {
                         Label("Last.fm", systemImage: "antenna.radiowaves.left.and.right")
                     }
                 }
+
+                #if DEBUG
+                Section("Debug") {
+                    NavigationLink {
+                        DebugQueueView()
+                    } label: {
+                        Label("View Queue Order", systemImage: "list.number")
+                    }
+                }
+                #endif
             }
             .navigationTitle("Settings")
             .toolbar {

@@ -17,6 +17,9 @@ final class ShufflePlayer: ObservableObject {
 
     @Published private(set) var playbackState: PlaybackState = .empty
 
+    /// Debug: The last shuffled queue order (for verifying shuffle algorithms)
+    @Published private(set) var lastShuffledQueue: [Song] = []
+
     private var playedSongIds: Set<String> = []
     private var lastObservedSongId: String?
     private var preparedSongIds: Set<String> = []
@@ -120,6 +123,7 @@ final class ShufflePlayer: ObservableObject {
         let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
         let shuffler = QueueShuffler(algorithm: algorithm)
         let shuffledSongs = shuffler.shuffle(songs)
+        lastShuffledQueue = shuffledSongs
 
         try await musicService.setQueue(songs: shuffledSongs)
         preparedSongIds = Set(songs.map(\.id))
@@ -136,6 +140,7 @@ final class ShufflePlayer: ObservableObject {
         let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
         let shuffler = QueueShuffler(algorithm: algorithm)
         let shuffledSongs = shuffler.shuffle(songs)
+        lastShuffledQueue = shuffledSongs
 
         try await musicService.setQueue(songs: shuffledSongs)
         preparedSongIds = Set(songs.map(\.id))
