@@ -66,7 +66,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
                 title: musicKitSong.title,
                 artist: musicKitSong.artistName,
                 albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil
+                artworkURL: nil,
+                playCount: musicKitSong.playCount ?? 0,
+                lastPlayedDate: musicKitSong.lastPlayedDate
             )
         }
 
@@ -88,7 +90,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
                 title: musicKitSong.title,
                 artist: musicKitSong.artistName,
                 albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil
+                artworkURL: nil,
+                playCount: musicKitSong.playCount ?? 0,
+                lastPlayedDate: musicKitSong.lastPlayedDate
             )
         }
     }
@@ -200,7 +204,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             title: musicKitSong.title,
             artist: musicKitSong.artistName,
             albumTitle: musicKitSong.albumTitle ?? "",
-            artworkURL: musicKitSong.artwork?.url(width: 300, height: 300)
+            artworkURL: musicKitSong.artwork?.url(width: 300, height: 300),
+            playCount: musicKitSong.playCount ?? 0,
+            lastPlayedDate: musicKitSong.lastPlayedDate
         )
 
         switch player.state.playbackStatus {
