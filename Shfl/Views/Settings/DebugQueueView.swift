@@ -12,10 +12,17 @@ struct DebugQueueView: View {
         List {
             Section {
                 HStack {
-                    Text("Algorithm")
+                    Text("Current Setting")
                     Spacer()
                     Text(algorithm.displayName)
                         .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Algorithm Used")
+                    Spacer()
+                    Text(player.lastUsedAlgorithm.displayName)
+                        .foregroundStyle(player.lastUsedAlgorithm == algorithm ? Color.secondary : Color.red)
                 }
 
                 HStack {
@@ -23,6 +30,10 @@ struct DebugQueueView: View {
                     Spacer()
                     Text("\(player.lastShuffledQueue.count) songs")
                         .foregroundStyle(.secondary)
+                }
+            } footer: {
+                if player.lastUsedAlgorithm != algorithm {
+                    Text("⚠️ Press play again to apply the new algorithm")
                 }
             }
 

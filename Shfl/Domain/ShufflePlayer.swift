@@ -19,6 +19,8 @@ final class ShufflePlayer: ObservableObject {
 
     /// Debug: The last shuffled queue order (for verifying shuffle algorithms)
     @Published private(set) var lastShuffledQueue: [Song] = []
+    /// Debug: The algorithm used for the last shuffle
+    @Published private(set) var lastUsedAlgorithm: ShuffleAlgorithm = .noRepeat
 
     private var playedSongIds: Set<String> = []
     private var lastObservedSongId: String?
@@ -36,9 +38,48 @@ final class ShufflePlayer: ObservableObject {
     /// Exposed for testing only
     var playedSongIdsForTesting: Set<String> { playedSongIds }
 
+    private var algorithmObserver: NSObjectProtocol?
+
     init(musicService: MusicService) {
         self.musicService = musicService
         observePlaybackState()
+        observeAlgorithmChanges()
+    }
+
+    private func observeAlgorithmChanges() {
+        algorithmObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.reshuffleIfNeeded()
+            }
+        }
+    }
+
+    private func reshuffleIfNeeded() async {
+        // Only reshuffle if we have songs and are actively playing
+        guard !songs.isEmpty, playbackState.isActive else { return }
+
+        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
+        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+
+        // Only reshuffle if algorithm actually changed
+        guard algorithm != lastUsedAlgorithm else { return }
+
+        print("🎲 Algorithm changed to \(algorithm.displayName), reshuffling...")
+
+        let shuffler = QueueShuffler(algorithm: algorithm)
+        let upcomingSongs = songs.filter { !playedSongIds.contains($0.id) }
+        let shuffledSongs = shuffler.shuffle(upcomingSongs)
+        lastShuffledQueue = shuffledSongs
+        lastUsedAlgorithm = algorithm
+
+        print("🎲 New queue order: \(shuffledSongs.map { "\($0.title) by \($0.artist)" })")
+
+        try? await musicService.setQueue(songs: shuffledSongs)
     }
 
     deinit {
@@ -138,9 +179,14 @@ final class ShufflePlayer: ObservableObject {
 
         let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
         let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+        print("🎲 Shuffling with algorithm: \(algorithm.displayName) (raw: \(algorithmRaw))")
+
         let shuffler = QueueShuffler(algorithm: algorithm)
         let shuffledSongs = shuffler.shuffle(songs)
         lastShuffledQueue = shuffledSongs
+        lastUsedAlgorithm = algorithm
+
+        print("🎲 Queue order: \(shuffledSongs.map { "\($0.title) by \($0.artist)" })")
 
         try await musicService.setQueue(songs: shuffledSongs)
         preparedSongIds = Set(songs.map(\.id))
