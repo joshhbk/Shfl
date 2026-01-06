@@ -113,10 +113,15 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             return
         }
 
-        let queue = ApplicationMusicPlayer.Queue(for: response.items, startingAt: nil)
+        // Reorder response items to match our desired order
+        let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
+        let orderedItems = songs.compactMap { itemsById[$0.id] }
+
+        // Start from the first item in our ordered queue
+        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: orderedItems.first)
         player.queue = queue
-        player.state.shuffleMode = .songs
-        print("🎵 setQueue() completed")
+        player.state.shuffleMode = .off  // We handle shuffling ourselves
+        print("🎵 setQueue() completed with \(orderedItems.count) items, starting at \(orderedItems.first?.title ?? "nil")")
     }
 
     func play() async throws {

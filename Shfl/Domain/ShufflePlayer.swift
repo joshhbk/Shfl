@@ -48,41 +48,62 @@ final class ShufflePlayer: ObservableObject {
 
     private func observeAlgorithmChanges() {
         algorithmObserver = NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification,
+            forName: .shuffleAlgorithmChanged,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                await self?.reshuffleIfNeeded()
+                await self?.reshuffleWithNewAlgorithm()
             }
         }
     }
 
-    private func reshuffleIfNeeded() async {
-        // Only reshuffle if we have songs and are actively playing
+    private func reshuffleWithNewAlgorithm() async {
         guard !songs.isEmpty, playbackState.isActive else { return }
 
         let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
         let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
 
-        // Only reshuffle if algorithm actually changed
-        guard algorithm != lastUsedAlgorithm else { return }
-
         print("🎲 Algorithm changed to \(algorithm.displayName), reshuffling...")
 
+        // Get currently playing song
+        let currentSongId = playbackState.currentSongId
+
+        // Filter out played songs AND the currently playing song
+        let upcomingSongs = songs.filter { song in
+            !playedSongIds.contains(song.id) && song.id != currentSongId
+        }
+
         let shuffler = QueueShuffler(algorithm: algorithm)
-        let upcomingSongs = songs.filter { !playedSongIds.contains($0.id) }
-        let shuffledSongs = shuffler.shuffle(upcomingSongs)
-        lastShuffledQueue = shuffledSongs
+        let shuffledUpcoming = shuffler.shuffle(upcomingSongs)
+
+        // Build full queue: current song first (if exists), then shuffled upcoming
+        var newQueue: [Song] = []
+        if let currentId = currentSongId, let currentSong = songs.first(where: { $0.id == currentId }) {
+            newQueue.append(currentSong)
+        }
+        newQueue.append(contentsOf: shuffledUpcoming)
+
+        lastShuffledQueue = newQueue
         lastUsedAlgorithm = algorithm
 
-        print("🎲 New queue order: \(shuffledSongs.map { "\($0.title) by \($0.artist)" })")
+        print("🎲 New queue order: \(newQueue.map { "\($0.title) by \($0.artist)" })")
 
-        try? await musicService.setQueue(songs: shuffledSongs)
+        do {
+            try await musicService.setQueue(songs: newQueue)
+            // Need to call play() to make the new queue take effect mid-playback
+            try await musicService.play()
+            print("🎲 setQueue and play() succeeded")
+        } catch {
+            print("🎲 setQueue/play FAILED: \(error)")
+        }
     }
 
     deinit {
         stateTask?.cancel()
+        if let observer = algorithmObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     private func observePlaybackState() {

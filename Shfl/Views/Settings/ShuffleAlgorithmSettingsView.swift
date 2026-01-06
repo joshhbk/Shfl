@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let shuffleAlgorithmChanged = Notification.Name("shuffleAlgorithmChanged")
+}
+
 struct ShuffleAlgorithmSettingsView: View {
     @AppStorage("shuffleAlgorithm") private var algorithmRaw: String = ShuffleAlgorithm.noRepeat.rawValue
 
@@ -12,7 +16,9 @@ struct ShuffleAlgorithmSettingsView: View {
             Section {
                 ForEach(ShuffleAlgorithm.allCases, id: \.self) { algo in
                     Button {
+                        guard algorithmRaw != algo.rawValue else { return }
                         algorithmRaw = algo.rawValue
+                        NotificationCenter.default.post(name: .shuffleAlgorithmChanged, object: nil)
                     } label: {
                         HStack {
                             Text(algo.displayName)
