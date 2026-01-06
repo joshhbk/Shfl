@@ -1,11 +1,13 @@
 import Foundation
 
-/// AutofillSource implementation that fetches random songs from the user's Apple Music library
+/// AutofillSource implementation that fetches songs from the user's Apple Music library
 struct LibraryAutofillSource: AutofillSource {
     private let musicService: MusicService
+    private let algorithm: AutofillAlgorithm
 
-    init(musicService: MusicService) {
+    init(musicService: MusicService, algorithm: AutofillAlgorithm = .random) {
         self.musicService = musicService
+        self.algorithm = algorithm
     }
 
     func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
@@ -17,11 +19,11 @@ struct LibraryAutofillSource: AutofillSource {
             offset: 0
         )
 
-        // Filter out excluded songs and shuffle
+        // Filter out excluded songs
         let available = page.songs.filter { !excluding.contains($0.id) }
-        let shuffled = available.shuffled()
 
-        // Return up to limit
-        return Array(shuffled.prefix(limit))
+        // Both algorithms shuffle - the difference is the source pool
+        // (Currently both use recentlyAdded, but Random could use a different sort later)
+        return Array(available.shuffled().prefix(limit))
     }
 }

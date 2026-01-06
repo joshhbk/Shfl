@@ -73,7 +73,9 @@ struct SongPickerView: View {
                     } else {
                         Button("Autofill") {
                             Task {
-                                let source = LibraryAutofillSource(musicService: musicService)
+                                let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
+                                let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
+                                let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
                                 await viewModel.autofill(into: player, using: source)
                             }
                         }

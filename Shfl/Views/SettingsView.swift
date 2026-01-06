@@ -23,8 +23,7 @@ struct SettingsView: View {
                     }
 
                     NavigationLink {
-                        Text("Autofill settings coming soon")
-                            .navigationTitle("Autofill")
+                        AutofillSettingsView()
                     } label: {
                         Label("Autofill", systemImage: "text.badge.plus")
                     }
