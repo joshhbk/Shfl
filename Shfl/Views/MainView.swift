@@ -51,6 +51,7 @@ struct MainView: View {
         }
         .sheet(isPresented: $viewModel.showingSettings) {
             SettingsView()
+                .environmentObject(viewModel.player)
         }
         .alert("Authorization Required", isPresented: .init(
             get: { viewModel.authorizationError != nil },

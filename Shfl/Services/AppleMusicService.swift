@@ -66,7 +66,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
                 title: musicKitSong.title,
                 artist: musicKitSong.artistName,
                 albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil
+                artworkURL: nil,
+                playCount: musicKitSong.playCount ?? 0,
+                lastPlayedDate: musicKitSong.lastPlayedDate
             )
         }
 
@@ -88,7 +90,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
                 title: musicKitSong.title,
                 artist: musicKitSong.artistName,
                 albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil
+                artworkURL: nil,
+                playCount: musicKitSong.playCount ?? 0,
+                lastPlayedDate: musicKitSong.lastPlayedDate
             )
         }
     }
@@ -109,10 +113,15 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             return
         }
 
-        let queue = ApplicationMusicPlayer.Queue(for: response.items, startingAt: nil)
+        // Reorder response items to match our desired order
+        let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
+        let orderedItems = songs.compactMap { itemsById[$0.id] }
+
+        // Start from the first item in our ordered queue
+        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: orderedItems.first)
         player.queue = queue
-        player.state.shuffleMode = .songs
-        print("🎵 setQueue() completed")
+        player.state.shuffleMode = .off  // We handle shuffling ourselves
+        print("🎵 setQueue() completed with \(orderedItems.count) items, starting at \(orderedItems.first?.title ?? "nil")")
     }
 
     func play() async throws {
@@ -200,7 +209,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             title: musicKitSong.title,
             artist: musicKitSong.artistName,
             albumTitle: musicKitSong.albumTitle ?? "",
-            artworkURL: musicKitSong.artwork?.url(width: 300, height: 300)
+            artworkURL: musicKitSong.artwork?.url(width: 300, height: 300),
+            playCount: musicKitSong.playCount ?? 0,
+            lastPlayedDate: musicKitSong.lastPlayedDate
         )
 
         switch player.state.playbackStatus {

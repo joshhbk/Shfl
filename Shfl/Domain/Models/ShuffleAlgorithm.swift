@@ -1,0 +1,34 @@
+import Foundation
+
+enum ShuffleAlgorithm: String, CaseIterable, Sendable, Hashable {
+    case pureRandom = "pureRandom"
+    case noRepeat = "noRepeat"
+    case weightedByRecency = "weightedByRecency"
+    case weightedByPlayCount = "weightedByPlayCount"
+    case artistSpacing = "artistSpacing"
+
+    var displayName: String {
+        switch self {
+        case .pureRandom: return "Pure Random"
+        case .noRepeat: return "Full Shuffle"
+        case .weightedByRecency: return "Least Recent"
+        case .weightedByPlayCount: return "Least Played"
+        case .artistSpacing: return "Artist Spacing"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .pureRandom:
+            return "Picks songs randomly. The same song may play again before others."
+        case .noRepeat:
+            return "Shuffles your queue and plays every song before repeating."
+        case .weightedByRecency:
+            return "Prioritizes songs you haven't listened to recently."
+        case .weightedByPlayCount:
+            return "Prioritizes songs with fewer plays."
+        case .artistSpacing:
+            return "Shuffles while avoiding back-to-back songs from the same artist."
+        }
+    }
+}
