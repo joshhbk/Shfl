@@ -55,4 +55,13 @@ protocol MusicService: Sendable {
 
     /// Duration of current song in seconds (0 if nothing playing)
     var currentSongDuration: TimeInterval { get }
+
+    /// Add a song to Apple Music favorites (loved)
+    func addToFavorites(songID: String) async throws
+
+    /// Remove a song from Apple Music favorites
+    func removeFromFavorites(songID: String) async throws
+
+    /// Check if a song is in the user's favorites
+    func isFavorite(songID: String) async throws -> Bool
 }

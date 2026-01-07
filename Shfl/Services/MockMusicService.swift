@@ -32,4 +32,7 @@ final class MockMusicService: MusicService, @unchecked Sendable {
     func skipToNext() async throws {}
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
+    func addToFavorites(songID: String) async throws {}
+    func removeFromFavorites(songID: String) async throws {}
+    func isFavorite(songID: String) async throws -> Bool { false }
 }

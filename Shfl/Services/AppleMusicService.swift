@@ -229,4 +229,74 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             return .stopped
         }
     }
+
+    // MARK: - Favorites
+
+    func addToFavorites(songID: String) async throws {
+        print("❤️ addToFavorites() called for song: \(songID)")
+
+        // Apple Music API uses rating value of 1 for "loved" (favorite)
+        let url = URL(string: "https://api.music.apple.com/v1/me/ratings/library-songs/\(songID)")!
+        var request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        request.httpMethod = "PUT"
+
+        // Rating payload: value 1 = loved/favorite
+        let ratingPayload = """
+        {
+            "type": "rating",
+            "attributes": {
+                "value": 1
+            }
+        }
+        """
+        request.httpBody = ratingPayload.data(using: .utf8)
+
+        let response = try await request.response()
+        print("❤️ addToFavorites() response status: \(response.urlResponse)")
+    }
+
+    func removeFromFavorites(songID: String) async throws {
+        print("💔 removeFromFavorites() called for song: \(songID)")
+
+        // DELETE the rating to remove from favorites
+        let url = URL(string: "https://api.music.apple.com/v1/me/ratings/library-songs/\(songID)")!
+        var request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        request.httpMethod = "DELETE"
+
+        let response = try await request.response()
+        print("💔 removeFromFavorites() response status: \(response.urlResponse)")
+    }
+
+    func isFavorite(songID: String) async throws -> Bool {
+        print("💕 isFavorite() called for song: \(songID)")
+
+        let url = URL(string: "https://api.music.apple.com/v1/me/ratings/library-songs/\(songID)")!
+        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
+
+        do {
+            let response = try await request.response()
+
+            // Parse response to check if rating exists and is positive (1 = loved)
+            struct RatingResponse: Decodable {
+                let data: [RatingData]?
+
+                struct RatingData: Decodable {
+                    let attributes: RatingAttributes?
+
+                    struct RatingAttributes: Decodable {
+                        let value: Int
+                    }
+                }
+            }
+
+            let ratingResponse = try JSONDecoder().decode(RatingResponse.self, from: response.data)
+            let isFavorited = ratingResponse.data?.first?.attributes?.value == 1
+            print("💕 isFavorite() result: \(isFavorited)")
+            return isFavorited
+        } catch {
+            // If 404, the song has no rating (not a favorite)
+            print("💕 isFavorite() error (likely no rating): \(error)")
+            return false
+        }
+    }
 }

@@ -17,6 +17,8 @@ struct PlayerView: View {
     @State private var progressTimer: Timer?
     @State private var currentThemeIndex: Int = Int.random(in: 0..<ShuffleTheme.allThemes.count)
     @State private var dragOffset: CGFloat = 0
+    @State private var isFavorite: Bool = false
+    @State private var isFavoriteLoading: Bool = false
 
     private var currentTheme: ShuffleTheme {
         ShuffleTheme.allThemes[currentThemeIndex]
@@ -120,9 +122,10 @@ struct PlayerView: View {
             .onAppear {
                 startProgressTimer()
                 motionManager?.start()
-                // Extract color if there's already a song playing
+                // Extract color and check favorite status if there's already a song playing
                 if let song = player.playbackState.currentSong {
                     colorExtractor.updateColor(for: song.id)
+                    checkFavoriteStatus(for: song)
                 }
             }
             .onDisappear {
@@ -171,11 +174,24 @@ struct PlayerView: View {
                     .tint(currentTheme.textColor)
                 NowPlayingInfo(title: song.title, artist: song.artist)
                     .opacity(0.7)
+                FavoriteButton(
+                    isFavorite: isFavorite,
+                    isLoading: isFavoriteLoading,
+                    action: { toggleFavorite(for: song) }
+                )
+                .opacity(0.7)
             }
             .transition(.opacity)
         case .playing(let song), .paused(let song):
-            NowPlayingInfo(title: song.title, artist: song.artist)
-                .transition(.opacity)
+            VStack(spacing: 12) {
+                NowPlayingInfo(title: song.title, artist: song.artist)
+                FavoriteButton(
+                    isFavorite: isFavorite,
+                    isLoading: isFavoriteLoading,
+                    action: { toggleFavorite(for: song) }
+                )
+            }
+            .transition(.opacity)
         default:
             emptyStateView
         }
@@ -252,6 +268,41 @@ struct PlayerView: View {
         }
     }
 
+    private func toggleFavorite(for song: Song) {
+        Task {
+            isFavoriteLoading = true
+            do {
+                if isFavorite {
+                    try await musicService.removeFromFavorites(songID: song.id)
+                    isFavorite = false
+                    HapticFeedback.light.trigger()
+                } else {
+                    try await musicService.addToFavorites(songID: song.id)
+                    isFavorite = true
+                    HapticFeedback.medium.trigger()
+                }
+            } catch {
+                errorMessage = "Could not update favorite status"
+                withAnimation {
+                    showError = true
+                }
+            }
+            isFavoriteLoading = false
+        }
+    }
+
+    private func checkFavoriteStatus(for song: Song) {
+        Task {
+            isFavoriteLoading = true
+            do {
+                isFavorite = try await musicService.isFavorite(songID: song.id)
+            } catch {
+                isFavorite = false
+            }
+            isFavoriteLoading = false
+        }
+    }
+
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
         if case .error(let error) = newState {
             errorMessage = error.localizedDescription
@@ -263,11 +314,13 @@ struct PlayerView: View {
         // Update duration when song changes
         duration = musicService.currentSongDuration
 
-        // Extract color from album artwork
+        // Extract color from album artwork and check favorite status
         if let song = newState.currentSong {
             colorExtractor.updateColor(for: song.id)
+            checkFavoriteStatus(for: song)
         } else {
             colorExtractor.clear()
+            isFavorite = false
         }
     }
 
@@ -319,6 +372,9 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     func skipToNext() async throws {}
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
+    func addToFavorites(songID: String) async throws {}
+    func removeFromFavorites(songID: String) async throws {}
+    func isFavorite(songID: String) async throws -> Bool { false }
 }
 
 #Preview("Empty State") {
