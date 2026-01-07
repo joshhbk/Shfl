@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		DCBD255E2F0CCD9E00E57867 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = DCBD255C2F0CCD9E00E57867 /* Shaders.metal */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		DC1306A52EFDBDA400200F38 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -18,31 +14,16 @@
 			remoteGlobalIDString = DC1306942EFDBDA300200F38;
 			remoteInfo = Shfl;
 		};
-
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		DC1306952EFDBDA300200F38 /* Shfl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shfl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		DCBD255C2F0CCD9E00E57867 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		DCBD22212F01083C00E57867 /* Exceptions for "Shfl" folder in "Shfl" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = DC1306942EFDBDA300200F38 /* Shfl */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DC1306972EFDBDA300200F38 /* Shfl */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				DCBD22212F01083C00E57867 /* Exceptions for "Shfl" folder in "Shfl" target */,
-			);
 			path = Shfl;
 			sourceTree = "<group>";
 		};
@@ -51,7 +32,6 @@
 			path = ShflTests;
 			sourceTree = "<group>";
 		};
-
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,23 +49,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		DC1306AB2EFDBDA400200F38 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		DC13068C2EFDBDA300200F38 = {
 			isa = PBXGroup;
 			children = (
-				DCBD255D2F0CCD9E00E57867 /* Resources */,
 				DC1306972EFDBDA300200F38 /* Shfl */,
 				DC1306A72EFDBDA400200F38 /* ShflTests */,
-
 				DC1306962EFDBDA300200F38 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -95,17 +66,8 @@
 			children = (
 				DC1306952EFDBDA300200F38 /* Shfl.app */,
 				DC1306A42EFDBDA400200F38 /* ShflTests.xctest */,
-
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		DCBD255D2F0CCD9E00E57867 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				DCBD255C2F0CCD9E00E57867 /* Shaders.metal */,
-			);
-			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -156,7 +118,6 @@
 			productReference = DC1306A42EFDBDA400200F38 /* ShflTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -171,10 +132,6 @@
 						CreatedOnToolsVersion = 26.2;
 					};
 					DC1306A32EFDBDA400200F38 = {
-						CreatedOnToolsVersion = 26.2;
-						TestTargetID = DC1306942EFDBDA300200F38;
-					};
-					DC1306AD2EFDBDA400200F38 = {
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = DC1306942EFDBDA300200F38;
 					};
@@ -215,13 +172,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		DC1306AC2EFDBDA400200F38 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -229,18 +179,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DCBD255E2F0CCD9E00E57867 /* Shaders.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DC1306A02EFDBDA400200F38 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		DC1306AA2EFDBDA400200F38 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -255,7 +197,6 @@
 			target = DC1306942EFDBDA300200F38 /* Shfl */;
 			targetProxy = DC1306A52EFDBDA400200F38 /* PBXContainerItemProxy */;
 		};
-
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -390,7 +331,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Shfl/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Shuffled;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Shuffled needs access to Apple Music to search your library and play songs.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -440,7 +380,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Shfl/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Shuffled;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Shuffled needs access to Apple Music to search your library and play songs.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -527,7 +466,6 @@
 			};
 			name = Release;
 		};
-
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -558,7 +496,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-
 /* End XCConfigurationList section */
 	};
 	rootObject = DC13068D2EFDBDA300200F38 /* Project object */;
