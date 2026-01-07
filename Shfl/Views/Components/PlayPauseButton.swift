@@ -4,6 +4,7 @@ struct PlayPauseButton: View {
     let isPlaying: Bool
     let action: () -> Void
     let theme: ShuffleTheme
+    let highlightOffset: CGPoint
 
     @State private var isPressed = false
 
@@ -22,6 +23,13 @@ struct PlayPauseButton: View {
         ZStack {
             Circle()
                 .fill(buttonBackgroundColor)
+                .colorEffect(
+                    ShaderLibrary.shfl_brushedMetal(
+                        .float2(buttonSize / 2, buttonSize / 2),
+                        .float2(highlightOffset),
+                        .float(theme.brushedMetalIntensity)
+                    )
+                )
                 .frame(width: buttonSize, height: buttonSize)
                 .shadow(
                     color: .black.opacity(0.1),
@@ -65,8 +73,8 @@ struct PlayPauseButton: View {
 
 #Preview("Pink Theme") {
     VStack(spacing: 40) {
-        PlayPauseButton(isPlaying: false, action: {}, theme: .pink)
-        PlayPauseButton(isPlaying: true, action: {}, theme: .pink)
+        PlayPauseButton(isPlaying: false, action: {}, theme: .pink, highlightOffset: .zero)
+        PlayPauseButton(isPlaying: true, action: {}, theme: .pink, highlightOffset: .zero)
     }
     .padding()
     .background(ShuffleTheme.pink.bodyGradient)
@@ -74,8 +82,8 @@ struct PlayPauseButton: View {
 
 #Preview("Silver Theme") {
     VStack(spacing: 40) {
-        PlayPauseButton(isPlaying: false, action: {}, theme: .silver)
-        PlayPauseButton(isPlaying: true, action: {}, theme: .silver)
+        PlayPauseButton(isPlaying: false, action: {}, theme: .silver, highlightOffset: .zero)
+        PlayPauseButton(isPlaying: true, action: {}, theme: .silver, highlightOffset: .zero)
     }
     .padding()
     .background(ShuffleTheme.silver.bodyGradient)
@@ -83,8 +91,8 @@ struct PlayPauseButton: View {
 
 #Preview("Blue Theme") {
     VStack(spacing: 40) {
-        PlayPauseButton(isPlaying: false, action: {}, theme: .blue)
-        PlayPauseButton(isPlaying: true, action: {}, theme: .blue)
+        PlayPauseButton(isPlaying: false, action: {}, theme: .blue, highlightOffset: .zero)
+        PlayPauseButton(isPlaying: true, action: {}, theme: .blue, highlightOffset: .zero)
     }
     .padding()
     .background(ShuffleTheme.blue.bodyGradient)

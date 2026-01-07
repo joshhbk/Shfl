@@ -11,6 +11,7 @@ struct ClickWheelView: View {
     let onSkipBack: () -> Void
     let onVolumeUp: () -> Void
     let onVolumeDown: () -> Void
+    let highlightOffset: CGPoint
 
     private let wheelSize: CGFloat = 280
     private let centerButtonSize: CGFloat = 150
@@ -89,7 +90,7 @@ struct ClickWheelView: View {
             .frame(width: buttonContainerSize)
 
             // Center play/pause button
-            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, theme: theme)
+            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, theme: theme, highlightOffset: highlightOffset)
         }
         .compositingGroup()
         .scaleEffect(pressPosition != .none ? ClickWheelFeedback.wheelPressScale : 1.0)
@@ -112,7 +113,8 @@ struct ClickWheelView: View {
         onSkipForward: {},
         onSkipBack: {},
         onVolumeUp: {},
-        onVolumeDown: {}
+        onVolumeDown: {},
+        highlightOffset: .zero
     )
     .padding()
     .background(ShuffleTheme.pink.bodyGradient)
@@ -126,7 +128,8 @@ struct ClickWheelView: View {
         onSkipForward: {},
         onSkipBack: {},
         onVolumeUp: {},
-        onVolumeDown: {}
+        onVolumeDown: {},
+        highlightOffset: .zero
     )
     .padding()
     .background(ShuffleTheme.silver.bodyGradient)
