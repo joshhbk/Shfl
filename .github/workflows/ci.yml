@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/setup-ci-research-NNLTc]
   pull_request:
     branches: [main]
 
