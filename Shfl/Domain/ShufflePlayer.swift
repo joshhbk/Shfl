@@ -180,12 +180,17 @@ final class ShufflePlayer: ObservableObject {
     func prepareQueue() async throws {
         guard !songs.isEmpty else { return }
 
+        // Upstream: Shuffle Logic
         let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
         let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
         let shuffler = QueueShuffler(algorithm: algorithm)
         let shuffledSongs = shuffler.shuffle(songs)
         lastShuffledQueue = shuffledSongs
+        
+        lastUsedAlgorithm = algorithm
+        print("🎲 Prepared queue with algorithm: \(algorithm.displayName)")
 
+        // Revert: Simple blocking setQueue (but using shuffledSongs)
         try await musicService.setQueue(songs: shuffledSongs)
         preparedSongIds = Set(songs.map(\.id))
     }
@@ -197,19 +202,10 @@ final class ShufflePlayer: ObservableObject {
         playedSongIds.removeAll()
         lastObservedSongId = nil
 
-        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
-        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
-        print("🎲 Shuffling with algorithm: \(algorithm.displayName) (raw: \(algorithmRaw))")
-
-        let shuffler = QueueShuffler(algorithm: algorithm)
-        let shuffledSongs = shuffler.shuffle(songs)
-        lastShuffledQueue = shuffledSongs
-        lastUsedAlgorithm = algorithm
-
-        print("🎲 Queue order: \(shuffledSongs.map { "\($0.title) by \($0.artist)" })")
-
-        try await musicService.setQueue(songs: shuffledSongs)
-        preparedSongIds = Set(songs.map(\.id))
+        if !isQueuePrepared {
+            try await prepareQueue()
+        }
+        
         try await musicService.play()
     }
 

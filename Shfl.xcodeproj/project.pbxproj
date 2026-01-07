@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DCBD255E2F0CCD9E00E57867 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = DCBD255C2F0CCD9E00E57867 /* Shaders.metal */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		DC1306A52EFDBDA400200F38 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		DC1306952EFDBDA300200F38 /* Shfl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shfl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCBD255C2F0CCD9E00E57867 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -88,6 +93,7 @@
 		DC13068C2EFDBDA300200F38 = {
 			isa = PBXGroup;
 			children = (
+				DCBD255D2F0CCD9E00E57867 /* Resources */,
 				DC1306972EFDBDA300200F38 /* Shfl */,
 				DC1306A72EFDBDA400200F38 /* ShflTests */,
 				DC1306B12EFDBDA400200F38 /* ShflUITests */,
@@ -103,6 +109,14 @@
 				DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		DCBD255D2F0CCD9E00E57867 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				DCBD255C2F0CCD9E00E57867 /* Shaders.metal */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -249,6 +263,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DCBD255E2F0CCD9E00E57867 /* Shaders.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

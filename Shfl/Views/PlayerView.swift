@@ -85,7 +85,8 @@ struct PlayerView: View {
                             onSkipForward: handleSkipForward,
                             onSkipBack: handleSkipBack,
                             onVolumeUp: { VolumeController.increaseVolume() },
-                            onVolumeDown: { VolumeController.decreaseVolume() }
+                            onVolumeDown: { VolumeController.decreaseVolume() },
+                            highlightOffset: highlightOffset
                         )
                         .disabled(player.songCount == 0)
                         .opacity(player.songCount == 0 ? 0.6 : 1.0)
