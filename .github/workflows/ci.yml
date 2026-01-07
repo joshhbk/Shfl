@@ -39,7 +39,6 @@ jobs:
             -scheme Shfl \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             -configuration Debug \
-            -skip-testing:ShflUITests \
             -resultBundlePath TestResults \
             CODE_SIGNING_ALLOWED=NO
 
