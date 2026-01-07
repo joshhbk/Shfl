@@ -35,79 +35,64 @@ static float shfl_noise(float2 st) {
     float radius = length(delta);
     float angle = atan2(delta.y, delta.x);
     
-    // --- TEXTURE GENERATION (Sparkling Anodized) ---
-    // Target: Visible, metallic grain that sparkles.
+    // --- TEXTURE GENERATION ---
     
-    float2 uv = position;
+    // 1. Base Grain (The main "spun" look)
+    float baseGrain = shfl_noise(float2(radius * 400.0, angle * 2.0));
     
-    // 1. Visible Grain (Medium frequency)
-    // Larger scale so individual "grains" are visible on screen.
-    float grainHigh = shfl_noise(uv * 3.0);
-    float grainLow = shfl_noise(uv * 0.5);
+    // 2. Micro-scratches (Fine detail)
+    float scratches = shfl_noise(float2(radius * 1200.0 + shfl_noise(float2(angle * 50.0)) * 20.0, angle * 20.0));
     
-    // 2. Mix for natural variation
-    // The "grain" is the surface texture.
-    float grain = grainHigh * 0.7 + grainLow * 0.3;
+    // 3. Radial variation (Subtle rings)
+    float rings = shfl_noise(float2(radius * 50.0, 0.0));
     
-    // 3. Directional Bias (Linear Vertical - very subtle)
-    // Keeps it feeling like a manufactured casing
-    float directional = shfl_noise(float2(uv.x * 4.0, uv.y * 0.1));
+    // 4. Low-frequency waviness (New layer for "realism" and imperfections)
+    // Helps avoid the perfect computer-generated look.
+    float waviness = shfl_noise(float2(radius * 10.0, angle * 4.0));
     
-    // Height map
-    // Sharper contrast for "rough" metal look
-    float height = grain * 0.8 + directional * 0.2;
+    // Compose the height map (0.0 to 1.0)
+    // Increased weight of scratches and waviness for more "bite"
+    float height = (baseGrain * 0.4 + scratches * 0.4 + rings * 0.1 + waviness * 0.1);
     
     // --- LIGHTING ---
     
-    // Tangent/Bitangent (Standard UV space)
-    float2 bitangent = float2(1.0, 0.0); // Horizontal
+    // Calculate Normal from height map
+    // Tangent follows the brush direction (angular)
+    float2 tangent = float2(-sin(angle), cos(angle));
+    // Bitangent points outwards (radial)
+    float2 bitangent = float2(cos(angle), sin(angle));
     
-    // Perturb normal - SIGNFICANTLY INCREASED for metallic "bite"
-    // Was 0.15 (too smooth), now 1.2
-    float normalPerturb = (height - 0.5) * 1.2;
-    
-    // Anisotropic Normal (Brushed-ish bias)
-    float3 anisotropicNormal = normalize(float3(bitangent * normalPerturb, 1.0));
-    // Isotropic Normal (General surface)
-    float3 isotropicNormal = normalize(float3(bitangent * normalPerturb * 0.5, 1.0));
+    // Perturb normal - increased perturbation for more "crunchy" metal feel
+    float normalPerturb = (height - 0.5) * 1.5; 
+    float3 surfaceNormal = normalize(float3(bitangent * normalPerturb * 0.5, 1.0));
     
     // Light Source
-    float3 lightDir = normalize(float3(highlightOffset.x * 0.015, highlightOffset.y * 0.015, 1.0));
+    // Reduced tilt sensitivity slightly to keep glare more centered/controlled
+    float3 lightDir = normalize(float3(highlightOffset.x * 0.005, highlightOffset.y * 0.005, 1.0));
     
-    // Specular Reflection
+    // Specular Reflection (Blinn-Phong)
     float3 viewDir = float3(0.0, 0.0, 1.0);
     float3 halfwayDir = normalize(lightDir + viewDir);
+    float specAngle = max(dot(surfaceNormal, halfwayDir), 0.0);
     
-    // 1. Broad Sheen (Satin finish)
-    float isoAngle = max(dot(isotropicNormal, halfwayDir), 0.0);
-    float baseSheen = pow(isoAngle, 2.0);
-    
-    // 2. Metallic Sparkle (High freq interaction)
-    // We actively start creating "hot spots" based on the noise grain
-    float sparkleAngle = max(dot(anisotropicNormal, halfwayDir), 0.0);
-    // High exponent for sharp sparkles
-    float sparkleSpec = pow(sparkleAngle, 12.0);
-    // Modulate sparkle by the grain height - high points sparkle more
-    float sparkle = sparkleSpec * (height * 1.5); 
-    
-    // Combine Specular
-    // Base sheen for shape + Sparkle for texture "pop"
-    float specular = baseSheen * 0.4 + sparkle * 0.6;
+    // Anisotropic highlight
+    // BROADER falloff (lower exponent) for a softer, less "laser-like" glare.
+    // This helps avoid the "cut off" feel by spreading the light more.
+    float specular = pow(specAngle, 8.0); 
     
     // --- COMPOSITION ---
     
-    // Ambient Occlusion
-    // Restoring some contrast so the texture exists in the darks too
-    float occlusion = 0.8 + 0.2 * height;
+    // Deepen the ambient occlusion in grooves
+    float occlusion = 0.7 + 0.3 * height;
     
     half3 baseColor = color.rgb * occlusion;
     
-    // Highlight Overlay
-    half3 highlightColor = half3(1.0, 1.0, 1.0);
+    // Warm, soft highlight
+    half3 highlightColor = half3(1.0, 0.98, 0.95);
     
     // Final mix
-    // Intensity bump (0.12 -> 0.22) to make the sparkle visible
-    half3 finalColor = baseColor + (highlightColor * specular * intensity * 0.22 * color.a);
+    // Reduced intensity multiplier to fix "insane glare"
+    half3 finalColor = baseColor + highlightColor * specular * intensity * 0.25;
     
     return half4(finalColor, color.a);
 }
