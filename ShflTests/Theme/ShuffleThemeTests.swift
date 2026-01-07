@@ -51,4 +51,12 @@ struct ShuffleThemeTests {
             #expect(isValid, "Random theme should be one of the predefined themes")
         }
     }
+
+    @Test("All themes have brushed metal configuration")
+    func allThemesHaveBrushedMetalConfig() {
+        for theme in ShuffleTheme.allThemes {
+            #expect(theme.brushedMetalIntensity >= 0 && theme.brushedMetalIntensity <= 1)
+            #expect(theme.motionSensitivity >= 0 && theme.motionSensitivity <= 1)
+        }
+    }
 }

@@ -14,8 +14,6 @@ final class MockMusicService: MusicService, @unchecked Sendable {
 
     func requestAuthorization() async -> Bool { true }
 
-    func prefetchLibrary() async {}
-
     func fetchLibrarySongs(
         sortedBy: SortOption,
         limit: Int,

@@ -24,3 +24,6 @@ Pods/
 # IDE
 .idea/
 *.xcworkspace/xcuserdata/
+
+# Worktrees
+.worktrees/

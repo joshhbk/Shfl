@@ -43,12 +43,50 @@ struct SongPickerView: View {
                     )
                     .padding(.bottom, 32)
                 }
+
+                if showAutofillBanner {
+                    Text(autofillMessage)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.bottom, 32)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .onAppear {
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                withAnimation {
+                                    viewModel.resetAutofillState()
+                                }
+                            }
+                        }
+                }
             }
             .navigationTitle("Add Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if viewModel.autofillState == .loading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                    } else {
+                        Button("Autofill") {
+                            Task {
+                                let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
+                                let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
+                                let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
+                                await viewModel.autofill(into: player, using: source)
+                            }
+                        }
+                        .disabled(player.remainingCapacity == 0)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDismiss)
+                    Button("Clear") {
+                        player.removeAllSongs()
+                    }
+                    .disabled(player.songCount == 0)
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search your library")
@@ -169,5 +207,19 @@ struct SongPickerView: View {
             HapticFeedback.medium.trigger()
         }
         undoManager.dismiss()
+    }
+
+    private var showAutofillBanner: Bool {
+        if case .completed = viewModel.autofillState {
+            return true
+        }
+        return false
+    }
+
+    private var autofillMessage: String {
+        if case .completed(let count) = viewModel.autofillState {
+            return "Added \(count) songs"
+        }
+        return ""
     }
 }

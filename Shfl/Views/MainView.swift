@@ -18,7 +18,8 @@ struct MainView: View {
                     player: viewModel.player,
                     musicService: viewModel.musicService,
                     onManageTapped: { viewModel.openManage() },
-                    onAddTapped: { viewModel.openPickerDirect() }
+                    onAddTapped: { viewModel.openPickerDirect() },
+                    onSettingsTapped: { viewModel.openSettings() }
                 )
             } else {
                 authorizationView
@@ -33,7 +34,7 @@ struct MainView: View {
                 onAddTapped: { viewModel.openPicker() },
                 onDismiss: { viewModel.closeManage() }
             )
-            .sheet(isPresented: $viewModel.showingPicker) {
+            .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
                 SongPickerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
@@ -41,12 +42,16 @@ struct MainView: View {
                 )
             }
         }
-        .sheet(isPresented: $viewModel.showingPickerDirect) {
+        .sheet(isPresented: $viewModel.showingPickerDirect, onDismiss: { viewModel.closePickerDirect() }) {
             SongPickerView(
                 player: viewModel.player,
                 musicService: viewModel.musicService,
                 onDismiss: { viewModel.closePickerDirect() }
             )
+        }
+        .sheet(isPresented: $viewModel.showingSettings) {
+            SettingsView()
+                .environmentObject(viewModel.player)
         }
         .alert("Authorization Required", isPresented: .init(
             get: { viewModel.authorizationError != nil },

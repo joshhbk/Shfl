@@ -38,4 +38,46 @@ struct SongTests {
 
         #expect(song.artworkURL == url)
     }
+
+    @Test("Song with play count")
+    func songWithPlayCount() {
+        let song = Song(
+            id: "1",
+            title: "Test",
+            artist: "Artist",
+            albumTitle: "Album",
+            artworkURL: nil,
+            playCount: 42,
+            lastPlayedDate: nil
+        )
+        #expect(song.playCount == 42)
+    }
+
+    @Test("Song with last played date")
+    func songWithLastPlayedDate() {
+        let date = Date(timeIntervalSince1970: 1000000)
+        let song = Song(
+            id: "1",
+            title: "Test",
+            artist: "Artist",
+            albumTitle: "Album",
+            artworkURL: nil,
+            playCount: 0,
+            lastPlayedDate: date
+        )
+        #expect(song.lastPlayedDate == date)
+    }
+
+    @Test("Song default values for playCount and lastPlayedDate")
+    func songDefaultValues() {
+        let song = Song(
+            id: "1",
+            title: "Test",
+            artist: "Artist",
+            albumTitle: "Album",
+            artworkURL: nil
+        )
+        #expect(song.playCount == 0)
+        #expect(song.lastPlayedDate == nil)
+    }
 }

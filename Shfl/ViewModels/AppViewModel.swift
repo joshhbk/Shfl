@@ -7,26 +7,39 @@ final class AppViewModel: ObservableObject {
     let player: ShufflePlayer
     let musicService: MusicService
     private let repository: SongRepository
+    private let scrobbleTracker: ScrobbleTracker
+    private var cancellables = Set<AnyCancellable>()
 
     @Published var isAuthorized = false
     @Published var showingManage = false
     @Published var showingPicker = false
     @Published var showingPickerDirect = false
+    @Published var showingSettings = false
     @Published var authorizationError: String?
 
     init(musicService: MusicService, modelContext: ModelContext) {
         self.musicService = musicService
         self.player = ShufflePlayer(musicService: musicService)
         self.repository = SongRepository(modelContext: modelContext)
+
+        // Setup scrobbling
+        let lastFMTransport = LastFMTransport(
+            apiKey: LastFMConfig.apiKey,
+            sharedSecret: LastFMConfig.sharedSecret
+        )
+        let scrobbleManager = ScrobbleManager(transports: [lastFMTransport])
+        self.scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, musicService: musicService)
+
+        // Forward playback state to scrobble tracker
+        player.$playbackState
+            .sink { [weak self] state in
+                self?.scrobbleTracker.onPlaybackStateChanged(state)
+            }
+            .store(in: &cancellables)
     }
 
     func onAppear() async {
         isAuthorized = await musicService.isAuthorized
-
-        // Prefetch library in background for faster access later
-        Task {
-            await musicService.prefetchLibrary()
-        }
 
         do {
             let songs = try repository.loadSongs()
@@ -36,6 +49,9 @@ final class AppViewModel: ObservableObject {
         } catch {
             print("Failed to load songs: \(error)")
         }
+
+        // Prepare queue in background for instant playback
+        Task { try? await player.prepareQueue() }
     }
 
     func requestAuthorization() async {
@@ -78,5 +94,13 @@ final class AppViewModel: ObservableObject {
     func closePickerDirect() {
         showingPickerDirect = false
         persistSongs()
+    }
+
+    func openSettings() {
+        showingSettings = true
+    }
+
+    func closeSettings() {
+        showingSettings = false
     }
 }

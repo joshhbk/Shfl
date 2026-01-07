@@ -5,19 +5,31 @@ struct PlayerView: View {
     let musicService: MusicService
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
+    let onSettingsTapped: () -> Void
 
+    @Environment(\.motionManager) private var motionManager
+    @StateObject private var colorExtractor = AlbumArtColorExtractor()
+    @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var currentTime: TimeInterval = 0
     @State private var duration: TimeInterval = 0
     @State private var progressTimer: Timer?
-    @State private var removedSong: Song?
-    @State private var showUndoPill = false
     @State private var currentThemeIndex: Int = Int.random(in: 0..<ShuffleTheme.allThemes.count)
     @State private var dragOffset: CGFloat = 0
 
     private var currentTheme: ShuffleTheme {
         ShuffleTheme.allThemes[currentThemeIndex]
+    }
+
+    /// Dynamic highlight color from album art, with fallback to theme-based color
+    private var dynamicHighlightColor: Color {
+        // Use extracted color if available
+        if let extractedColor = colorExtractor.extractedColor {
+            return extractedColor
+        }
+        // Fall back to theme-based color (white for colored themes, black for silver)
+        return currentTheme.wheelStyle == .dark ? .black : .white
     }
 
     private let swipeThreshold: CGFloat = 100
@@ -26,19 +38,28 @@ struct PlayerView: View {
         player: ShufflePlayer,
         musicService: MusicService,
         onManageTapped: @escaping () -> Void,
-        onAddTapped: @escaping () -> Void = {}
+        onAddTapped: @escaping () -> Void = {},
+        onSettingsTapped: @escaping () -> Void = {}
     ) {
         self.player = player
         self.musicService = musicService
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
+        self.onSettingsTapped = onSettingsTapped
     }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 // Background - first in ZStack = behind
-                currentTheme.bodyGradient
+                BrushedMetalBackground(
+                    baseColor: currentTheme.bodyGradientTop,
+                    intensity: currentTheme.brushedMetalIntensity,
+                    highlightOffset: highlightOffset,
+                    motionEnabled: currentTheme.motionEnabled,
+                    highlightColor: dynamicHighlightColor
+                )
+                .animation(.easeInOut(duration: 0.5), value: colorExtractor.extractedColor?.description)
 
                 // Content
                 VStack(spacing: 0) {
@@ -63,8 +84,9 @@ struct PlayerView: View {
                             onPlayPause: handlePlayPause,
                             onSkipForward: handleSkipForward,
                             onSkipBack: handleSkipBack,
-                            onAdd: onAddTapped,
-                            onRemove: handleRemove
+                            onVolumeUp: { VolumeController.increaseVolume() },
+                            onVolumeDown: { VolumeController.decreaseVolume() },
+                            highlightOffset: highlightOffset
                         )
                         .disabled(player.songCount == 0)
                         .opacity(player.songCount == 0 ? 0.6 : 1.0)
@@ -88,37 +110,31 @@ struct PlayerView: View {
                     .padding(.bottom, geometry.safeAreaInsets.bottom + 24)
                 }
 
-                // Undo pill
-                if showUndoPill, let song = removedSong {
-                    VStack {
-                        Spacer()
-                        UndoPill(
-                            state: UndoState(action: .removed, song: song),
-                            onUndo: handleUndo,
-                            onDismiss: {
-                                withAnimation {
-                                    showUndoPill = false
-                                }
-                            }
-                        )
-                        .padding(.bottom, geometry.safeAreaInsets.bottom + 60)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
             }
             .ignoresSafeArea()
             .simultaneousGesture(themeSwipeGesture)
             .animation(.easeInOut(duration: 0.2), value: showError)
-            .animation(.easeInOut(duration: 0.2), value: showUndoPill)
             .environment(\.shuffleTheme, currentTheme)
             .onChange(of: player.playbackState) { _, newState in
                 handlePlaybackStateChange(newState)
             }
             .onAppear {
                 startProgressTimer()
+                motionManager?.start()
+                // Extract color if there's already a song playing
+                if let song = player.playbackState.currentSong {
+                    colorExtractor.updateColor(for: song.id)
+                }
             }
             .onDisappear {
                 stopProgressTimer()
+                motionManager?.stop()
+            }
+            .onChange(of: motionManager?.pitch) { _, _ in
+                updateHighlightOffset()
+            }
+            .onChange(of: motionManager?.roll) { _, _ in
+                updateHighlightOffset()
             }
         }
     }
@@ -126,10 +142,23 @@ struct PlayerView: View {
     @ViewBuilder
     private func topBar(geometry: GeometryProxy) -> some View {
         HStack {
+            Button(action: onAddTapped) {
+                HStack(spacing: 4) {
+                    Text("Songs")
+                        .font(.system(size: 16, weight: .medium))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(currentTheme.textColor)
+            }
             Spacer()
-            CapacityIndicator(current: player.songCount, maximum: player.capacity)
-            Spacer()
+            Button(action: onSettingsTapped) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(currentTheme.textColor)
+            }
         }
+        .padding(.horizontal, 20)
         .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
     }
 
@@ -151,11 +180,6 @@ struct PlayerView: View {
         default:
             emptyStateView
         }
-    }
-
-    @ViewBuilder
-    private func themedBackground(geometry: GeometryProxy) -> some View {
-        currentTheme.bodyGradient
     }
 
     private var themeSwipeGesture: some Gesture {
@@ -229,33 +253,6 @@ struct PlayerView: View {
         }
     }
 
-    private func handleRemove() {
-        guard let currentSong = player.playbackState.currentSong else { return }
-
-        removedSong = currentSong
-        player.removeSong(id: currentSong.id)
-
-        withAnimation {
-            showUndoPill = true
-        }
-
-        // Auto-hide after 5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            withAnimation {
-                showUndoPill = false
-            }
-        }
-    }
-
-    private func handleUndo() {
-        guard let song = removedSong else { return }
-        try? player.addSong(song)
-        removedSong = nil
-        withAnimation {
-            showUndoPill = false
-        }
-    }
-
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
         if case .error(let error) = newState {
             errorMessage = error.localizedDescription
@@ -266,6 +263,13 @@ struct PlayerView: View {
 
         // Update duration when song changes
         duration = musicService.currentSongDuration
+
+        // Extract color from album artwork
+        if let song = newState.currentSong {
+            colorExtractor.updateColor(for: song.id)
+        } else {
+            colorExtractor.clear()
+        }
     }
 
     // MARK: - Progress Timer
@@ -280,6 +284,18 @@ struct PlayerView: View {
     private func stopProgressTimer() {
         progressTimer?.invalidate()
         progressTimer = nil
+    }
+
+    // MARK: - Motion
+
+    private func updateHighlightOffset() {
+        guard let manager = motionManager else { return }
+        highlightOffset = MotionManager.highlightOffset(
+            pitch: manager.pitch,
+            roll: manager.roll,
+            sensitivity: currentTheme.motionSensitivity,
+            maxOffset: 220
+        )
     }
 }
 
@@ -313,7 +329,8 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
         player: player,
         musicService: mockService,
         onManageTapped: {},
-        onAddTapped: {}
+        onAddTapped: {},
+        onSettingsTapped: {}
     )
 }
 
@@ -324,6 +341,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
         player: player,
         musicService: mockService,
         onManageTapped: {},
-        onAddTapped: {}
+        onAddTapped: {},
+        onSettingsTapped: {}
     )
 }

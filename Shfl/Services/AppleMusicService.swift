@@ -7,10 +7,6 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     private var stateObservationTask: Task<Void, Never>?
     private var continuation: AsyncStream<PlaybackState>.Continuation?
 
-    // Library cache
-    private var cachedLibrary: [SortOption: [Song]] = [:]
-    private var prefetchTask: Task<Void, Never>?
-
     var playbackStateStream: AsyncStream<PlaybackState> {
         AsyncStream { [weak self] continuation in
             self?.continuation = continuation
@@ -42,24 +38,14 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         return status == .authorized
     }
 
-    /// Prefetch library songs in background for faster access later
-    func prefetchLibrary() async {
-        // Prefetch most common sort option
-        _ = try? await fetchAllLibrarySongs(sortedBy: .mostPlayed)
-    }
-
-    private func fetchAllLibrarySongs(sortedBy: SortOption) async throws -> [Song] {
-        // Return cached if available
-        if let cached = cachedLibrary[sortedBy] {
-            print("📚 Returning \(cached.count) cached songs for \(sortedBy)")
-            return cached
-        }
-
-        print("📚 Fetching library songs for \(sortedBy)...")
+    func fetchLibrarySongs(
+        sortedBy: SortOption,
+        limit: Int,
+        offset: Int
+    ) async throws -> LibraryPage {
         var request = MusicLibraryRequest<MusicKit.Song>()
-
-        // Limit for faster loading during development
-        request.limit = 100
+        request.limit = limit
+        request.offset = offset
 
         switch sortedBy {
         case .mostPlayed:
@@ -73,60 +59,42 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         }
 
         let response = try await request.response()
-        print("📚 Got \(response.items.count) songs from MusicKit")
 
-        // Map songs (artwork loaded lazily by ArtworkLoader)
-        let allSongs = response.items.map { musicKitSong in
+        let songs = response.items.map { musicKitSong in
             Song(
                 id: musicKitSong.id.rawValue,
                 title: musicKitSong.title,
                 artist: musicKitSong.artistName,
                 albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil
+                artworkURL: nil,
+                playCount: musicKitSong.playCount ?? 0,
+                lastPlayedDate: musicKitSong.lastPlayedDate
             )
         }
 
-        // Only cache if we got results
-        if !allSongs.isEmpty {
-            cachedLibrary[sortedBy] = allSongs
-        }
-        print("📚 Processed \(allSongs.count) songs")
-        return allSongs
-    }
+        // hasMore is true if we got a full page (might be more)
+        let hasMore = response.items.count == limit
 
-    func fetchLibrarySongs(
-        sortedBy: SortOption,
-        limit: Int,
-        offset: Int
-    ) async throws -> LibraryPage {
-        let allSongs = try await fetchAllLibrarySongs(sortedBy: sortedBy)
-
-        let startIndex = min(offset, allSongs.count)
-        let endIndex = min(offset + limit, allSongs.count)
-        let pageItems = Array(allSongs[startIndex..<endIndex])
-        let hasMore = endIndex < allSongs.count
-
-        return LibraryPage(songs: pageItems, hasMore: hasMore)
+        return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
     func searchLibrarySongs(query: String) async throws -> [Song] {
-        print("🔍 Searching for: '\(query)'")
+        var request = MusicLibrarySearchRequest(term: query, types: [MusicKit.Song.self])
+        request.limit = 50
 
-        // Search directly against cached library - no async fetch needed
-        guard let allSongs = cachedLibrary[.mostPlayed] else {
-            print("🔍 Cache miss - no songs cached yet")
-            return []
+        let response = try await request.response()
+
+        return response.songs.map { musicKitSong in
+            Song(
+                id: musicKitSong.id.rawValue,
+                title: musicKitSong.title,
+                artist: musicKitSong.artistName,
+                albumTitle: musicKitSong.albumTitle ?? "",
+                artworkURL: nil,
+                playCount: musicKitSong.playCount ?? 0,
+                lastPlayedDate: musicKitSong.lastPlayedDate
+            )
         }
-
-        let lowercasedQuery = query.lowercased()
-        let results = allSongs.filter { song in
-            song.title.lowercased().contains(lowercasedQuery) ||
-            song.artist.lowercased().contains(lowercasedQuery) ||
-            song.albumTitle.lowercased().contains(lowercasedQuery)
-        }
-
-        print("🔍 Found \(results.count) results for '\(query)'")
-        return results
     }
 
     func setQueue(songs: [Song]) async throws {
@@ -145,10 +113,15 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             return
         }
 
-        let queue = ApplicationMusicPlayer.Queue(for: response.items, startingAt: nil)
+        // Reorder response items to match our desired order
+        let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
+        let orderedItems = songs.compactMap { itemsById[$0.id] }
+
+        // Start from the first item in our ordered queue
+        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: orderedItems.first)
         player.queue = queue
-        player.state.shuffleMode = .songs
-        print("🎵 setQueue() completed")
+        player.state.shuffleMode = .off  // We handle shuffling ourselves
+        print("🎵 setQueue() completed with \(orderedItems.count) items, starting at \(orderedItems.first?.title ?? "nil")")
     }
 
     func play() async throws {
@@ -236,7 +209,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             title: musicKitSong.title,
             artist: musicKitSong.artistName,
             albumTitle: musicKitSong.albumTitle ?? "",
-            artworkURL: musicKitSong.artwork?.url(width: 300, height: 300)
+            artworkURL: musicKitSong.artwork?.url(width: 300, height: 300),
+            playCount: musicKitSong.playCount ?? 0,
+            lastPlayedDate: musicKitSong.lastPlayedDate
         )
 
         switch player.state.playbackStatus {

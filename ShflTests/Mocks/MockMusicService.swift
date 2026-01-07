@@ -8,7 +8,12 @@ actor MockMusicService: MusicService {
     var shouldThrowOnSearch: Error?
     var shouldThrowOnSkip: Error?
     var librarySongs: [Song] = []
+    var setQueueCallCount: Int = 0
+    var lastQueuedSongs: [Song] = []
     var shouldThrowOnFetch: Error?
+
+    /// Configurable duration for testing. Access via currentSongDuration.
+    nonisolated(unsafe) var mockDuration: TimeInterval = 180
 
     private var currentState: PlaybackState = .empty
     private var continuation: AsyncStream<PlaybackState>.Continuation?
@@ -22,7 +27,7 @@ actor MockMusicService: MusicService {
     }
 
     nonisolated var currentPlaybackTime: TimeInterval { 0 }
-    nonisolated var currentSongDuration: TimeInterval { 180 }
+    nonisolated var currentSongDuration: TimeInterval { mockDuration }
 
     private func setContinuation(_ cont: AsyncStream<PlaybackState>.Continuation) {
         self.continuation = cont
@@ -36,8 +41,6 @@ actor MockMusicService: MusicService {
     var isAuthorized: Bool {
         authorizationResult
     }
-
-    func prefetchLibrary() async {}
 
     func fetchLibrarySongs(
         sortedBy: SortOption,
@@ -65,12 +68,20 @@ actor MockMusicService: MusicService {
     }
 
     func setQueue(songs: [Song]) async throws {
-        queuedSongs = songs.shuffled()
+        setQueueCallCount += 1
+        lastQueuedSongs = songs
+        queuedSongs = songs  // Don't shuffle - let QueueShuffler handle it
         currentIndex = 0
-        if queuedSongs.isEmpty {
-            updateState(.empty)
-        } else {
-            updateState(.stopped)
+
+        switch currentState {
+        case .playing, .paused:
+            break
+        default:
+            if queuedSongs.isEmpty {
+                updateState(.empty)
+            } else {
+                updateState(.stopped)
+            }
         }
     }
 
@@ -123,5 +134,10 @@ actor MockMusicService: MusicService {
 
     func simulatePlaybackState(_ state: PlaybackState) {
         updateState(state)
+    }
+
+    func resetQueueTracking() {
+        setQueueCallCount = 0
+        lastQueuedSongs = []
     }
 }
