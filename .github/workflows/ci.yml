@@ -34,6 +34,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run Unit Tests
+        env:
+          CI: "true"
         run: |
           xcodebuild test \
             -scheme Shfl \
