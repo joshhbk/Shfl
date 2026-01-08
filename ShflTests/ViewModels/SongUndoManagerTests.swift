@@ -22,11 +22,13 @@ struct SongUndoManagerTests {
         let undoManager = SongUndoManager()
         let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
 
-        undoManager.recordAction(.added, song: song, autoHideDelay: 0.1)
+        // Use longer delays for CI reliability
+        undoManager.recordAction(.added, song: song, autoHideDelay: 0.3)
 
         #expect(undoManager.currentState != nil)
 
-        try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        // Wait significantly longer than the delay to account for CI scheduling delays
+        try await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
 
         #expect(undoManager.currentState == nil)
     }
