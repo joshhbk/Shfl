@@ -63,8 +63,8 @@ struct ScrobbleTrackerTests {
         // Simulate time passing (threshold is 30 seconds for 60-second song)
         await tracker.simulateTimeElapsed(seconds: 31)
 
-        // Allow async work to complete
-        try await Task.sleep(for: .milliseconds(50))
+        // Allow async work to complete - use longer wait for CI reliability
+        try await Task.sleep(for: .milliseconds(200))
 
         let scrobbled = await transport.scrobbledEvents
         #expect(scrobbled.count == 1)

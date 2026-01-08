@@ -14,35 +14,35 @@
 			remoteGlobalIDString = DC1306942EFDBDA300200F38;
 			remoteInfo = Shfl;
 		};
+		DC1306AF2EFDBDA400200F38 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DC13068D2EFDBDA300200F38 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DC1306942EFDBDA300200F38;
+			remoteInfo = Shfl;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		DC1306952EFDBDA300200F38 /* Shfl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shfl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		DCBD22212F01083C00E57867 /* Exceptions for "Shfl" folder in "Shfl" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = DC1306942EFDBDA300200F38 /* Shfl */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DC1306972EFDBDA300200F38 /* Shfl */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				DCBD22212F01083C00E57867 /* Exceptions for "Shfl" folder in "Shfl" target */,
-			);
 			path = Shfl;
 			sourceTree = "<group>";
 		};
 		DC1306A72EFDBDA400200F38 /* ShflTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ShflTests;
+			sourceTree = "<group>";
+		};
+		DC1306B12EFDBDA400200F38 /* ShflUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShflUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -62,6 +62,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DC1306AB2EFDBDA400200F38 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -70,6 +77,7 @@
 			children = (
 				DC1306972EFDBDA300200F38 /* Shfl */,
 				DC1306A72EFDBDA400200F38 /* ShflTests */,
+				DC1306B12EFDBDA400200F38 /* ShflUITests */,
 				DC1306962EFDBDA300200F38 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,6 +87,7 @@
 			children = (
 				DC1306952EFDBDA300200F38 /* Shfl.app */,
 				DC1306A42EFDBDA400200F38 /* ShflTests.xctest */,
+				DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -131,6 +140,29 @@
 			productReference = DC1306A42EFDBDA400200F38 /* ShflTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		DC1306AD2EFDBDA400200F38 /* ShflUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DC1306BE2EFDBDA400200F38 /* Build configuration list for PBXNativeTarget "ShflUITests" */;
+			buildPhases = (
+				DC1306AA2EFDBDA400200F38 /* Sources */,
+				DC1306AB2EFDBDA400200F38 /* Frameworks */,
+				DC1306AC2EFDBDA400200F38 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DC1306B02EFDBDA400200F38 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				DC1306B12EFDBDA400200F38 /* ShflUITests */,
+			);
+			name = ShflUITests;
+			packageProductDependencies = (
+			);
+			productName = ShflUITests;
+			productReference = DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -145,6 +177,10 @@
 						CreatedOnToolsVersion = 26.2;
 					};
 					DC1306A32EFDBDA400200F38 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = DC1306942EFDBDA300200F38;
+					};
+					DC1306AD2EFDBDA400200F38 = {
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = DC1306942EFDBDA300200F38;
 					};
@@ -166,6 +202,7 @@
 			targets = (
 				DC1306942EFDBDA300200F38 /* Shfl */,
 				DC1306A32EFDBDA400200F38 /* ShflTests */,
+				DC1306AD2EFDBDA400200F38 /* ShflUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -179,6 +216,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DC1306A22EFDBDA400200F38 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DC1306AC2EFDBDA400200F38 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -202,6 +246,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DC1306AA2EFDBDA400200F38 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -209,6 +260,11 @@
 			isa = PBXTargetDependency;
 			target = DC1306942EFDBDA300200F38 /* Shfl */;
 			targetProxy = DC1306A52EFDBDA400200F38 /* PBXContainerItemProxy */;
+		};
+		DC1306B02EFDBDA400200F38 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DC1306942EFDBDA300200F38 /* Shfl */;
+			targetProxy = DC1306AF2EFDBDA400200F38 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -357,7 +413,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
@@ -375,7 +431,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				XROS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Debug;
 		};
@@ -407,7 +463,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
@@ -425,7 +481,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				XROS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
@@ -437,7 +493,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZJRV3JWFV6;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.ShflTests;
@@ -451,7 +507,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shfl.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Shfl";
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				XROS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Debug;
 		};
@@ -463,7 +519,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZJRV3JWFV6;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.ShflTests;
@@ -477,7 +533,57 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shfl.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Shfl";
-				XROS_DEPLOYMENT_TARGET = 1.0;
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		DC1306BF2EFDBDA400200F38 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZJRV3JWFV6;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.ShflUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = Shfl;
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		DC1306C02EFDBDA400200F38 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZJRV3JWFV6;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.ShflUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = Shfl;
+				XROS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
@@ -507,6 +613,15 @@
 			buildConfigurations = (
 				DC1306BC2EFDBDA400200F38 /* Debug */,
 				DC1306BD2EFDBDA400200F38 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DC1306BE2EFDBDA400200F38 /* Build configuration list for PBXNativeTarget "ShflUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC1306BF2EFDBDA400200F38 /* Debug */,
+				DC1306C02EFDBDA400200F38 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
