@@ -38,11 +38,11 @@ struct ClickWheelButton: View {
                         let bounds = CGRect(x: 0, y: 0, width: 60, height: 60)
                         if bounds.contains(value.location) {
                             tapCount += 1
+                            HapticFeedback.heavy.trigger()
                             action()
                         }
                     }
             )
-            .sensoryFeedback(.impact(weight: .heavy, intensity: 0.8), trigger: tapCount)
     }
 }
 

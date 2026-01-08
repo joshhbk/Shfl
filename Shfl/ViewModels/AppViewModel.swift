@@ -11,6 +11,7 @@ final class AppViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     @Published var isAuthorized = false
+    @Published var isLoading = true
     @Published var showingManage = false
     @Published var showingPicker = false
     @Published var showingPickerDirect = false
@@ -49,6 +50,8 @@ final class AppViewModel: ObservableObject {
         } catch {
             print("Failed to load songs: \(error)")
         }
+
+        isLoading = false
 
         // Prepare queue in background for instant playback
         Task { try? await player.prepareQueue() }

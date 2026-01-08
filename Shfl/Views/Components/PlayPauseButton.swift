@@ -57,6 +57,7 @@ struct PlayPauseButton: View {
                     // Only fire action if release was within bounds
                     let bounds = CGRect(x: 0, y: 0, width: buttonSize, height: buttonSize)
                     if bounds.contains(value.location) {
+                        HapticFeedback.medium.trigger()
                         action()
                     }
                 }
@@ -67,7 +68,6 @@ struct PlayPauseButton: View {
         .accessibilityAction {
             action()
         }
-        .sensoryFeedback(.impact(weight: .medium), trigger: isPlaying)
     }
 }
 
