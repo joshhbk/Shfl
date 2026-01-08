@@ -21,9 +21,22 @@
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DCBD22212F01083C00E57867 /* Exceptions for "Shfl" folder in "Shfl" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DC1306942EFDBDA300200F38 /* Shfl */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DC1306972EFDBDA300200F38 /* Shfl */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DCBD22212F01083C00E57867 /* Exceptions for "Shfl" folder in "Shfl" target */,
+			);
 			path = Shfl;
 			sourceTree = "<group>";
 		};
@@ -331,6 +344,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Shfl/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Shuffled;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Shuffled needs access to Apple Music to search your library and play songs.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -380,6 +394,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Shfl/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Shuffled;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Shuffled needs access to Apple Music to search your library and play songs.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
