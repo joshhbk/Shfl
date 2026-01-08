@@ -237,8 +237,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
         // Apple Music API uses rating value of 1 for "loved" (favorite)
         let url = URL(string: "https://api.music.apple.com/v1/me/ratings/library-songs/\(songID)")!
-        var request = MusicDataRequest(urlRequest: URLRequest(url: url))
-        request.httpMethod = "PUT"
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "PUT"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         // Rating payload: value 1 = loved/favorite
         let ratingPayload = """
@@ -249,8 +250,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
             }
         }
         """
-        request.httpBody = ratingPayload.data(using: .utf8)
+        urlRequest.httpBody = ratingPayload.data(using: .utf8)
 
+        let request = MusicDataRequest(urlRequest: urlRequest)
         let response = try await request.response()
         print("❤️ addToFavorites() response status: \(response.urlResponse)")
     }
@@ -260,9 +262,10 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
         // DELETE the rating to remove from favorites
         let url = URL(string: "https://api.music.apple.com/v1/me/ratings/library-songs/\(songID)")!
-        var request = MusicDataRequest(urlRequest: URLRequest(url: url))
-        request.httpMethod = "DELETE"
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "DELETE"
 
+        let request = MusicDataRequest(urlRequest: urlRequest)
         let response = try await request.response()
         print("💔 removeFromFavorites() response status: \(response.urlResponse)")
     }
@@ -271,7 +274,8 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("💕 isFavorite() called for song: \(songID)")
 
         let url = URL(string: "https://api.music.apple.com/v1/me/ratings/library-songs/\(songID)")!
-        let request = MusicDataRequest(urlRequest: URLRequest(url: url))
+        let urlRequest = URLRequest(url: url)
+        let request = MusicDataRequest(urlRequest: urlRequest)
 
         do {
             let response = try await request.response()
