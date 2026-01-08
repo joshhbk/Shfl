@@ -13,7 +13,9 @@ struct MainView: View {
 
     var body: some View {
         Group {
-            if viewModel.isAuthorized {
+            if viewModel.isLoading {
+                loadingView
+            } else if viewModel.isAuthorized {
                 PlayerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
@@ -68,6 +70,18 @@ struct MainView: View {
                 Text(error)
             }
         }
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+
+            Text("Loading your music...")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var authorizationView: some View {

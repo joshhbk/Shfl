@@ -7,10 +7,11 @@ final class AppViewModel: ObservableObject {
     let player: ShufflePlayer
     let musicService: MusicService
     private let repository: SongRepository
-    private let scrobbleTracker: ScrobbleTracker
+    private var scrobbleTracker: ScrobbleTracker?
     private var cancellables = Set<AnyCancellable>()
 
     @Published var isAuthorized = false
+    @Published var isLoading = true
     @Published var showingManage = false
     @Published var showingPicker = false
     @Published var showingPickerDirect = false
@@ -21,21 +22,7 @@ final class AppViewModel: ObservableObject {
         self.musicService = musicService
         self.player = ShufflePlayer(musicService: musicService)
         self.repository = SongRepository(modelContext: modelContext)
-
-        // Setup scrobbling
-        let lastFMTransport = LastFMTransport(
-            apiKey: LastFMConfig.apiKey,
-            sharedSecret: LastFMConfig.sharedSecret
-        )
-        let scrobbleManager = ScrobbleManager(transports: [lastFMTransport])
-        self.scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, musicService: musicService)
-
-        // Forward playback state to scrobble tracker
-        player.$playbackState
-            .sink { [weak self] state in
-                self?.scrobbleTracker.onPlaybackStateChanged(state)
-            }
-            .store(in: &cancellables)
+        // Scrobbling setup deferred to after initial load for faster startup
     }
 
     func onAppear() async {
@@ -50,8 +37,30 @@ final class AppViewModel: ObservableObject {
             print("Failed to load songs: \(error)")
         }
 
+        // Mark loading complete - UI is now interactive
+        isLoading = false
+
+        // Deferred initialization: setup non-critical services after UI is ready
+        setupScrobbling()
+
         // Prepare queue in background for instant playback
         Task { try? await player.prepareQueue() }
+    }
+
+    private func setupScrobbling() {
+        let lastFMTransport = LastFMTransport(
+            apiKey: LastFMConfig.apiKey,
+            sharedSecret: LastFMConfig.sharedSecret
+        )
+        let scrobbleManager = ScrobbleManager(transports: [lastFMTransport])
+        self.scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, musicService: musicService)
+
+        // Forward playback state to scrobble tracker
+        player.$playbackState
+            .sink { [weak self] state in
+                self?.scrobbleTracker?.onPlaybackStateChanged(state)
+            }
+            .store(in: &cancellables)
     }
 
     func requestAuthorization() async {
