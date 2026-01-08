@@ -3,19 +3,19 @@ import Testing
 @testable import Shfl
 
 /// Check if running in CI environment (keychain not available)
-private let isRunningOnCI: Bool = {
+private func isRunningOnCI() -> Bool {
     ProcessInfo.processInfo.environment["CI"] != nil ||
     ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil
-}()
-
-/// Check if keychain is available (not on CI)
-private let isKeychainAvailable: Bool = !isRunningOnCI
+}
 
 @Suite("LastFMAuthenticator Tests")
 struct LastFMAuthenticatorTests {
 
-    @Test("Store and retrieve session from keychain", .enabled(if: isKeychainAvailable, "Keychain not available in CI"))
+    @Test("Store and retrieve session from keychain")
     func storeAndRetrieve() async throws {
+        // Skip on CI - keychain not available
+        try #require(!isRunningOnCI(), "Skipping keychain test on CI")
+
         let authenticator = LastFMAuthenticator(
             apiKey: "testkey",
             sharedSecret: "testsecret",
@@ -33,8 +33,11 @@ struct LastFMAuthenticatorTests {
         try await authenticator.clearSession()
     }
 
-    @Test("isAuthenticated returns true when session exists", .enabled(if: isKeychainAvailable, "Keychain not available in CI"))
+    @Test("isAuthenticated returns true when session exists")
     func isAuthenticatedTrue() async throws {
+        // Skip on CI - keychain not available
+        try #require(!isRunningOnCI(), "Skipping keychain test on CI")
+
         let authenticator = LastFMAuthenticator(
             apiKey: "testkey",
             sharedSecret: "testsecret",
@@ -63,8 +66,11 @@ struct LastFMAuthenticatorTests {
         #expect(isAuth == false)
     }
 
-    @Test("Clear session removes from keychain", .enabled(if: isKeychainAvailable, "Keychain not available in CI"))
+    @Test("Clear session removes from keychain")
     func clearSession() async throws {
+        // Skip on CI - keychain not available
+        try #require(!isRunningOnCI(), "Skipping keychain test on CI")
+
         let authenticator = LastFMAuthenticator(
             apiKey: "testkey",
             sharedSecret: "testsecret",
