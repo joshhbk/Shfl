@@ -12,6 +12,7 @@ final class AppViewModel: ObservableObject {
 
     @Published var isAuthorized = false
     @Published var isLoading = true
+    @Published var loadingMessage = "Loading..."
     @Published var showingManage = false
     @Published var showingPicker = false
     @Published var showingPickerDirect = false
@@ -40,21 +41,33 @@ final class AppViewModel: ObservableObject {
     }
 
     func onAppear() async {
-        isAuthorized = await musicService.isAuthorized
+        // Check authorization in parallel with song loading
+        loadingMessage = "Loading your music..."
+        async let authStatus = musicService.isAuthorized
 
+        // Load songs (synchronous SwiftData call, runs on MainActor)
+        var songs: [Song] = []
         do {
-            let songs = try repository.loadSongs()
-            for song in songs {
-                try? player.addSong(song)
-            }
+            songs = try repository.loadSongs()
         } catch {
             print("Failed to load songs: \(error)")
         }
 
-        isLoading = false
+        // Batch-add songs (O(n) instead of O(n²))
+        if !songs.isEmpty {
+            try? player.addSongs(songs)
+        }
 
-        // Prepare queue in background for instant playback
-        Task { try? await player.prepareQueue() }
+        // Wait for auth check
+        isAuthorized = await authStatus
+
+        // Prepare queue before dismissing loading screen
+        if !player.songs.isEmpty {
+            loadingMessage = "Preparing playback..."
+            try? await player.prepareQueue()
+        }
+
+        isLoading = false
     }
 
     func requestAuthorization() async {

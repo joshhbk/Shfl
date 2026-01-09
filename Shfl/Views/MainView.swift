@@ -77,7 +77,7 @@ struct MainView: View {
             ProgressView()
                 .scaleEffect(1.5)
 
-            Text("Loading your music...")
+            Text(viewModel.loadingMessage)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
