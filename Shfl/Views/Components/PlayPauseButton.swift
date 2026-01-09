@@ -23,6 +23,7 @@ struct PlayPauseButton: View {
         ZStack {
             Circle()
                 .fill(buttonBackgroundColor)
+                .frame(width: buttonSize, height: buttonSize)
                 .colorEffect(
                     ShaderLibrary.shfl_brushedMetal(
                         .float2(buttonSize / 2, buttonSize / 2),
@@ -30,7 +31,7 @@ struct PlayPauseButton: View {
                         .float(theme.brushedMetalIntensity)
                     )
                 )
-                .frame(width: buttonSize, height: buttonSize)
+                .clipShape(Circle())
                 .shadow(
                     color: .black.opacity(0.1),
                     radius: isPressed ? ClickWheelFeedback.centerPressedShadowRadius : ClickWheelFeedback.centerNormalShadowRadius,

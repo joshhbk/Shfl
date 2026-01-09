@@ -160,6 +160,19 @@ final class ShufflePlayer: ObservableObject {
         rebuildQueueIfPlaying()
     }
 
+    func addSongs(_ newSongs: [Song]) throws {
+        let existingIds = Set(songs.map(\.id))
+        let uniqueNewSongs = newSongs.filter { !existingIds.contains($0.id) }
+
+        let availableCapacity = Self.maxSongs - songs.count
+        guard uniqueNewSongs.count <= availableCapacity else {
+            throw ShufflePlayerError.capacityReached
+        }
+
+        songs.append(contentsOf: uniqueNewSongs)
+        // Don't rebuild queue during initial load - not playing yet
+    }
+
     func removeSong(id: String) {
         songs.removeAll { $0.id == id }
         rebuildQueueIfPlaying()
@@ -203,9 +216,13 @@ final class ShufflePlayer: ObservableObject {
         lastObservedSongId = nil
 
         if !isQueuePrepared {
+            // Emit loading state for immediate UI feedback
+            if let firstSong = songs.first {
+                playbackState = .loading(firstSong)
+            }
             try await prepareQueue()
         }
-        
+
         try await musicService.play()
     }
 
