@@ -27,6 +27,12 @@ struct SettingsView: View {
                     } label: {
                         Label("Autofill", systemImage: "text.badge.plus")
                     }
+
+                    NavigationLink {
+                        LibrarySortingSettingsView()
+                    } label: {
+                        Label("Library Sorting", systemImage: "arrow.up.arrow.down")
+                    }
                 }
 
                 Section("Connections") {

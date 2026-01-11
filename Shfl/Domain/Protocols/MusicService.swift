@@ -1,10 +1,19 @@
 import Foundation
 
-enum SortOption: Sendable {
+enum SortOption: String, CaseIterable, Sendable {
     case mostPlayed
     case recentlyPlayed
     case recentlyAdded
     case alphabetical
+
+    var displayName: String {
+        switch self {
+        case .mostPlayed: "Most Played"
+        case .recentlyPlayed: "Recently Played"
+        case .recentlyAdded: "Recently Added"
+        case .alphabetical: "Alphabetical"
+        }
+    }
 }
 
 struct LibraryPage: Sendable {

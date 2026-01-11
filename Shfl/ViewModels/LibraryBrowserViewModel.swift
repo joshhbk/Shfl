@@ -23,7 +23,7 @@ final class LibraryBrowserViewModel: ObservableObject {
     @Published private(set) var browseLoading = true  // Start true to show skeleton
     @Published private(set) var hasMorePages = true
     @Published private(set) var hasLoadedOnce = false
-    @Published var sortOption: SortOption = .mostPlayed
+    @Published var sortOption: SortOption
 
     // Search state
     @Published private(set) var searchResults: [Song] = []
@@ -54,10 +54,52 @@ final class LibraryBrowserViewModel: ObservableObject {
     private let musicService: MusicService
     private var searchCancellable: AnyCancellable?
     private var searchTask: Task<Void, Never>?
+    private var sortingChangedObserver: NSObjectProtocol?
 
     init(musicService: MusicService) {
         self.musicService = musicService
+
+        // Read sort option from UserDefaults
+        let savedRaw = UserDefaults.standard.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
+        self.sortOption = SortOption(rawValue: savedRaw) ?? .mostPlayed
+
         setupSearchSubscription()
+        setupSortingObserver()
+    }
+
+    private func setupSortingObserver() {
+        sortingChangedObserver = NotificationCenter.default.addObserver(
+            forName: Notification.Name("librarySortingChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleSortingChanged()
+            }
+        }
+    }
+
+    private func handleSortingChanged() {
+        let savedRaw = UserDefaults.standard.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
+        let newOption = SortOption(rawValue: savedRaw) ?? .mostPlayed
+
+        guard newOption != sortOption else { return }
+
+        sortOption = newOption
+        hasLoadedOnce = false
+        browseSongs = []
+        currentOffset = 0
+        hasMorePages = true
+
+        Task {
+            await loadInitialPage()
+        }
+    }
+
+    deinit {
+        if let observer = sortingChangedObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     private func setupSearchSubscription() {
