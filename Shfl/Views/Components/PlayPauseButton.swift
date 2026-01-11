@@ -5,11 +5,12 @@ struct PlayPauseButton: View {
     let action: () -> Void
     let theme: ShuffleTheme
     let highlightOffset: CGPoint
+    var scale: CGFloat = 1.0
 
     @State private var isPressed = false
 
-    private let buttonSize: CGFloat = 150
-    private let iconSize: CGFloat = 40
+    private var buttonSize: CGFloat { 150 * scale }
+    private var iconSize: CGFloat { 40 * scale }
 
     private var buttonBackgroundColor: Color {
         theme.bodyGradientTop

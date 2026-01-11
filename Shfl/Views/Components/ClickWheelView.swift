@@ -12,9 +12,10 @@ struct ClickWheelView: View {
     let onVolumeUp: () -> Void
     let onVolumeDown: () -> Void
     let highlightOffset: CGPoint
+    var scale: CGFloat = 1.0
 
-    private let wheelSize: CGFloat = 280
-    private let centerButtonSize: CGFloat = 150
+    private var wheelSize: CGFloat { 280 * scale }
+    private var centerButtonSize: CGFloat { 150 * scale }
 
     // Position buttons at the midpoint of the ring
     // Ring spans from centerButtonSize/2 to wheelSize/2
@@ -90,7 +91,7 @@ struct ClickWheelView: View {
             .frame(width: buttonContainerSize)
 
             // Center play/pause button
-            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, theme: theme, highlightOffset: highlightOffset)
+            PlayPauseButton(isPlaying: isPlaying, action: onPlayPause, theme: theme, highlightOffset: highlightOffset, scale: scale)
         }
         .compositingGroup()
         .scaleEffect(pressPosition != .none ? ClickWheelFeedback.wheelPressScale : 1.0)

@@ -51,15 +51,12 @@ struct PlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background - first in ZStack = behind
-                BrushedMetalBackground(
-                    baseColor: currentTheme.bodyGradientTop,
-                    intensity: currentTheme.brushedMetalIntensity,
-                    highlightOffset: highlightOffset,
-                    motionEnabled: currentTheme.motionEnabled,
-                    highlightColor: dynamicHighlightColor
+                // Background - album art with minimal blur
+                AlbumArtBackground(
+                    artworkURL: player.playbackState.currentSong?.artworkURL,
+                    fallbackColor: currentTheme.bodyGradientTop,
+                    blurRadius: 3
                 )
-                .animation(.easeInOut(duration: 0.5), value: colorExtractor.extractedColor?.description)
 
                 // Content
                 VStack(spacing: 0) {
@@ -76,9 +73,18 @@ struct PlayerView: View {
 
                     Spacer()
 
-                    VStack(spacing: 32) {
-                        nowPlayingSection
+                    // Song info panel - brushed metal
+                    ShuffleBodyView(highlightOffset: highlightOffset, height: 120) {
+                        songInfoContent
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 20)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
 
+                    // Controls panel - brushed metal
+                    ShuffleBodyView(highlightOffset: highlightOffset) {
                         ClickWheelView(
                             isPlaying: player.playbackState.isPlaying,
                             onPlayPause: handlePlayPause,
@@ -86,28 +92,14 @@ struct PlayerView: View {
                             onSkipBack: handleSkipBack,
                             onVolumeUp: { VolumeController.increaseVolume() },
                             onVolumeDown: { VolumeController.decreaseVolume() },
-                            highlightOffset: highlightOffset
+                            highlightOffset: highlightOffset,
+                            scale: 0.6
                         )
                         .disabled(player.songCount == 0)
                         .opacity(player.songCount == 0 ? 0.6 : 1.0)
-
-                        if FeatureFlags.showProgressBar {
-                            PlaybackProgressBar(
-                                currentTime: currentTime,
-                                duration: duration
-                            )
-                            .padding(.horizontal, 40)
-                        }
                     }
-
-                    Spacer()
-
-                    Button(action: onManageTapped) {
-                        Text("View Library")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(currentTheme.secondaryTextColor)
-                    }
-                    .padding(.bottom, geometry.safeAreaInsets.bottom + 24)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, geometry.safeAreaInsets.bottom + 12)
                 }
 
             }
@@ -143,21 +135,32 @@ struct PlayerView: View {
     private func topBar(geometry: GeometryProxy) -> some View {
         HStack {
             Button(action: onAddTapped) {
-                HStack(spacing: 4) {
-                    Text("Songs")
-                        .font(.system(size: 16, weight: .medium))
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(currentTheme.textColor)
+                Image(systemName: "music.note.list")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(currentTheme.bodyGradientTop)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                    )
             }
             Spacer()
             Button(action: onSettingsTapped) {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(currentTheme.textColor)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(currentTheme.bodyGradientTop)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                    )
             }
         }
+        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
         .padding(.horizontal, 20)
         .padding(.top, showError ? 16 : geometry.safeAreaInsets.top + 16)
     }
@@ -180,6 +183,160 @@ struct PlayerView: View {
         default:
             emptyStateView
         }
+    }
+
+    @ViewBuilder
+    private var songInfoContent: some View {
+        switch player.playbackState {
+        case .loading(let song):
+            VStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .tint(currentTheme.textColor)
+                Text(song.title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(currentTheme.textColor)
+                    .lineLimit(1)
+                Text(song.artist)
+                    .font(.system(size: 14))
+                    .foregroundStyle(currentTheme.secondaryTextColor)
+                    .lineLimit(1)
+            }
+        case .playing(let song), .paused(let song):
+            VStack(spacing: 4) {
+                Text(song.title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(currentTheme.textColor)
+                    .lineLimit(1)
+                Text(song.artist)
+                    .font(.system(size: 14))
+                    .foregroundStyle(currentTheme.secondaryTextColor)
+                    .lineLimit(1)
+
+                if FeatureFlags.showProgressBar {
+                    PlaybackProgressBar(
+                        currentTime: currentTime,
+                        duration: duration
+                    )
+                    .padding(.top, 8)
+                }
+            }
+        default:
+            VStack(spacing: 8) {
+                Text("No songs yet")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(currentTheme.textColor)
+                Text("Add some music to get started")
+                    .font(.system(size: 14))
+                    .foregroundStyle(currentTheme.secondaryTextColor)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var songInfoPanel: some View {
+        switch player.playbackState {
+        case .loading(let song):
+            FrostedPanel {
+                VStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .tint(.white)
+                    Text(song.title)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(song.artist)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            }
+            .transition(.opacity)
+        case .playing(let song), .paused(let song):
+            FrostedPanel {
+                VStack(spacing: 4) {
+                    Text(song.title)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(song.artist)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+
+                    if FeatureFlags.showProgressBar {
+                        PlaybackProgressBar(
+                            currentTime: currentTime,
+                            duration: duration
+                        )
+                        .padding(.top, 8)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .padding(.horizontal, 8)
+            }
+            .transition(.opacity)
+        default:
+            FrostedPanel {
+                VStack(spacing: 8) {
+                    Text("No songs yet")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("Add some music to get started")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Button(action: onAddTapped) {
+                        Text("Add Songs")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(.white.opacity(0.2))
+                            .clipShape(Capsule())
+                    }
+                    .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var overlayNowPlayingSection: some View {
+        switch player.playbackState {
+        case .loading(let song):
+            VStack(spacing: 12) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .tint(.white)
+                OverlaySongInfo(title: song.title, artist: song.artist)
+                    .opacity(0.7)
+            }
+            .transition(.opacity)
+        case .playing(let song), .paused(let song):
+            OverlaySongInfo(title: song.title, artist: song.artist)
+                .transition(.opacity)
+        default:
+            overlayEmptyStateView
+        }
+    }
+
+    private var overlayEmptyStateView: some View {
+        VStack(spacing: 8) {
+            Text("No songs yet")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+
+            Text("Add some music to get started")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
     }
 
     private var themeSwipeGesture: some Gesture {
@@ -300,12 +457,19 @@ struct PlayerView: View {
 }
 
 private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
+    let initialState: PlaybackState
+
+    init(initialState: PlaybackState = .empty) {
+        self.initialState = initialState
+    }
+
     var isAuthorized: Bool { true }
     var currentPlaybackTime: TimeInterval { 78 }
     var currentSongDuration: TimeInterval { 242 }
     var playbackStateStream: AsyncStream<PlaybackState> {
-        AsyncStream { continuation in
-            continuation.yield(.empty)
+        let state = initialState
+        return AsyncStream { continuation in
+            continuation.yield(state)
         }
     }
     func requestAuthorization() async -> Bool { true }
@@ -322,10 +486,18 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     func restartOrSkipToPrevious() async throws {}
 }
 
+private let previewSong = Song(
+    id: "preview-1",
+    title: "Bohemian Rhapsody",
+    artist: "Queen",
+    albumTitle: "A Night at the Opera",
+    artworkURL: URL(string: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/3c/1b/a9/3c1ba9e1-cf27-f6d1-6287-a3f0be3483a0/00602547288233.rgb.jpg/600x600bb.jpg")
+)
+
 #Preview("Empty State") {
     let mockService = PreviewMockMusicService()
     let player = ShufflePlayer(musicService: mockService)
-    return PlayerView(
+    PlayerView(
         player: player,
         musicService: mockService,
         onManageTapped: {},
@@ -335,13 +507,91 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
 }
 
 #Preview("Playing") {
-    let mockService = PreviewMockMusicService()
-    let player = ShufflePlayer(musicService: mockService)
-    return PlayerView(
-        player: player,
-        musicService: mockService,
-        onManageTapped: {},
-        onAddTapped: {},
-        onSettingsTapped: {}
-    )
+    ZStack {
+        // Local asset for preview (network images don't load in previews)
+        GeometryReader { geometry in
+            Image("SampleAlbumArt")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+                .blur(radius: 3)
+                .ignoresSafeArea()
+        }
+
+        VStack(spacing: 0) {
+            // Top bar
+            HStack {
+                Button(action: {}) {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(ShuffleTheme.silver.bodyGradientTop)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                Spacer()
+                Button(action: {}) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(ShuffleTheme.silver.bodyGradientTop)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                        )
+                }
+            }
+            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            .padding(.horizontal, 20)
+            .padding(.top, 60)
+
+            Spacer()
+
+            // Song info panel - brushed metal
+            ShuffleBodyView(highlightOffset: .zero, height: 120) {
+                VStack(spacing: 4) {
+                    Text(previewSong.title)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(ShuffleTheme.silver.textColor)
+                        .lineLimit(1)
+                    Text(previewSong.artist)
+                        .font(.system(size: 14))
+                        .foregroundStyle(ShuffleTheme.silver.secondaryTextColor)
+                        .lineLimit(1)
+
+                    PlaybackProgressBar(currentTime: 78, duration: 242)
+                        .padding(.top, 8)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+
+            // Controls panel - brushed metal
+            ShuffleBodyView(highlightOffset: .zero) {
+                ClickWheelView(
+                    isPlaying: true,
+                    onPlayPause: {},
+                    onSkipForward: {},
+                    onSkipBack: {},
+                    onVolumeUp: {},
+                    onVolumeDown: {},
+                    highlightOffset: .zero,
+                    scale: 0.6
+                )
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 34)
+        }
+    }
+    .environment(\.shuffleTheme, .silver)
 }
