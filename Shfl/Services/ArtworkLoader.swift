@@ -1,16 +1,19 @@
-import Combine
 import MusicKit
 import SwiftUI
 
 /// Lazy artwork loader with rate limiting to avoid overwhelming MusicKit
+@Observable
 @MainActor
-final class ArtworkLoader: ObservableObject {
+final class ArtworkLoader {
     static let shared = ArtworkLoader()
 
-    private var cache: [String: Artwork] = [:]
-    private var pending: Set<String> = []
-    private var loadQueue: [String] = []
-    private var isProcessing = false
+    @ObservationIgnored private var cache: [String: Artwork] = [:]
+    @ObservationIgnored private var pending: Set<String> = []
+    @ObservationIgnored private var loadQueue: [String] = []
+    @ObservationIgnored private var isProcessing = false
+
+    /// Triggers view updates when artwork is loaded
+    private(set) var lastUpdateTimestamp = Date()
 
     private init() {}
 
@@ -62,7 +65,7 @@ final class ArtworkLoader: ObservableObject {
                 pending.remove(song.id.rawValue)
             }
             // Trigger UI update
-            objectWillChange.send()
+            lastUpdateTimestamp = Date()
         } catch {
             // Remove from pending on error so they can retry
             for id in songIds {

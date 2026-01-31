@@ -1,30 +1,20 @@
 import SwiftUI
 
-extension Notification.Name {
-    static let librarySortingChanged = Notification.Name("librarySortingChanged")
-}
-
 struct LibrarySortingSettingsView: View {
-    @AppStorage("librarySortOption") private var sortOptionRaw: String = SortOption.mostPlayed.rawValue
-
-    private var sortOption: SortOption {
-        SortOption(rawValue: sortOptionRaw) ?? .mostPlayed
-    }
+    @Environment(\.appSettings) private var appSettings
 
     var body: some View {
         Form {
             Section {
                 ForEach(SortOption.allCases, id: \.self) { option in
                     Button {
-                        guard sortOptionRaw != option.rawValue else { return }
-                        sortOptionRaw = option.rawValue
-                        NotificationCenter.default.post(name: .librarySortingChanged, object: nil)
+                        appSettings?.librarySortOption = option
                     } label: {
                         HStack {
                             Text(option.displayName)
                                 .foregroundStyle(.primary)
                             Spacer()
-                            if sortOption == option {
+                            if appSettings?.librarySortOption == option {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(Color.accentColor)
                             }
@@ -41,4 +31,5 @@ struct LibrarySortingSettingsView: View {
     NavigationStack {
         LibrarySortingSettingsView()
     }
+    .environment(\.appSettings, AppSettings())
 }

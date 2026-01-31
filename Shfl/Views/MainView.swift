@@ -2,16 +2,19 @@ import SwiftUI
 import SwiftData
 
 struct MainView: View {
-    @StateObject private var viewModel: AppViewModel
+    @State private var viewModel: AppViewModel
+    @State private var appSettings = AppSettings()
 
     init(musicService: MusicService, modelContext: ModelContext) {
-        _viewModel = StateObject(wrappedValue: AppViewModel(
+        _viewModel = State(wrappedValue: AppViewModel(
             musicService: musicService,
             modelContext: modelContext
         ))
     }
 
     var body: some View {
+        @Bindable var viewModel = viewModel
+
         Group {
             if viewModel.isLoading {
                 loadingView
@@ -27,8 +30,17 @@ struct MainView: View {
                 authorizationView
             }
         }
+        .environment(\.appSettings, appSettings)
+        .onAppear {
+            VolumeController.initialize()
+        }
         .task {
             await viewModel.onAppear()
+        }
+        .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
+            Task {
+                await viewModel.player.reshuffleWithNewAlgorithm(newAlgorithm)
+            }
         }
         .sheet(isPresented: $viewModel.showingManage) {
             ManageView(
@@ -36,12 +48,14 @@ struct MainView: View {
                 onAddTapped: { viewModel.openPicker() },
                 onDismiss: { viewModel.closeManage() }
             )
+            .environment(\.appSettings, appSettings)
             .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
                 SongPickerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
                     onDismiss: { viewModel.closePicker() }
                 )
+                .environment(\.appSettings, appSettings)
             }
         }
         .sheet(isPresented: $viewModel.showingPickerDirect, onDismiss: { viewModel.closePickerDirect() }) {
@@ -50,10 +64,12 @@ struct MainView: View {
                 musicService: viewModel.musicService,
                 onDismiss: { viewModel.closePickerDirect() }
             )
+            .environment(\.appSettings, appSettings)
         }
         .sheet(isPresented: $viewModel.showingSettings) {
             SettingsView()
-                .environmentObject(viewModel.player)
+                .environment(\.appSettings, appSettings)
+                .environment(\.shufflePlayer, viewModel.player)
         }
         .alert("Authorization Required", isPresented: .init(
             get: { viewModel.authorizationError != nil },

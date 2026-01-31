@@ -1,12 +1,14 @@
 import SwiftUI
 
 struct SongPickerView: View {
-    @ObservedObject var player: ShufflePlayer
+    var player: ShufflePlayer
     let musicService: MusicService
     let onDismiss: () -> Void
 
-    @StateObject private var viewModel: LibraryBrowserViewModel
-    @StateObject private var undoManager = SongUndoManager()
+    @State private var viewModel: LibraryBrowserViewModel
+    @State private var undoManager = SongUndoManager()
+
+    @Environment(\.appSettings) private var appSettings
 
     init(
         player: ShufflePlayer,
@@ -16,7 +18,7 @@ struct SongPickerView: View {
         self.player = player
         self.musicService = musicService
         self.onDismiss = onDismiss
-        self._viewModel = StateObject(wrappedValue: LibraryBrowserViewModel(musicService: musicService))
+        self._viewModel = State(wrappedValue: LibraryBrowserViewModel(musicService: musicService))
     }
 
     var body: some View {
@@ -89,9 +91,14 @@ struct SongPickerView: View {
                     .disabled(player.songCount == 0)
                 }
             }
-            .searchable(text: $viewModel.searchText, prompt: "Search your library")
+            .searchable(text: Bindable(viewModel).searchText, prompt: "Search your library")
             .task {
                 await viewModel.loadInitialPage()
+            }
+            .onChange(of: appSettings?.librarySortOption) { _, newOption in
+                if let newOption {
+                    viewModel.handleSortOptionChanged(newOption)
+                }
             }
             .alert("Error", isPresented: .init(
                 get: { viewModel.errorMessage != nil },

@@ -1,14 +1,14 @@
 import SwiftUI
 
 struct PlayerView: View {
-    @ObservedObject var player: ShufflePlayer
+    var player: ShufflePlayer
     let musicService: MusicService
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
 
     @Environment(\.motionManager) private var motionManager
-    @StateObject private var colorExtractor = AlbumArtColorExtractor()
+    @State private var colorExtractor = AlbumArtColorExtractor()
     @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""

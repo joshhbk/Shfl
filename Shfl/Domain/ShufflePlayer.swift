@@ -1,4 +1,3 @@
-import Combine
 import Foundation
 
 enum ShufflePlayerError: Error, Equatable {
@@ -7,24 +6,25 @@ enum ShufflePlayerError: Error, Equatable {
     case playbackFailed(String)
 }
 
+@Observable
 @MainActor
-final class ShufflePlayer: ObservableObject {
+final class ShufflePlayer {
     static let maxSongs = 120
 
-    private let musicService: MusicService
-    @Published private(set) var songs: [Song] = []
-    private var stateTask: Task<Void, Never>?
+    @ObservationIgnored private let musicService: MusicService
+    private(set) var songs: [Song] = []
+    @ObservationIgnored private var stateTask: Task<Void, Never>?
 
-    @Published private(set) var playbackState: PlaybackState = .empty
+    private(set) var playbackState: PlaybackState = .empty
 
     /// Debug: The last shuffled queue order (for verifying shuffle algorithms)
-    @Published private(set) var lastShuffledQueue: [Song] = []
+    private(set) var lastShuffledQueue: [Song] = []
     /// Debug: The algorithm used for the last shuffle
-    @Published private(set) var lastUsedAlgorithm: ShuffleAlgorithm = .noRepeat
+    private(set) var lastUsedAlgorithm: ShuffleAlgorithm = .noRepeat
 
-    private var playedSongIds: Set<String> = []
-    private var lastObservedSongId: String?
-    private var preparedSongIds: Set<String> = []
+    @ObservationIgnored private var playedSongIds: Set<String> = []
+    @ObservationIgnored private var lastObservedSongId: String?
+    @ObservationIgnored private var preparedSongIds: Set<String> = []
 
     private var isQueuePrepared: Bool {
         Set(songs.map(\.id)) == preparedSongIds
@@ -38,31 +38,14 @@ final class ShufflePlayer: ObservableObject {
     /// Exposed for testing only
     var playedSongIdsForTesting: Set<String> { playedSongIds }
 
-    private var algorithmObserver: NSObjectProtocol?
-
     init(musicService: MusicService) {
         self.musicService = musicService
         observePlaybackState()
-        observeAlgorithmChanges()
     }
 
-    private func observeAlgorithmChanges() {
-        algorithmObserver = NotificationCenter.default.addObserver(
-            forName: .shuffleAlgorithmChanged,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.reshuffleWithNewAlgorithm()
-            }
-        }
-    }
-
-    private func reshuffleWithNewAlgorithm() async {
+    /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
+    func reshuffleWithNewAlgorithm(_ algorithm: ShuffleAlgorithm) async {
         guard !songs.isEmpty, playbackState.isActive else { return }
-
-        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
-        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
 
         print("🎲 Algorithm changed to \(algorithm.displayName), reshuffling...")
 
@@ -101,15 +84,12 @@ final class ShufflePlayer: ObservableObject {
 
     deinit {
         stateTask?.cancel()
-        if let observer = algorithmObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
 
     private func observePlaybackState() {
-        stateTask = Task { [weak self] in
+        stateTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            for await state in musicService.playbackStateStream {
+            for await state in self.musicService.playbackStateStream {
                 self.handlePlaybackStateChange(state)
             }
         }
