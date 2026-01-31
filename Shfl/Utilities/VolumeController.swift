@@ -13,6 +13,7 @@ import UIKit
 /// - The view hierarchy lookup fails for other reasons
 enum VolumeController {
     private static let volumeStep: Float = 0.0625 // 1/16, matches iOS default
+    private static var isInitialized = false
 
     private static var volumeView: MPVolumeView = {
         let view = MPVolumeView(frame: .zero)
@@ -24,32 +25,37 @@ enum VolumeController {
         volumeView.subviews.compactMap { $0 as? UISlider }.first
     }
 
-    private static func ensureVolumeViewInHierarchy() {
-        guard volumeView.superview == nil,
-              let window = UIApplication.shared.connectedScenes
-                  .compactMap({ $0 as? UIWindowScene })
-                  .first?.windows.first else { return }
+    /// Call this early in app lifecycle (e.g., from AppDelegate or initial view)
+    /// to ensure the volume view is ready before user interaction.
+    static func initialize() {
+        guard !isInitialized else { return }
+        isInitialized = true
+
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first?.windows.first else {
+            assertionFailure("VolumeController: No window available during initialization")
+            return
+        }
         window.addSubview(volumeView)
+        // Force layout so subviews are populated
+        volumeView.layoutIfNeeded()
     }
 
     static func increaseVolume() {
-        ensureVolumeViewInHierarchy()
-        guard let slider = volumeSlider else {
-            assertionFailure("VolumeController: Could not find volume slider in MPVolumeView hierarchy")
-            return
-        }
-        let newValue = min(slider.value + volumeStep, 1.0)
-        slider.value = newValue
-        slider.sendActions(for: .touchUpInside)
+        adjustVolume(by: volumeStep)
     }
 
     static func decreaseVolume() {
-        ensureVolumeViewInHierarchy()
+        adjustVolume(by: -volumeStep)
+    }
+
+    private static func adjustVolume(by delta: Float) {
         guard let slider = volumeSlider else {
-            assertionFailure("VolumeController: Could not find volume slider in MPVolumeView hierarchy")
+            assertionFailure("VolumeController: Slider unavailable. Ensure initialize() is called on app launch.")
             return
         }
-        let newValue = max(slider.value - volumeStep, 0.0)
+        let newValue = max(0.0, min(slider.value + delta, 1.0))
         slider.value = newValue
         slider.sendActions(for: .touchUpInside)
     }
