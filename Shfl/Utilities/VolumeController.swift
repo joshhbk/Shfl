@@ -25,18 +25,21 @@ enum VolumeController {
         volumeView.subviews.compactMap { $0 as? UISlider }.first
     }
 
-    /// Call this early in app lifecycle (e.g., from AppDelegate or initial view)
+    /// Call this early in app lifecycle (e.g., from a view's onAppear)
     /// to ensure the volume view is ready before user interaction.
+    /// Safe to call multiple times - will only initialize once when a window is available.
     static func initialize() {
         guard !isInitialized else { return }
-        isInitialized = true
 
         guard let window = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first?.windows.first else {
-            assertionFailure("VolumeController: No window available during initialization")
+            // Window not available yet - this is expected if called too early.
+            // Volume control will attempt to initialize lazily when first used.
             return
         }
+
+        isInitialized = true
         window.addSubview(volumeView)
         // Force layout so subviews are populated
         volumeView.layoutIfNeeded()
@@ -51,8 +54,13 @@ enum VolumeController {
     }
 
     private static func adjustVolume(by delta: Float) {
+        // Attempt lazy initialization if not done yet
+        if !isInitialized {
+            initialize()
+        }
+
         guard let slider = volumeSlider else {
-            assertionFailure("VolumeController: Slider unavailable. Ensure initialize() is called on app launch.")
+            // Slider may be unavailable if window isn't ready or MPVolumeView structure changed
             return
         }
         let newValue = max(0.0, min(slider.value + delta, 1.0))

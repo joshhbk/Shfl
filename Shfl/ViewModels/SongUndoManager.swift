@@ -1,9 +1,9 @@
-import Combine
 import SwiftUI
 
+@Observable
 @MainActor
-final class SongUndoManager: ObservableObject {
-    @Published private(set) var currentState: UndoState?
+final class SongUndoManager {
+    private(set) var currentState: UndoState?
     private var dismissTask: Task<Void, Never>?
 
     func recordAction(_ action: UndoAction, song: Song, autoHideDelay: TimeInterval = 3.0) {

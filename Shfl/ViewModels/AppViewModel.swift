@@ -1,23 +1,22 @@
-import Combine
 import SwiftData
 import SwiftUI
 
+@Observable
 @MainActor
-final class AppViewModel: ObservableObject {
+final class AppViewModel {
     let player: ShufflePlayer
-    let musicService: MusicService
-    private let repository: SongRepository
-    private let scrobbleTracker: ScrobbleTracker
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored let musicService: MusicService
+    @ObservationIgnored private let repository: SongRepository
+    @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
-    @Published var isAuthorized = false
-    @Published var isLoading = true
-    @Published var loadingMessage = "Loading..."
-    @Published var showingManage = false
-    @Published var showingPicker = false
-    @Published var showingPickerDirect = false
-    @Published var showingSettings = false
-    @Published var authorizationError: String?
+    var isAuthorized = false
+    var isLoading = true
+    var loadingMessage = "Loading..."
+    var showingManage = false
+    var showingPicker = false
+    var showingPickerDirect = false
+    var showingSettings = false
+    var authorizationError: String?
 
     init(musicService: MusicService, modelContext: ModelContext) {
         self.musicService = musicService
@@ -32,13 +31,37 @@ final class AppViewModel: ObservableObject {
         let scrobbleManager = ScrobbleManager(transports: [lastFMTransport])
         self.scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, musicService: musicService)
 
-        // Forward playback state to scrobble tracker
-        player.$playbackState
-            .sink { [weak self] state in
-                self?.scrobbleTracker.onPlaybackStateChanged(state)
-            }
-            .store(in: &cancellables)
+        // Start observing playback state for scrobbling
+        startObservingPlaybackState()
     }
+
+    @ObservationIgnored private var scrobbleObservationTask: Task<Void, Never>?
+
+    deinit {
+        scrobbleObservationTask?.cancel()
+    }
+
+    private func startObservingPlaybackState() {
+        // Track last state to avoid duplicate notifications
+        var lastState: PlaybackState?
+
+        scrobbleObservationTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+
+                // Check if state changed
+                let currentState = self.player.playbackState
+                if currentState != lastState {
+                    lastState = currentState
+                    self.scrobbleTracker.onPlaybackStateChanged(currentState)
+                }
+
+                // Poll at reasonable interval - scrobbling doesn't need instant updates
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+    }
+
 
     func onAppear() async {
         // Check authorization in parallel with song loading

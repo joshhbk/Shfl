@@ -12,10 +12,6 @@ import SwiftData
 struct ShuffledApp: App {
     @State private var motionManager = MotionManager()
 
-    init() {
-        VolumeController.initialize()
-    }
-
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([PersistedSong.self])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

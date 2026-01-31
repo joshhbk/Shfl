@@ -1,30 +1,20 @@
 import SwiftUI
 
-extension Notification.Name {
-    static let shuffleAlgorithmChanged = Notification.Name("shuffleAlgorithmChanged")
-}
-
 struct ShuffleAlgorithmSettingsView: View {
-    @AppStorage("shuffleAlgorithm") private var algorithmRaw: String = ShuffleAlgorithm.noRepeat.rawValue
-
-    private var algorithm: ShuffleAlgorithm {
-        ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
-    }
+    @Environment(\.appSettings) private var appSettings
 
     var body: some View {
         Form {
             Section {
                 ForEach(ShuffleAlgorithm.allCases, id: \.self) { algo in
                     Button {
-                        guard algorithmRaw != algo.rawValue else { return }
-                        algorithmRaw = algo.rawValue
-                        NotificationCenter.default.post(name: .shuffleAlgorithmChanged, object: nil)
+                        appSettings?.shuffleAlgorithm = algo
                     } label: {
                         HStack {
                             Text(algo.displayName)
                                 .foregroundStyle(.primary)
                             Spacer()
-                            if algorithm == algo {
+                            if appSettings?.shuffleAlgorithm == algo {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(Color.accentColor)
                             }
@@ -32,7 +22,9 @@ struct ShuffleAlgorithmSettingsView: View {
                     }
                 }
             } footer: {
-                Text(algorithm.description)
+                if let algorithm = appSettings?.shuffleAlgorithm {
+                    Text(algorithm.description)
+                }
             }
         }
         .navigationTitle("Shuffle Algorithm")
@@ -43,4 +35,5 @@ struct ShuffleAlgorithmSettingsView: View {
     NavigationStack {
         ShuffleAlgorithmSettingsView()
     }
+    .environment(\.appSettings, AppSettings())
 }

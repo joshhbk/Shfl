@@ -25,7 +25,7 @@ struct SongDisplay: View {
 
 struct SongArtwork: View {
     let songId: String
-    @ObservedObject private var loader = ArtworkLoader.shared
+    private var loader: ArtworkLoader { ArtworkLoader.shared }
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
@@ -43,6 +43,8 @@ struct SongArtwork: View {
             .onAppear {
                 loader.requestArtwork(for: songId)
             }
+            // Force view updates when artwork is loaded
+            .id(loader.lastUpdateTimestamp)
     }
 }
 

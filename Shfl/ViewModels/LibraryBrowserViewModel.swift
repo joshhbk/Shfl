@@ -1,8 +1,8 @@
-import Combine
 import Foundation
 
+@Observable
 @MainActor
-final class LibraryBrowserViewModel: ObservableObject {
+final class LibraryBrowserViewModel {
     enum Mode: Equatable {
         case browse
         case search
@@ -16,22 +16,27 @@ final class LibraryBrowserViewModel: ObservableObject {
     }
 
     // Autofill state
-    @Published private(set) var autofillState: AutofillState = .idle
+    private(set) var autofillState: AutofillState = .idle
 
     // Browse state
-    @Published private(set) var browseSongs: [Song] = []
-    @Published private(set) var browseLoading = true  // Start true to show skeleton
-    @Published private(set) var hasMorePages = true
-    @Published private(set) var hasLoadedOnce = false
-    @Published var sortOption: SortOption
+    private(set) var browseSongs: [Song] = []
+    private(set) var browseLoading = true  // Start true to show skeleton
+    private(set) var hasMorePages = true
+    private(set) var hasLoadedOnce = false
+    var sortOption: SortOption
 
     // Search state
-    @Published private(set) var searchResults: [Song] = []
-    @Published private(set) var searchLoading = false
+    private(set) var searchResults: [Song] = []
+    private(set) var searchLoading = false
 
     // Shared state
-    @Published var searchText = ""
-    @Published private(set) var errorMessage: String?
+    var searchText = "" {
+        didSet {
+            guard searchText != oldValue else { return }
+            handleSearchTextChanged()
+        }
+    }
+    private(set) var errorMessage: String?
 
     var currentMode: Mode {
         searchText.isEmpty ? .browse : .search
@@ -46,15 +51,14 @@ final class LibraryBrowserViewModel: ObservableObject {
     }
 
     // Pagination
-    private let pageSize = 50
-    private var currentOffset = 0
-    private var isLoadingMore = false
+    @ObservationIgnored private let pageSize = 50
+    @ObservationIgnored private var currentOffset = 0
+    @ObservationIgnored private var isLoadingMore = false
 
     // Dependencies
-    private let musicService: MusicService
-    private var searchCancellable: AnyCancellable?
-    private var searchTask: Task<Void, Never>?
-    private var sortingChangedObserver: NSObjectProtocol?
+    @ObservationIgnored private let musicService: MusicService
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var debounceTask: Task<Void, Never>?
 
     init(musicService: MusicService) {
         self.musicService = musicService
@@ -62,27 +66,10 @@ final class LibraryBrowserViewModel: ObservableObject {
         // Read sort option from UserDefaults
         let savedRaw = UserDefaults.standard.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
         self.sortOption = SortOption(rawValue: savedRaw) ?? .mostPlayed
-
-        setupSearchSubscription()
-        setupSortingObserver()
     }
 
-    private func setupSortingObserver() {
-        sortingChangedObserver = NotificationCenter.default.addObserver(
-            forName: Notification.Name("librarySortingChanged"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleSortingChanged()
-            }
-        }
-    }
-
-    private func handleSortingChanged() {
-        let savedRaw = UserDefaults.standard.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
-        let newOption = SortOption(rawValue: savedRaw) ?? .mostPlayed
-
+    /// Called when sort option changes. Views should call this via onChange(of: appSettings.librarySortOption).
+    func handleSortOptionChanged(_ newOption: SortOption) {
         guard newOption != sortOption else { return }
 
         sortOption = newOption
@@ -96,33 +83,31 @@ final class LibraryBrowserViewModel: ObservableObject {
         }
     }
 
-    deinit {
-        if let observer = sortingChangedObserver {
-            NotificationCenter.default.removeObserver(observer)
+    private func handleSearchTextChanged() {
+        // Cancel previous debounce
+        debounceTask?.cancel()
+
+        let query = searchText
+
+        // Clear results immediately when search is cleared
+        if query.isEmpty {
+            searchResults = []
+            searchTask?.cancel()
+            return
         }
-    }
 
-    private func setupSearchSubscription() {
-        searchCancellable = $searchText
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .removeDuplicates()
-            .sink { [weak self] query in
-                print("🔎 Debounced search triggered for: '\(query)'")
-                guard let self else { return }
+        // Debounce search
+        debounceTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+            guard !Task.isCancelled else { return }
 
-                // Clear results immediately when search is cleared
-                if query.isEmpty {
-                    Task { @MainActor in
-                        self.searchResults = []
-                    }
-                    return
-                }
+            print("🔎 Debounced search triggered for: '\(query)'")
 
-                self.searchTask?.cancel()
-                self.searchTask = Task {
-                    await self.performSearch(query: query)
-                }
+            searchTask?.cancel()
+            searchTask = Task {
+                await performSearch(query: query)
             }
+        }
     }
 
     // MARK: - Browse Methods

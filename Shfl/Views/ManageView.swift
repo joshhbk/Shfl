@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ManageView: View {
-    @ObservedObject var player: ShufflePlayer
+    var player: ShufflePlayer
     let onAddTapped: () -> Void
     let onDismiss: () -> Void
 

@@ -1,16 +1,16 @@
-import Combine
 import MusicKit
 import SwiftUI
 import UIKit
 
 /// Extracts colors from album artwork using MusicKit's catalog data
+@Observable
 @MainActor
-final class AlbumArtColorExtractor: ObservableObject {
-    @Published private(set) var extractedColor: Color?
+final class AlbumArtColorExtractor {
+    private(set) var extractedColor: Color?
 
-    private var currentSongId: String?
-    private var currentTask: Task<Void, Never>?
-    private var colorCache: [String: Color] = [:]
+    @ObservationIgnored private var currentSongId: String?
+    @ObservationIgnored private var currentTask: Task<Void, Never>?
+    @ObservationIgnored private var colorCache: [String: Color] = [:]
 
     /// Updates the extracted color for the given song by fetching from Apple Music catalog
     func updateColor(for songId: String) {
