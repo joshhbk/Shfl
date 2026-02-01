@@ -31,4 +31,10 @@ final class PlayerProgressState {
     func refreshDuration() {
         duration = musicService.currentSongDuration
     }
+
+    /// Resets time to current playback position immediately (call on song change)
+    func resetToCurrentPosition() {
+        currentTime = musicService.currentPlaybackTime
+        duration = musicService.currentSongDuration
+    }
 }

@@ -8,8 +8,7 @@ struct SettingsView: View {
             Form {
                 Section("Appearance") {
                     NavigationLink {
-                        Text("App Icon settings coming soon")
-                            .navigationTitle("App Icon")
+                        AppIconSettingsView()
                     } label: {
                         Label("App Icon", systemImage: "app.badge")
                     }

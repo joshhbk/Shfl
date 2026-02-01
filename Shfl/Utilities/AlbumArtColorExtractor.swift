@@ -21,9 +21,8 @@ final class AlbumArtColorExtractor {
         // Check cache first
         if let cached = colorCache[songId] {
             print("[ColorExtractor] Using cached color for songId: \(songId)")
-            withAnimation(.easeInOut(duration: 0.5)) {
-                extractedColor = cached
-            }
+            // No animation here - TintedThemeProvider handles the visual transition
+            extractedColor = cached
             return
         }
 
@@ -61,9 +60,8 @@ final class AlbumArtColorExtractor {
                 uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
                 print("[ColorExtractor] Got catalog backgroundColor - hue: \(h), sat: \(s), bright: \(b)")
 
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    extractedColor = color
-                }
+                // No animation here - TintedThemeProvider handles the visual transition
+                extractedColor = color
             } catch {
                 print("[ColorExtractor] Failed to fetch catalog data: \(error)")
             }
@@ -74,9 +72,8 @@ final class AlbumArtColorExtractor {
     func clear() {
         currentTask?.cancel()
         currentSongId = nil
-        withAnimation(.easeInOut(duration: 0.5)) {
-            extractedColor = nil
-        }
+        // No animation here - TintedThemeProvider handles the visual transition
+        extractedColor = nil
     }
 
     // MARK: - Color adjustment

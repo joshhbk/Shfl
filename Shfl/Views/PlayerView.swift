@@ -41,7 +41,7 @@ struct PlayerView: View {
                     currentTime: progressState?.currentTime ?? 0,
                     duration: progressState?.duration ?? 0,
                     highlightOffset: highlightOffset,
-                    actions: makeActions(),
+                    actions: actions,
                     showError: showError,
                     errorMessage: errorMessage,
                     safeAreaInsets: geometry.safeAreaInsets,
@@ -61,7 +61,10 @@ struct PlayerView: View {
                 progressState = PlayerProgressState(musicService: musicService)
             }
             progressState?.startUpdating()
-            motionManager?.start()
+            motionManager?.start(
+                sensitivity: themeController.currentTheme.motionSensitivity,
+                maxOffset: 220
+            )
 
             // Initialize tint provider with current theme
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
@@ -77,23 +80,24 @@ struct PlayerView: View {
         .onChange(of: player.playbackState) { _, newState in
             handlePlaybackStateChange(newState)
         }
-        .onChange(of: motionManager?.pitch) { _, _ in
-            updateHighlightOffset()
-        }
-        .onChange(of: motionManager?.roll) { _, _ in
-            updateHighlightOffset()
+        .onChange(of: motionManager?.highlightOffset) { _, newOffset in
+            highlightOffset = newOffset ?? .zero
         }
         .onChange(of: colorExtractor.extractedColor) { _, newColor in
             tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)
         }
         .onChange(of: themeController.currentTheme) { _, newTheme in
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: newTheme)
+            motionManager?.updateSettings(
+                sensitivity: newTheme.motionSensitivity,
+                maxOffset: 220
+            )
         }
     }
 
     // MARK: - Actions
 
-    private func makeActions() -> PlayerActions {
+    private var actions: PlayerActions {
         PlayerActions(
             onPlayPause: handlePlayPause,
             onSkipForward: handleSkipForward,
@@ -135,7 +139,8 @@ struct PlayerView: View {
             }
         }
 
-        progressState?.refreshDuration()
+        // Reset progress immediately so the bar doesn't show stale time
+        progressState?.resetToCurrentPosition()
 
         if let song = newState.currentSong {
             colorExtractor.updateColor(for: song.id)
@@ -144,17 +149,6 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Motion
-
-    private func updateHighlightOffset() {
-        guard let manager = motionManager else { return }
-        highlightOffset = MotionManager.highlightOffset(
-            pitch: manager.pitch,
-            roll: manager.roll,
-            sensitivity: themeController.currentTheme.motionSensitivity,
-            maxOffset: 220
-        )
-    }
 }
 
 // MARK: - Previews
