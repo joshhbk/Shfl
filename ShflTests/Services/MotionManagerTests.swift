@@ -1,15 +1,15 @@
 import CoreFoundation
+import CoreGraphics
 import Testing
 @testable import Shfl
 
 @Suite("MotionManager Tests")
 struct MotionManagerTests {
 
-    @Test("Initial pitch and roll are zero")
+    @Test("Initial highlight offset is zero")
     func initialValuesAreZero() {
         let manager = MotionManager()
-        #expect(manager.pitch == 0)
-        #expect(manager.roll == 0)
+        #expect(manager.highlightOffset == .zero)
     }
 
     @Test("Highlight offset calculation maps tilt to offset")
