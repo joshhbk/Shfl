@@ -13,6 +13,7 @@ final class ShufflePlayer {
 
     @ObservationIgnored private let musicService: MusicService
     private(set) var songs: [Song] = []
+    @ObservationIgnored private var songIds: Set<String> = []
     @ObservationIgnored private var stateTask: Task<Void, Never>?
 
     private(set) var playbackState: PlaybackState = .empty
@@ -133,16 +134,16 @@ final class ShufflePlayer {
         guard songs.count < Self.maxSongs else {
             throw ShufflePlayerError.capacityReached
         }
-        guard !songs.contains(where: { $0.id == song.id }) else {
+        guard !songIds.contains(song.id) else {
             return // Already added
         }
         songs.append(song)
+        songIds.insert(song.id)
         rebuildQueueIfPlaying()
     }
 
     func addSongs(_ newSongs: [Song]) throws {
-        let existingIds = Set(songs.map(\.id))
-        let uniqueNewSongs = newSongs.filter { !existingIds.contains($0.id) }
+        let uniqueNewSongs = newSongs.filter { !songIds.contains($0.id) }
 
         let availableCapacity = Self.maxSongs - songs.count
         guard uniqueNewSongs.count <= availableCapacity else {
@@ -150,22 +151,25 @@ final class ShufflePlayer {
         }
 
         songs.append(contentsOf: uniqueNewSongs)
+        songIds.formUnion(uniqueNewSongs.map(\.id))
         // Don't rebuild queue during initial load - not playing yet
     }
 
     func removeSong(id: String) {
         songs.removeAll { $0.id == id }
+        songIds.remove(id)
         rebuildQueueIfPlaying()
     }
 
     func removeAllSongs() {
         songs.removeAll()
+        songIds.removeAll()
         playedSongIds.removeAll()
         lastObservedSongId = nil
     }
 
     func containsSong(id: String) -> Bool {
-        songs.contains { $0.id == id }
+        songIds.contains(id)
     }
 
     // MARK: - Queue Preparation

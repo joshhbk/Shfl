@@ -28,3 +28,9 @@ Pods/
 # Worktrees
 .worktrees/
 .worktrees
+
+# AI/Agent tools
+.agent/
+.agents/
+.claude/
+.opencode/
