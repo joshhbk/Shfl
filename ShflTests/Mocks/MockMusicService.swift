@@ -34,6 +34,8 @@ actor MockMusicService: MusicService {
 
     nonisolated var currentPlaybackTime: TimeInterval { mockPlaybackTime }
     nonisolated var currentSongDuration: TimeInterval { mockDuration }
+    nonisolated var currentSongId: String? { mockCurrentSongId }
+    nonisolated(unsafe) var mockCurrentSongId: String?
 
     private func setContinuation(_ cont: AsyncStream<PlaybackState>.Continuation) {
         self.continuation = cont

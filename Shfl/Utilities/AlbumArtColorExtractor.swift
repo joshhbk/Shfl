@@ -2,7 +2,7 @@ import MusicKit
 import SwiftUI
 import UIKit
 
-/// Extracts colors from album artwork using MusicKit's catalog data
+/// Extracts colors from album artwork using MusicKit's library data
 @Observable
 @MainActor
 final class AlbumArtColorExtractor {
@@ -12,7 +12,7 @@ final class AlbumArtColorExtractor {
     @ObservationIgnored private var currentTask: Task<Void, Never>?
     @ObservationIgnored private var colorCache: [String: Color] = [:]
 
-    /// Updates the extracted color for the given song by fetching from Apple Music catalog
+    /// Updates the extracted color for the given song by fetching from user's library
     func updateColor(for songId: String) {
         // Skip if already processing this song
         guard songId != currentSongId else { return }
@@ -29,17 +29,18 @@ final class AlbumArtColorExtractor {
         // Cancel any existing task
         currentTask?.cancel()
 
-        print("[ColorExtractor] Fetching catalog data for songId: \(songId)")
+        print("[ColorExtractor] Fetching library data for songId: \(songId)")
         currentTask = Task {
             do {
-                // Fetch from catalog to get full artwork metadata
-                let request = MusicCatalogResourceRequest<MusicKit.Song>(matching: \.id, equalTo: MusicItemID(songId))
+                // Fetch from library using library ID
+                var request = MusicLibraryRequest<MusicKit.Song>()
+                request.filter(matching: \.id, equalTo: MusicItemID(songId))
                 let response = try await request.response()
 
                 guard !Task.isCancelled, currentSongId == songId else { return }
 
                 guard let song = response.items.first else {
-                    print("[ColorExtractor] No song found in catalog for songId: \(songId)")
+                    print("[ColorExtractor] No song found in library for songId: \(songId)")
                     return
                 }
 
@@ -47,7 +48,7 @@ final class AlbumArtColorExtractor {
 
                 guard let artwork = song.artwork,
                       let bgColor = artwork.backgroundColor else {
-                    print("[ColorExtractor] No backgroundColor available from catalog for songId: \(songId)")
+                    print("[ColorExtractor] No backgroundColor available from library for songId: \(songId)")
                     return
                 }
 
@@ -58,12 +59,12 @@ final class AlbumArtColorExtractor {
                 let uiColor = UIColor(color)
                 var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
                 uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                print("[ColorExtractor] Got catalog backgroundColor - hue: \(h), sat: \(s), bright: \(b)")
+                print("[ColorExtractor] Got library backgroundColor - hue: \(h), sat: \(s), bright: \(b)")
 
                 // No animation here - TintedThemeProvider handles the visual transition
                 extractedColor = color
             } catch {
-                print("[ColorExtractor] Failed to fetch catalog data: \(error)")
+                print("[ColorExtractor] Failed to fetch library data: \(error)")
             }
         }
     }

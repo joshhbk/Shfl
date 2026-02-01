@@ -123,4 +123,9 @@ extension ShuffleTheme {
     static func random() -> ShuffleTheme {
         allThemes.randomElement() ?? .pink
     }
+
+    /// Look up theme by ID for widget extension usage
+    static func theme(byId id: String) -> ShuffleTheme? {
+        allThemes.first { $0.id == id }
+    }
 }

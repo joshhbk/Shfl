@@ -11,6 +11,7 @@ final class MockMusicService: MusicService, @unchecked Sendable {
 
     var currentPlaybackTime: TimeInterval { 0 }
     var currentSongDuration: TimeInterval { 180 }
+    var currentSongId: String? { nil }
 
     func requestAuthorization() async -> Bool { true }
 

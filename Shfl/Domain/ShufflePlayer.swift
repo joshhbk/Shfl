@@ -35,6 +35,23 @@ final class ShufflePlayer {
     /// Exposed for testing only
     var playedSongIdsForTesting: Set<String> { playedSongIds }
 
+    // MARK: - Queue State Exposure (for persistence)
+
+    /// Current queue order as song IDs (for persistence)
+    var currentQueueOrder: [String] {
+        lastShuffledQueue.map(\.id)
+    }
+
+    /// Currently played song IDs (for persistence)
+    var currentPlayedSongIds: Set<String> {
+        playedSongIds
+    }
+
+    /// Whether there's a valid state that could be restored
+    var hasRestorableState: Bool {
+        !songs.isEmpty && !lastShuffledQueue.isEmpty
+    }
+
     init(musicService: MusicService) {
         self.musicService = musicService
         observePlaybackState()
@@ -93,16 +110,49 @@ final class ShufflePlayer {
     }
 
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
-        let newSongId = newState.currentSongId
+        // MusicKit returns catalog IDs for queue entries, but our song pool uses library IDs.
+        // Look up the song in our pool by title+artist to get the correct library ID,
+        // but keep MusicKit's fresh artwork URL.
+        let resolvedState: PlaybackState
+        let resolvedSongId: String?
+
+        if let musicKitSong = newState.currentSong,
+           let poolSong = songs.first(where: { $0.title == musicKitSong.title && $0.artist == musicKitSong.artist }) {
+            // Found matching song in pool - use pool's ID but keep MusicKit's artwork
+            resolvedSongId = poolSong.id
+            let mergedSong = Song(
+                id: poolSong.id,
+                title: musicKitSong.title,
+                artist: musicKitSong.artist,
+                albumTitle: musicKitSong.albumTitle,
+                artworkURL: musicKitSong.artworkURL,  // Keep MusicKit's fresh artwork
+                playCount: musicKitSong.playCount,
+                lastPlayedDate: musicKitSong.lastPlayedDate
+            )
+            switch newState {
+            case .playing:
+                resolvedState = .playing(mergedSong)
+            case .paused:
+                resolvedState = .paused(mergedSong)
+            case .loading:
+                resolvedState = .loading(mergedSong)
+            default:
+                resolvedState = newState
+            }
+        } else {
+            // No match in pool - use MusicKit's data as-is
+            resolvedSongId = newState.currentSongId
+            resolvedState = newState
+        }
 
         // Song changed - add previous to history
-        if let lastId = lastObservedSongId, lastId != newSongId {
+        if let lastId = lastObservedSongId, lastId != resolvedSongId {
             playedSongIds.insert(lastId)
         }
-        lastObservedSongId = newSongId
+        lastObservedSongId = resolvedSongId
 
         // Clear history on stop/empty/error
-        switch newState {
+        switch resolvedState {
         case .stopped, .empty, .error:
             playedSongIds.removeAll()
             lastObservedSongId = nil
@@ -110,7 +160,7 @@ final class ShufflePlayer {
             break
         }
 
-        playbackState = newState
+        playbackState = resolvedState
     }
 
     private func rebuildQueueIfPlaying() async {
@@ -336,5 +386,118 @@ final class ShufflePlayer {
             // Try to play again
             try await play()
         }
+    }
+
+    // MARK: - Queue Restoration
+
+    /// Restores the queue from persisted state.
+    /// - Parameters:
+    ///   - queueOrder: Array of song IDs representing the queue order
+    ///   - currentSongId: The ID of the song that was playing
+    ///   - playedIds: Set of song IDs that have been played
+    ///   - playbackPosition: The position in seconds to seek to
+    /// - Returns: True if restoration was successful, false if a fresh shuffle is needed
+    func restoreQueue(
+        queueOrder: [String],
+        currentSongId: String?,
+        playedIds: Set<String>,
+        playbackPosition: TimeInterval
+    ) async -> Bool {
+        print("🔄 restoreQueue called: songs=\(songs.count), queueOrder=\(queueOrder.count), currentSongId=\(currentSongId ?? "nil")")
+
+        guard !songs.isEmpty else {
+            print("🔄 restoreQueue: No songs in pool, returning false")
+            return false
+        }
+
+        // Build song lookup for O(1) access
+        let songById = Dictionary(uniqueKeysWithValues: songs.map { ($0.id, $0) })
+
+        // Filter queue to only songs that still exist in the pool
+        let validQueueSongs = queueOrder.compactMap { songById[$0] }
+        print("🔄 restoreQueue: validQueueSongs=\(validQueueSongs.count)")
+
+        // If queue is empty after filtering, need fresh shuffle
+        guard !validQueueSongs.isEmpty else {
+            print("🔄 restoreQueue: No valid queue songs, returning false")
+            return false
+        }
+
+        // Restore played history (only for songs still in pool)
+        let validPlayedIds = playedIds.filter { songById[$0] != nil }
+        playedSongIds = validPlayedIds
+
+        // Reorder queue so current song is first (setQueue always starts from first song)
+        let effectiveQueue: [Song]
+        let effectiveCurrentSong: Song?
+
+        // Debug: log what we're searching for
+        print("🔄 restoreQueue: Looking for currentSongId=\(currentSongId ?? "nil") in \(validQueueSongs.count) songs")
+        if let currentId = currentSongId {
+            let matchingSongs = validQueueSongs.filter { $0.id == currentId }
+            print("🔄 restoreQueue: Found \(matchingSongs.count) matching songs")
+            if matchingSongs.isEmpty {
+                // Log first few song IDs to see what we have
+                let sampleIds = validQueueSongs.prefix(5).map { $0.id }
+                print("🔄 restoreQueue: Sample song IDs in queue: \(sampleIds)")
+            }
+        }
+
+        if let currentId = currentSongId,
+           let currentIndex = validQueueSongs.firstIndex(where: { $0.id == currentId }) {
+            // Current song exists - reorder queue to start from it
+            let fromCurrentSong = Array(validQueueSongs[currentIndex...])
+            let beforeCurrentSong = Array(validQueueSongs[..<currentIndex])
+            effectiveQueue = fromCurrentSong + beforeCurrentSong
+            effectiveCurrentSong = validQueueSongs[currentIndex]
+            lastObservedSongId = currentId
+            print("🔄 restoreQueue: Reordered queue to start at \(effectiveCurrentSong?.title ?? "unknown") (index \(currentIndex))")
+        } else {
+            // Current song missing - start with first available from queue
+            effectiveQueue = validQueueSongs
+            effectiveCurrentSong = validQueueSongs.first
+            lastObservedSongId = effectiveCurrentSong?.id
+            print("🔄 restoreQueue: Current song not found, starting from first song: \(effectiveCurrentSong?.title ?? "unknown") (id=\(effectiveCurrentSong?.id ?? "nil"))")
+        }
+
+        // Update debug state
+        lastShuffledQueue = effectiveQueue
+        // Read shuffle algorithm from UserDefaults for lastUsedAlgorithm
+        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
+            ?? ShuffleAlgorithm.noRepeat.rawValue
+        lastUsedAlgorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+
+        // Set the queue in MusicKit
+        do {
+            print("🔄 restoreQueue: Setting queue with \(effectiveQueue.count) songs, first=\(effectiveQueue.first?.title ?? "none")")
+            try await musicService.setQueue(songs: effectiveQueue)
+            queueValid = true
+
+            // Brief play to load the song (required for seek to work and metadata to load)
+            print("🔄 restoreQueue: Playing briefly to load song...")
+            try await musicService.play()
+
+            // Seek to saved position
+            let clampedPosition = max(0, playbackPosition)
+            if clampedPosition > 0 {
+                print("🔄 restoreQueue: Seeking to position \(clampedPosition)")
+                musicService.seek(to: clampedPosition)
+            }
+
+            // Pause - user will see restored state
+            print("🔄 restoreQueue: Pausing...")
+            await musicService.pause()
+
+            print("🔄 restoreQueue: Success!")
+            return true
+        } catch {
+            print("🔄 restoreQueue: Failed to set queue: \(error)")
+            return false
+        }
+    }
+
+    /// Resumes playback after restoration (call after restoreQueue succeeds)
+    func resumeAfterRestore() async throws {
+        try await musicService.play()
     }
 }

@@ -16,6 +16,16 @@ final class ThemeController {
         self.currentThemeIndex = startingIndex ?? Int.random(in: 0..<ShuffleTheme.allThemes.count)
     }
 
+    /// Initialize with a theme ID, falling back to random if not found
+    init(themeId: String?) {
+        if let id = themeId,
+           let index = ShuffleTheme.allThemes.firstIndex(where: { $0.id == id }) {
+            self.currentThemeIndex = index
+        } else {
+            self.currentThemeIndex = Int.random(in: 0..<ShuffleTheme.allThemes.count)
+        }
+    }
+
     func makeSwipeGesture() -> some Gesture {
         DragGesture(minimumDistance: 30)
             .onChanged { [weak self] value in

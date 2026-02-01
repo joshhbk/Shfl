@@ -8,7 +8,8 @@ struct PlayerView: View {
     let onSettingsTapped: () -> Void
 
     @Environment(\.motionManager) private var motionManager
-    @State private var themeController = ThemeController()
+    @Environment(\.appSettings) private var appSettings
+    @State private var themeController: ThemeController
     @State private var tintProvider = TintedThemeProvider()
     @State private var progressState: PlayerProgressState?
     @State private var colorExtractor = AlbumArtColorExtractor()
@@ -19,6 +20,7 @@ struct PlayerView: View {
     init(
         player: ShufflePlayer,
         musicService: MusicService,
+        initialThemeId: String? = nil,
         onManageTapped: @escaping () -> Void,
         onAddTapped: @escaping () -> Void = {},
         onSettingsTapped: @escaping () -> Void = {}
@@ -28,6 +30,7 @@ struct PlayerView: View {
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
+        self._themeController = State(wrappedValue: ThemeController(themeId: initialThemeId))
     }
 
     var body: some View {
@@ -92,6 +95,8 @@ struct PlayerView: View {
                 sensitivity: newTheme.motionSensitivity,
                 maxOffset: 220
             )
+            // Sync theme to AppSettings for persistence and Live Activity
+            appSettings?.currentThemeId = newTheme.id
         }
     }
 
@@ -163,6 +168,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     var isAuthorized: Bool { true }
     var currentPlaybackTime: TimeInterval { 78 }
     var currentSongDuration: TimeInterval { 242 }
+    var currentSongId: String? { "preview-1" }
     var playbackStateStream: AsyncStream<PlaybackState> {
         let state = initialState
         return AsyncStream { continuation in
