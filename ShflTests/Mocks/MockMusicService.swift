@@ -99,6 +99,14 @@ actor MockMusicService: MusicService {
         lastQueuedSongs = queuedSongs
     }
 
+    func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws {
+        // Replace queue while preserving current song
+        queuedSongs = [currentSong] + songs
+        lastQueuedSongs = queuedSongs
+        currentIndex = 0
+        // Don't call play() - preserves current playback position
+    }
+
     func play() async throws {
         playCallCount += 1
         if let error = shouldThrowOnPlay {

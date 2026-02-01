@@ -66,6 +66,12 @@ final class ShufflePlayer {
         // Get currently playing song
         let currentSongId = playbackState.currentSongId
 
+        guard let currentId = currentSongId,
+              let currentSong = songs.first(where: { $0.id == currentId }) else {
+            print("🎲 No current song found, skipping reshuffle")
+            return
+        }
+
         // Filter out played songs AND the currently playing song
         let upcomingSongs = songs.filter { song in
             !playedSongIds.contains(song.id) && song.id != currentSongId
@@ -74,11 +80,8 @@ final class ShufflePlayer {
         let shuffler = QueueShuffler(algorithm: algorithm)
         let shuffledUpcoming = shuffler.shuffle(upcomingSongs)
 
-        // Build full queue: current song first (if exists), then shuffled upcoming
-        var newQueue: [Song] = []
-        if let currentId = currentSongId, let currentSong = songs.first(where: { $0.id == currentId }) {
-            newQueue.append(currentSong)
-        }
+        // Build full queue for tracking: current song first, then shuffled upcoming
+        var newQueue: [Song] = [currentSong]
         newQueue.append(contentsOf: shuffledUpcoming)
 
         lastShuffledQueue = newQueue
@@ -87,12 +90,11 @@ final class ShufflePlayer {
         print("🎲 New queue order: \(newQueue.map { "\($0.title) by \($0.artist)" })")
 
         do {
-            try await musicService.setQueue(songs: newQueue)
-            // Need to call play() to make the new queue take effect mid-playback
-            try await musicService.play()
-            print("🎲 setQueue and play() succeeded")
+            // Use replaceUpcomingQueue to preserve current playback position
+            try await musicService.replaceUpcomingQueue(with: shuffledUpcoming, currentSong: currentSong)
+            print("🎲 replaceUpcomingQueue succeeded")
         } catch {
-            print("🎲 setQueue/play FAILED: \(error)")
+            print("🎲 replaceUpcomingQueue FAILED: \(error)")
         }
     }
 

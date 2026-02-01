@@ -29,6 +29,7 @@ final class MockMusicService: MusicService, @unchecked Sendable {
 
     func setQueue(songs: [Song]) async throws {}
     func insertIntoQueue(songs: [Song]) async throws {}
+    func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws {}
     func play() async throws {}
     func pause() async {}
     func skipToNext() async throws {}
