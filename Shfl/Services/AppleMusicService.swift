@@ -158,6 +158,55 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("🎵 insertIntoQueue() completed - inserted \(orderedItems.count) items")
     }
 
+    func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws {
+        print("🎵 replaceUpcomingQueue() called with \(songs.count) upcoming songs")
+
+        // Save current playback position and state
+        let savedPlaybackTime = player.playbackTime
+        let wasPlaying = player.state.playbackStatus == .playing
+        print("🎵 Saving playback time: \(savedPlaybackTime), wasPlaying: \(wasPlaying)")
+
+        // Pause first to avoid audible skip
+        if wasPlaying {
+            player.pause()
+        }
+
+        // Build full queue: current song + upcoming songs
+        let allSongs = [currentSong] + songs
+        let ids = allSongs.map { MusicItemID($0.id) }
+
+        var request = MusicLibraryRequest<MusicKit.Song>()
+        request.filter(matching: \.id, memberOf: ids)
+        let response = try await request.response()
+
+        guard !response.items.isEmpty else {
+            print("🎵 No songs found, returning")
+            return
+        }
+
+        // Reorder response items to match our desired order
+        let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
+        let orderedItems = allSongs.compactMap { itemsById[$0.id] }
+
+        // Set the new queue starting from the current song
+        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: orderedItems.first)
+        player.queue = queue
+        player.state.shuffleMode = .off
+
+        // Resume playback if it was playing, then seek
+        if wasPlaying {
+            try await player.play()
+            // Seek AFTER play() - setting before gets ignored
+            player.playbackTime = savedPlaybackTime
+            print("🎵 Resumed playback at \(savedPlaybackTime)")
+        } else {
+            player.playbackTime = savedPlaybackTime
+            print("🎵 Queue updated at \(savedPlaybackTime) (paused)")
+        }
+
+        print("🎵 replaceUpcomingQueue() completed with \(orderedItems.count) items")
+    }
+
     func play() async throws {
         print("▶️ play() called")
         try await player.play()

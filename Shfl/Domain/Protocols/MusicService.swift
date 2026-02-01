@@ -44,6 +44,9 @@ protocol MusicService: Sendable {
     /// Insert songs into the existing queue without disrupting playback
     func insertIntoQueue(songs: [Song]) async throws
 
+    /// Replace the upcoming queue without disrupting the current song's playback position
+    func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws
+
     /// Start playback
     func play() async throws
 
