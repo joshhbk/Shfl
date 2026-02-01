@@ -1,45 +1,33 @@
 import SwiftUI
 
+/// Full-screen brushed metal background using the tinted theme color
 struct BrushedMetalBackground: View {
-    let baseColor: Color
-    let intensity: CGFloat
-    let highlightOffset: CGPoint
-    let motionEnabled: Bool
-    let highlightColor: Color
+    @Environment(\.shuffleTheme) private var theme
 
-    init(
-        baseColor: Color,
-        intensity: CGFloat = 0.5,
-        highlightOffset: CGPoint = .zero,
-        motionEnabled: Bool = true,
-        highlightColor: Color = .white
-    ) {
-        self.baseColor = baseColor
-        self.intensity = intensity
-        self.highlightOffset = motionEnabled ? highlightOffset : .zero
-        self.motionEnabled = motionEnabled
-        self.highlightColor = highlightColor
-    }
+    let highlightOffset: CGPoint
 
     var body: some View {
         GeometryReader { geometry in
-            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            
             Rectangle()
-                .fill(baseColor)
+                .fill(theme.bodyGradientTop)
                 .colorEffect(
                     ShaderLibrary.shfl_brushedMetal(
-                        .float2(center),
+                        .float2(geometry.size.width / 2, geometry.size.height / 2),
                         .float2(highlightOffset),
-                        .float(intensity)
+                        .float(theme.brushedMetalIntensity)
                     )
                 )
+                .ignoresSafeArea()
         }
     }
-
-
 }
 
-#Preview {
-    BrushedMetalBackground(baseColor: Color(red: 0.75, green: 0.75, blue: 0.75))
+#Preview("Silver") {
+    BrushedMetalBackground(highlightOffset: .zero)
+        .environment(\.shuffleTheme, .silver)
+}
+
+#Preview("Green") {
+    BrushedMetalBackground(highlightOffset: .zero)
+        .environment(\.shuffleTheme, .green)
 }
