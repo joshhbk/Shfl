@@ -12,10 +12,17 @@ final class ArtworkLoader {
     @ObservationIgnored private var loadQueue: [String] = []
     @ObservationIgnored private var isProcessing = false
 
-    /// Triggers view updates when artwork is loaded
-    private(set) var lastUpdateTimestamp = Date()
+    /// Per-song version tracking for granular view updates.
+    /// Only the specific SongArtwork view will re-render when its artwork loads.
+    private(set) var artworkVersions: [String: Int] = [:]
 
     private init() {}
+
+    /// Returns a stable version number for a song's artwork.
+    /// Increments when artwork is loaded, causing only that view to update.
+    func artworkVersion(for songId: String) -> Int {
+        artworkVersions[songId, default: 0]
+    }
 
     func artwork(for songId: String) -> Artwork? {
         cache[songId]
@@ -59,13 +66,14 @@ final class ArtworkLoader {
         do {
             let response = try await request.response()
             for song in response.items {
+                let songId = song.id.rawValue
                 if let artwork = song.artwork {
-                    cache[song.id.rawValue] = artwork
+                    cache[songId] = artwork
+                    // Increment only this song's version to trigger its view update
+                    artworkVersions[songId, default: 0] += 1
                 }
-                pending.remove(song.id.rawValue)
+                pending.remove(songId)
             }
-            // Trigger UI update
-            lastUpdateTimestamp = Date()
         } catch {
             // Remove from pending on error so they can retry
             for id in songIds {

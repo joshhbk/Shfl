@@ -17,6 +17,7 @@ struct BrushedMetalBackground: View {
                         .float(theme.brushedMetalIntensity)
                     )
                 )
+                .drawingGroup()  // Rasterize to reduce shader recomputation overhead
                 .ignoresSafeArea()
         }
     }

@@ -7,6 +7,7 @@ struct SongPickerView: View {
 
     @State private var viewModel: LibraryBrowserViewModel
     @State private var undoManager = SongUndoManager()
+    @State private var selectedSongIds: Set<String> = []
 
     @Environment(\.appSettings) private var appSettings
 
@@ -19,13 +20,14 @@ struct SongPickerView: View {
         self.musicService = musicService
         self.onDismiss = onDismiss
         self._viewModel = State(wrappedValue: LibraryBrowserViewModel(musicService: musicService))
+        self._selectedSongIds = State(wrappedValue: Set(player.allSongs.map(\.id)))
     }
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    CapacityProgressBar(current: player.songCount, maximum: player.capacity)
+                    CapacityProgressBar(current: selectedSongIds.count, maximum: player.capacity)
 
                     Group {
                         switch viewModel.currentMode {
@@ -79,16 +81,19 @@ struct SongPickerView: View {
                                 let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
                                 let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
                                 await viewModel.autofill(into: player, using: source)
+                                // Sync cached IDs after autofill
+                                selectedSongIds = Set(player.allSongs.map(\.id))
                             }
                         }
-                        .disabled(player.remainingCapacity == 0)
+                        .disabled(selectedSongIds.count >= player.capacity)
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Clear") {
                         player.removeAllSongs()
+                        selectedSongIds.removeAll()
                     }
-                    .disabled(player.songCount == 0)
+                    .disabled(selectedSongIds.isEmpty)
                 }
             }
             .searchable(text: Bindable(viewModel).searchText, prompt: "Search your library")
@@ -157,43 +162,45 @@ struct SongPickerView: View {
     }
 
     private func songList(songs: [Song], isPaginated: Bool) -> some View {
-        ScrollView {
+        let isAtCapacity = selectedSongIds.count >= player.capacity
+
+        return ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(songs) { song in
                     SongRow(
                         song: song,
-                        isSelected: player.containsSong(id: song.id),
-                        isAtCapacity: player.remainingCapacity == 0,
+                        isSelected: selectedSongIds.contains(song.id),
+                        isAtCapacity: isAtCapacity,
                         onToggle: { toggleSong(song) }
                     )
-                    .onAppear {
-                        if isPaginated {
-                            Task {
-                                await viewModel.loadNextPageIfNeeded(currentSong: song)
-                            }
-                        }
-                    }
                     Divider().padding(.leading, 72)
                 }
 
                 if isPaginated && viewModel.hasMorePages {
                     ProgressView()
                         .padding()
+                        .onAppear {
+                            Task {
+                                await viewModel.loadMorePages()
+                            }
+                        }
                 }
             }
         }
     }
 
     private func toggleSong(_ song: Song) {
-        if player.containsSong(id: song.id) {
+        if selectedSongIds.contains(song.id) {
             player.removeSong(id: song.id)
+            selectedSongIds.remove(song.id)
             undoManager.recordAction(.removed, song: song)
         } else {
             do {
                 try player.addSong(song)
+                selectedSongIds.insert(song.id)
                 undoManager.recordAction(.added, song: song)
 
-                if CapacityProgressBar.isMilestone(player.songCount) {
+                if CapacityProgressBar.isMilestone(selectedSongIds.count) {
                     HapticFeedback.milestone.trigger()
                 }
             } catch ShufflePlayerError.capacityReached {
@@ -208,9 +215,11 @@ struct SongPickerView: View {
         switch state.action {
         case .added:
             player.removeSong(id: state.song.id)
+            selectedSongIds.remove(state.song.id)
             HapticFeedback.light.trigger()
         case .removed:
             try? player.addSong(state.song)
+            selectedSongIds.insert(state.song.id)
             HapticFeedback.medium.trigger()
         }
         undoManager.dismiss()

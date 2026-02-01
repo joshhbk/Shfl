@@ -146,6 +146,12 @@ final class LibraryBrowserViewModel {
             return
         }
 
+        await loadMorePages()
+    }
+
+    func loadMorePages() async {
+        guard hasMorePages, !isLoadingMore else { return }
+
         isLoadingMore = true
 
         do {

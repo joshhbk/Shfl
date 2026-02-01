@@ -43,8 +43,8 @@ struct SongArtwork: View {
             .onAppear {
                 loader.requestArtwork(for: songId)
             }
-            // Force view updates when artwork is loaded
-            .id(loader.lastUpdateTimestamp)
+            // Use song-specific ID so only THIS view updates when its artwork loads
+            .id(loader.artworkVersion(for: songId))
     }
 }
 

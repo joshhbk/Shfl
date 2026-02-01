@@ -38,7 +38,7 @@ final class TintedThemeProvider {
 
         guard let albumColor else {
             // No album color - use pure theme
-            withAnimation(.easeInOut(duration: 0.5)) {
+            withAnimation(.easeInOut(duration: 0.3)) {
                 computedTheme = theme
             }
             return
@@ -57,7 +57,7 @@ final class TintedThemeProvider {
         // Determine wheel/text styles based on blended color luminance
         let (wheelStyle, textStyle, iconColor) = ColorBlending.determineStyles(for: blendedTop)
 
-        withAnimation(.easeInOut(duration: 0.5)) {
+        withAnimation(.easeInOut(duration: 0.3)) {
             computedTheme = ShuffleTheme(
                 id: theme.id,
                 name: theme.name,
