@@ -274,7 +274,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertTrue(queuedIds.contains("3"), "New song3 should be included")
     }
 
-    func testRemoveSongDuringPlaybackRebuildsQueue() async throws {
+    func testRemoveSongDuringPlaybackRemovesFromInternalList() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
@@ -282,17 +282,16 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        await mockService.resetQueueTracking()
-
         await player.removeSong(id: "2")
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let callCount = await mockService.setQueueCallCount
-        XCTAssertEqual(callCount, 1, "setQueue should be called when removing song during playback")
+        // Song should be removed from internal list
+        let containsSong = await player.containsSong(id: "2")
+        XCTAssertFalse(containsSong, "Removed song should not be in songs list")
 
-        let lastQueued = await mockService.lastQueuedSongs
-        let queuedIds = lastQueued.map { $0.id }
-        XCTAssertFalse(queuedIds.contains("2"), "Removed song should not be in queue")
+        // Playback should continue (no disruption)
+        let state = await player.playbackState
+        XCTAssertTrue(state.isActive, "Playback should continue after removing non-current song")
     }
 
     func testRemoveCurrentlyPlayingSongContinuesPlayback() async throws {

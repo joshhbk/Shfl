@@ -259,54 +259,81 @@ final class ShufflePlayer {
         // Don't rebuild queue during initial load - not playing yet
     }
 
-    /// Add songs and insert into queue if playing (for autofill efficiency)
+    /// Add songs and reshuffle queue if playing (interleaves new songs throughout upcoming queue)
     func addSongsWithQueueRebuild(_ newSongs: [Song]) async throws {
+        print("🔍 addSongsWithQueueRebuild: Received \(newSongs.count) songs")
         let uniqueNewSongs = newSongs.filter { !songIds.contains($0.id) }
+        print("🔍 addSongsWithQueueRebuild: \(uniqueNewSongs.count) unique after filtering")
 
         let availableCapacity = Self.maxSongs - songs.count
         guard uniqueNewSongs.count <= availableCapacity else {
+            print("🔍 addSongsWithQueueRebuild: Capacity exceeded!")
             throw ShufflePlayerError.capacityReached
         }
 
         songs.append(contentsOf: uniqueNewSongs)
         songIds.formUnion(uniqueNewSongs.map(\.id))
         queueValid = false
+        print("🔍 addSongsWithQueueRebuild: Added to internal list, playbackState.isActive = \(playbackState.isActive)")
 
-        // If playing, insert songs into existing queue without disruption
+        // If playing, reshuffle to interleave new songs throughout upcoming queue
         if playbackState.isActive {
-            // Update debug queue to show new songs
-            lastShuffledQueue.append(contentsOf: uniqueNewSongs)
+            let currentSongId = playbackState.currentSongId
+
+            guard let currentId = currentSongId,
+                  let currentSong = songs.first(where: { $0.id == currentId }) else {
+                print("🔍 addSongsWithQueueRebuild: No current song, skipping reshuffle")
+                return
+            }
+
+            // Combine existing upcoming songs (excluding played and current) with new songs
+            let upcomingSongs = songs.filter { song in
+                !playedSongIds.contains(song.id) && song.id != currentSongId
+            }
+
+            // Read shuffle algorithm from UserDefaults
+            let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
+                ?? ShuffleAlgorithm.noRepeat.rawValue
+            let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+
+            // Shuffle all upcoming songs together (new songs get interleaved)
+            let shuffler = QueueShuffler(algorithm: algorithm)
+            let shuffledUpcoming = shuffler.shuffle(upcomingSongs)
+
+            // Build full queue for tracking: current song first, then shuffled upcoming
+            var newQueue: [Song] = [currentSong]
+            newQueue.append(contentsOf: shuffledUpcoming)
+
+            lastShuffledQueue = newQueue
+            lastUsedAlgorithm = algorithm
+
+            print("🎵 Reshuffling with \(uniqueNewSongs.count) new songs interleaved into \(upcomingSongs.count - uniqueNewSongs.count) existing upcoming")
 
             do {
-                try await musicService.insertIntoQueue(songs: uniqueNewSongs)
-                print("🎵 Successfully inserted \(uniqueNewSongs.count) songs into queue")
+                try await musicService.replaceUpcomingQueue(with: shuffledUpcoming, currentSong: currentSong)
+                print("🎵 Successfully reshuffled queue with \(shuffledUpcoming.count) upcoming songs")
             } catch {
-                print("🎵 Failed to insert songs: \(error)")
+                print("🎵 Failed to reshuffle queue: \(error)")
             }
         }
+        print("🔍 addSongsWithQueueRebuild: Complete")
     }
 
     func removeSong(id: String) {
-        let isCurrentSong = playbackState.currentSongId == id
-
         songs.removeAll { $0.id == id }
         songIds.remove(id)
         queueValid = false
-
-        // If we removed the currently playing song, skip to next
-        if isCurrentSong && playbackState.isActive {
-            Task {
-                try? await musicService.skipToNext()
-            }
-        }
-        // Note: Songs removed that aren't current will still be in MusicKit's queue
-        // They'll be skipped when handlePlaybackStateChange detects they're not in our songs list
+        // Note: If this is the currently playing song, MusicKit will continue playing it
+        // since it's already in the queue. The song will finish naturally without skipping.
+        // Songs removed that aren't current will still be in MusicKit's queue but will be
+        // skipped when handlePlaybackStateChange detects they're not in our songs list.
     }
 
     func removeAllSongs() {
         songs.removeAll()
         songIds.removeAll()
         playedSongIds.removeAll()
+        lastShuffledQueue.removeAll()
         lastObservedSongId = nil
         queueValid = false
     }
