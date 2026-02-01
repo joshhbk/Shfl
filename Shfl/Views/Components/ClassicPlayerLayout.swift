@@ -28,29 +28,37 @@ struct ClassicPlayerLayout: View {
 
             Spacer()
 
-            // Song info panel - brushed metal
-            ShuffleBodyView(highlightOffset: highlightOffset, height: 120) {
-                SongInfoDisplay(
-                    playbackState: playbackState,
-                    currentTime: currentTime,
-                    duration: duration
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .padding(.horizontal, 20)
+            // Album art card - only show when there's a song
+            if let song = playbackState.currentSong {
+                AlbumArtCard(artworkURL: song.artworkURL, size: 320)
+                    .padding(.bottom, 24)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
 
-            // Controls panel
-            PlayerControlsPanel(
-                isPlaying: playbackState.isPlaying,
-                isDisabled: isControlsDisabled,
-                highlightOffset: highlightOffset,
-                actions: actions
+            // Song info - floating directly on background
+            SongInfoDisplay(
+                playbackState: playbackState,
+                currentTime: currentTime,
+                duration: duration,
+                onSeek: actions.onSeek
             )
-            .padding(.horizontal, 20)
-            .padding(.bottom, safeAreaInsets.bottom + 12)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 20)
+
+            // Click wheel - floating with shadow
+            ClickWheelView(
+                isPlaying: playbackState.isPlaying,
+                onPlayPause: actions.onPlayPause,
+                onSkipForward: actions.onSkipForward,
+                onSkipBack: actions.onSkipBack,
+                onVolumeUp: { VolumeController.increaseVolume() },
+                onVolumeDown: { VolumeController.decreaseVolume() },
+                highlightOffset: highlightOffset,
+                scale: 0.6
+            )
+            .disabled(isControlsDisabled)
+            .opacity(isControlsDisabled ? 0.6 : 1.0)
+            .padding(.bottom, safeAreaInsets.bottom + 20)
         }
         .animation(.easeInOut(duration: 0.2), value: showError)
     }

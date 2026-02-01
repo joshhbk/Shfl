@@ -9,6 +9,7 @@ struct PlayerView: View {
 
     @Environment(\.motionManager) private var motionManager
     @State private var themeController = ThemeController()
+    @State private var tintProvider = TintedThemeProvider()
     @State private var progressState: PlayerProgressState?
     @State private var colorExtractor = AlbumArtColorExtractor()
     @State private var highlightOffset: CGPoint = .zero
@@ -32,11 +33,7 @@ struct PlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                AlbumArtBackground(
-                    artworkURL: player.playbackState.currentSong?.artworkURL,
-                    fallbackColor: themeController.currentTheme.bodyGradientTop,
-                    blurRadius: 3
-                )
+                BrushedMetalBackground(highlightOffset: highlightOffset)
 
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
@@ -58,13 +55,17 @@ struct PlayerView: View {
             .ignoresSafeArea()
         }
         .simultaneousGesture(themeController.makeSwipeGesture())
-        .environment(\.shuffleTheme, themeController.currentTheme)
+        .environment(\.shuffleTheme, tintProvider.computedTheme)
         .onAppear {
             if progressState == nil {
                 progressState = PlayerProgressState(musicService: musicService)
             }
             progressState?.startUpdating()
             motionManager?.start()
+
+            // Initialize tint provider with current theme
+            tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
+
             if let song = player.playbackState.currentSong {
                 colorExtractor.updateColor(for: song.id)
             }
@@ -82,6 +83,12 @@ struct PlayerView: View {
         .onChange(of: motionManager?.roll) { _, _ in
             updateHighlightOffset()
         }
+        .onChange(of: colorExtractor.extractedColor) { _, newColor in
+            tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)
+        }
+        .onChange(of: themeController.currentTheme) { _, newTheme in
+            tintProvider.update(albumColor: colorExtractor.extractedColor, theme: newTheme)
+        }
     }
 
     // MARK: - Actions
@@ -93,8 +100,13 @@ struct PlayerView: View {
             onSkipBack: handleSkipBack,
             onManage: onManageTapped,
             onAdd: onAddTapped,
-            onSettings: onSettingsTapped
+            onSettings: onSettingsTapped,
+            onSeek: handleSeek
         )
+    }
+
+    private func handleSeek(_ time: TimeInterval) {
+        musicService.seek(to: time)
     }
 
     private func handlePlayPause() {
@@ -175,6 +187,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     func skipToNext() async throws {}
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
+    func seek(to time: TimeInterval) {}
 }
 
 private let previewSong = Song(
