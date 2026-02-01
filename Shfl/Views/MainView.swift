@@ -25,6 +25,7 @@ struct MainView: View {
                 PlayerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
+                    initialThemeId: appSettings.currentThemeId,
                     onManageTapped: { viewModel.openManage() },
                     onAddTapped: { viewModel.openPickerDirect() },
                     onSettingsTapped: { viewModel.openSettings() }

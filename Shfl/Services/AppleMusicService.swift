@@ -27,6 +27,14 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         return duration
     }
 
+    var currentSongId: String? {
+        guard let entry = player.queue.currentEntry,
+              case .song(let song) = entry.item else {
+            return nil
+        }
+        return song.id.rawValue
+    }
+
     var isAuthorized: Bool {
         get async {
             MusicAuthorization.currentStatus == .authorized

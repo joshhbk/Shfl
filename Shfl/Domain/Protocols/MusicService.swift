@@ -70,4 +70,8 @@ protocol MusicService: Sendable {
 
     /// Duration of current song in seconds (0 if nothing playing)
     var currentSongDuration: TimeInterval { get }
+
+    /// ID of the currently playing song (nil if nothing playing)
+    /// This reads directly from MusicKit, not from cached state
+    var currentSongId: String? { get }
 }

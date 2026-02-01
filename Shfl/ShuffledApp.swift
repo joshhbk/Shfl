@@ -13,7 +13,10 @@ struct ShuffledApp: App {
     @State private var motionManager = MotionManager()
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([PersistedSong.self])
+        let schema = Schema([
+            PersistedSong.self,
+            PersistedPlaybackState.self
+        ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {

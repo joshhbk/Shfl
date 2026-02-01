@@ -31,4 +31,15 @@ enum ShuffleAlgorithm: String, CaseIterable, Sendable, Hashable {
             return "Shuffles while avoiding back-to-back songs from the same artist."
         }
     }
+
+    /// SF Symbol name for Dynamic Island display
+    var iconName: String {
+        switch self {
+        case .pureRandom: return "dice"
+        case .noRepeat: return "arrow.triangle.2.circlepath"
+        case .weightedByRecency: return "clock.arrow.circlepath"
+        case .weightedByPlayCount: return "chart.bar.fill"
+        case .artistSpacing: return "person.2.wave.2"
+        }
+    }
 }

@@ -20,12 +20,23 @@ final class AppSettings {
         }
     }
 
+    var currentThemeId: String {
+        didSet {
+            guard currentThemeId != oldValue else { return }
+            UserDefaults.standard.set(currentThemeId, forKey: "currentThemeId")
+        }
+    }
+
     init() {
         let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
         self.shuffleAlgorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
 
         let sortRaw = UserDefaults.standard.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
         self.librarySortOption = SortOption(rawValue: sortRaw) ?? .mostPlayed
+
+        self.currentThemeId = UserDefaults.standard.string(forKey: "currentThemeId")
+            ?? ShuffleTheme.allThemes.randomElement()?.id
+            ?? "pink"
     }
 }
 
