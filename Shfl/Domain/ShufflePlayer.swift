@@ -25,11 +25,7 @@ final class ShufflePlayer {
 
     @ObservationIgnored private var playedSongIds: Set<String> = []
     @ObservationIgnored private var lastObservedSongId: String?
-    @ObservationIgnored private var preparedSongIds: Set<String> = []
-
-    private var isQueuePrepared: Bool {
-        Set(songs.map(\.id)) == preparedSongIds
-    }
+    @ObservationIgnored private var queueValid = false
 
     var songCount: Int { songs.count }
     var allSongs: [Song] { songs }
@@ -139,6 +135,7 @@ final class ShufflePlayer {
         }
         songs.append(song)
         songIds.insert(song.id)
+        queueValid = false
         rebuildQueueIfPlaying()
     }
 
@@ -152,12 +149,14 @@ final class ShufflePlayer {
 
         songs.append(contentsOf: uniqueNewSongs)
         songIds.formUnion(uniqueNewSongs.map(\.id))
+        queueValid = false
         // Don't rebuild queue during initial load - not playing yet
     }
 
     func removeSong(id: String) {
         songs.removeAll { $0.id == id }
         songIds.remove(id)
+        queueValid = false
         rebuildQueueIfPlaying()
     }
 
@@ -166,6 +165,7 @@ final class ShufflePlayer {
         songIds.removeAll()
         playedSongIds.removeAll()
         lastObservedSongId = nil
+        queueValid = false
     }
 
     func containsSong(id: String) -> Bool {
@@ -174,22 +174,26 @@ final class ShufflePlayer {
 
     // MARK: - Queue Preparation
 
-    func prepareQueue() async throws {
+    func prepareQueue(algorithm: ShuffleAlgorithm? = nil) async throws {
         guard !songs.isEmpty else { return }
 
-        // Upstream: Shuffle Logic
-        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
-        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
-        let shuffler = QueueShuffler(algorithm: algorithm)
+        // Use provided algorithm or fall back to UserDefaults
+        let effectiveAlgorithm: ShuffleAlgorithm
+        if let algorithm {
+            effectiveAlgorithm = algorithm
+        } else {
+            let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
+            effectiveAlgorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+        }
+
+        let shuffler = QueueShuffler(algorithm: effectiveAlgorithm)
         let shuffledSongs = shuffler.shuffle(songs)
         lastShuffledQueue = shuffledSongs
-        
-        lastUsedAlgorithm = algorithm
-        print("🎲 Prepared queue with algorithm: \(algorithm.displayName)")
+        lastUsedAlgorithm = effectiveAlgorithm
+        print("🎲 Prepared queue with algorithm: \(effectiveAlgorithm.displayName)")
 
-        // Revert: Simple blocking setQueue (but using shuffledSongs)
         try await musicService.setQueue(songs: shuffledSongs)
-        preparedSongIds = Set(songs.map(\.id))
+        queueValid = true
     }
 
     // MARK: - Playback Control
@@ -199,7 +203,7 @@ final class ShufflePlayer {
         playedSongIds.removeAll()
         lastObservedSongId = nil
 
-        if !isQueuePrepared {
+        if !queueValid {
             // Emit loading state for immediate UI feedback
             if let firstSong = songs.first {
                 playbackState = .loading(firstSong)

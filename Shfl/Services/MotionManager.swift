@@ -14,7 +14,7 @@ final class MotionManager {
 
     private let motionManager = CMMotionManager()
     private let sensorUpdateInterval: TimeInterval = 1.0 / 30.0  // 30Hz sensor reads
-    private let uiUpdateInterval: TimeInterval = 1.0 / 20.0  // 20Hz UI updates (throttled)
+    private let uiUpdateInterval: TimeInterval = 1.0 / 10.0  // 10Hz UI updates (throttled for perf)
 
     init() {
         isAvailable = motionManager.isDeviceMotionAvailable

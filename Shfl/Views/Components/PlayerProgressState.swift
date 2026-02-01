@@ -17,8 +17,15 @@ final class PlayerProgressState {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.currentTime = self.musicService.currentPlaybackTime
-                self.duration = self.musicService.currentSongDuration
+                // Only update if values changed to avoid unnecessary view invalidations
+                let newTime = self.musicService.currentPlaybackTime
+                let newDuration = self.musicService.currentSongDuration
+                if abs(newTime - self.currentTime) > 0.1 {
+                    self.currentTime = newTime
+                }
+                if abs(newDuration - self.duration) > 0.1 {
+                    self.duration = newDuration
+                }
             }
         }
     }

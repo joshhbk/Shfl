@@ -8,6 +8,7 @@ final class AppViewModel {
     @ObservationIgnored let musicService: MusicService
     @ObservationIgnored private let repository: SongRepository
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
+    @ObservationIgnored private let appSettings: AppSettings
 
     var isAuthorized = false
     var isLoading = true
@@ -18,10 +19,11 @@ final class AppViewModel {
     var showingSettings = false
     var authorizationError: String?
 
-    init(musicService: MusicService, modelContext: ModelContext) {
+    init(musicService: MusicService, modelContext: ModelContext, appSettings: AppSettings) {
         self.musicService = musicService
         self.player = ShufflePlayer(musicService: musicService)
         self.repository = SongRepository(modelContext: modelContext)
+        self.appSettings = appSettings
 
         // Setup scrobbling
         let lastFMTransport = LastFMTransport(
@@ -42,52 +44,48 @@ final class AppViewModel {
     }
 
     private func startObservingPlaybackState() {
-        // Track last state to avoid duplicate notifications
-        var lastState: PlaybackState?
-
+        // Use Swift Observation to watch player.playbackState changes
+        // This is event-driven, no polling required
         scrobbleObservationTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
 
-                // Check if state changed
-                let currentState = self.player.playbackState
-                if currentState != lastState {
-                    lastState = currentState
-                    self.scrobbleTracker.onPlaybackStateChanged(currentState)
-                }
+                // Capture current state and notify scrobbler
+                let state = self.player.playbackState
+                self.scrobbleTracker.onPlaybackStateChanged(state)
 
-                // Poll at reasonable interval - scrobbling doesn't need instant updates
-                try? await Task.sleep(for: .milliseconds(250))
+                // Wait until playbackState changes using Observation
+                await withCheckedContinuation { continuation in
+                    withObservationTracking {
+                        _ = self.player.playbackState
+                    } onChange: {
+                        continuation.resume()
+                    }
+                }
             }
         }
     }
 
 
     func onAppear() async {
-        // Check authorization in parallel with song loading
+        // Check authorization and load songs in parallel (both can run concurrently)
         loadingMessage = "Loading your music..."
         async let authStatus = musicService.isAuthorized
+        async let loadedSongs = try? repository.loadSongsAsync()
 
-        // Load songs (synchronous SwiftData call, runs on MainActor)
-        var songs: [Song] = []
-        do {
-            songs = try repository.loadSongs()
-        } catch {
-            print("Failed to load songs: \(error)")
-        }
+        // Wait for both to complete
+        let songs = await loadedSongs ?? []
+        isAuthorized = await authStatus
 
         // Batch-add songs (O(n) instead of O(n²))
         if !songs.isEmpty {
             try? player.addSongs(songs)
         }
 
-        // Wait for auth check
-        isAuthorized = await authStatus
-
         // Prepare queue before dismissing loading screen
         if !player.songs.isEmpty {
             loadingMessage = "Preparing playback..."
-            try? await player.prepareQueue()
+            try? await player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
         }
 
         isLoading = false

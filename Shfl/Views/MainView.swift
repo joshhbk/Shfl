@@ -3,12 +3,15 @@ import SwiftData
 
 struct MainView: View {
     @State private var viewModel: AppViewModel
-    @State private var appSettings = AppSettings()
+    @State private var appSettings: AppSettings
 
     init(musicService: MusicService, modelContext: ModelContext) {
+        let settings = AppSettings()
+        _appSettings = State(wrappedValue: settings)
         _viewModel = State(wrappedValue: AppViewModel(
             musicService: musicService,
-            modelContext: modelContext
+            modelContext: modelContext,
+            appSettings: settings
         ))
     }
 
