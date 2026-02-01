@@ -124,6 +124,32 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("🎵 setQueue() completed with \(orderedItems.count) items, starting at \(orderedItems.first?.title ?? "nil")")
     }
 
+    func insertIntoQueue(songs: [Song]) async throws {
+        guard !songs.isEmpty else { return }
+        print("🎵 insertIntoQueue() called with \(songs.count) songs")
+
+        let ids = songs.map { MusicItemID($0.id) }
+
+        var request = MusicLibraryRequest<MusicKit.Song>()
+        request.filter(matching: \.id, memberOf: ids)
+        let response = try await request.response()
+
+        guard !response.items.isEmpty else {
+            print("🎵 No songs found to insert")
+            return
+        }
+
+        // Reorder to match our desired order
+        let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
+        let orderedItems = songs.compactMap { itemsById[$0.id] }
+
+        // Insert each song at the tail of the queue (after current queue entries)
+        for item in orderedItems {
+            try await player.queue.insert(item, position: .tail)
+        }
+        print("🎵 insertIntoQueue() completed - inserted \(orderedItems.count) items")
+    }
+
     func play() async throws {
         print("▶️ play() called")
         try await player.play()

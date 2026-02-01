@@ -369,4 +369,122 @@ final class ShufflePlayerTests: XCTestCase {
         playedIds = await player.playedSongIdsForTesting
         XCTAssertTrue(playedIds.isEmpty, "History should be cleared on fresh play")
     }
+
+    // MARK: - Queue Rebuild with Shuffle Algorithm
+
+    func testAddSongDuringPlaybackAppliesShuffleAlgorithm() async throws {
+        UserDefaults.standard.set("artistSpacing", forKey: "shuffleAlgorithm")
+
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist A", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist B", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song2)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let usedAlgorithm = await player.lastUsedAlgorithm
+        XCTAssertEqual(usedAlgorithm, .artistSpacing, "Shuffle algorithm should be applied on queue rebuild")
+    }
+
+    func testAddSongDuringPlaybackCallsPlay() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song2)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let playCount = await mockService.playCallCount
+        XCTAssertEqual(playCount, 1, "play() should be called after setQueue during rebuild")
+    }
+
+    // MARK: - Playback Position Preservation
+
+    func testAddSongPreservesPlaybackPosition() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Simulate being 45 seconds into the song
+        await mockService.setMockPlaybackTime(45.0)
+        await mockService.resetQueueTracking()
+
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song2)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let seekCount = mockService.seekCallCount
+        let seekTime = mockService.lastSeekTime
+        XCTAssertEqual(seekCount, 1, "seek() should be called to restore position")
+        XCTAssertEqual(seekTime, 45.0, "Should seek to saved playback time")
+    }
+
+    func testRemoveCurrentSongDoesNotPreservePosition() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.setMockPlaybackTime(45.0)
+        await mockService.resetQueueTracking()
+
+        let currentSongId = await player.playbackState.currentSongId!
+        await player.removeSong(id: currentSongId)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let seekCount = mockService.seekCallCount
+        XCTAssertEqual(seekCount, 0, "seek() should NOT be called when removing current song")
+    }
+
+    // MARK: - Batch Add Operation
+
+    func testAddSongsWithQueueRebuildCallsSetQueueOnce() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        let newSongs = (2...5).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        try await player.addSongsWithQueueRebuild(newSongs)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let callCount = await mockService.setQueueCallCount
+        XCTAssertEqual(callCount, 1, "Batch add should only call setQueue once")
+    }
+
+    func testAddSongsWithQueueRebuildIncludesAllSongs() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        let newSongs = (2...4).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        try await player.addSongsWithQueueRebuild(newSongs)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let queuedIds = Set(await mockService.lastQueuedSongs.map(\.id))
+        XCTAssertTrue(queuedIds.contains("1"), "Original song should be in queue")
+        XCTAssertTrue(queuedIds.contains("2"), "New song 2 should be in queue")
+        XCTAssertTrue(queuedIds.contains("3"), "New song 3 should be in queue")
+        XCTAssertTrue(queuedIds.contains("4"), "New song 4 should be in queue")
+    }
 }

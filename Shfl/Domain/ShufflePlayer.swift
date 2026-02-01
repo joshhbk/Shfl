@@ -113,14 +113,54 @@ final class ShufflePlayer {
         playbackState = newState
     }
 
-    private func rebuildQueueIfPlaying() {
+    private func rebuildQueueIfPlaying() async {
         guard playbackState.isActive else { return }
 
-        let upcomingSongs = songs.filter { !playedSongIds.contains($0.id) }
-        guard !upcomingSongs.isEmpty else { return }
+        let currentSongId = playbackState.currentSongId
 
-        Task {
-            try? await musicService.setQueue(songs: upcomingSongs)
+        // Filter out played songs AND currently playing song
+        let upcomingSongs = songs.filter { song in
+            !playedSongIds.contains(song.id) && song.id != currentSongId
+        }
+
+        // Read shuffle algorithm from UserDefaults
+        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
+            ?? ShuffleAlgorithm.noRepeat.rawValue
+        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+
+        // Apply shuffle
+        let shuffler = QueueShuffler(algorithm: algorithm)
+        let shuffledUpcoming = shuffler.shuffle(upcomingSongs)
+
+        // Build queue: current song first, then shuffled upcoming
+        var newQueue: [Song] = []
+        if let currentId = currentSongId,
+           let currentSong = songs.first(where: { $0.id == currentId }) {
+            newQueue.append(currentSong)
+        }
+        newQueue.append(contentsOf: shuffledUpcoming)
+
+        guard !newQueue.isEmpty else { return }
+
+        lastShuffledQueue = newQueue
+        lastUsedAlgorithm = algorithm
+
+        // Check if currently playing (vs paused/loading)
+        let isCurrentlyPlaying = playbackState.isPlaying
+
+        do {
+            try await musicService.setQueue(songs: newQueue)
+
+            // Only call play() if we removed the current song (need to start next song)
+            // If still playing the same song, don't call play() - it would restart the song
+            let currentSongWasRemoved = currentSongId != nil &&
+                !songs.contains(where: { $0.id == currentSongId })
+
+            if currentSongWasRemoved || !isCurrentlyPlaying {
+                try await musicService.play()
+            }
+        } catch {
+            print("🎲 rebuildQueueIfPlaying failed: \(error)")
         }
     }
 
@@ -136,7 +176,21 @@ final class ShufflePlayer {
         songs.append(song)
         songIds.insert(song.id)
         queueValid = false
-        rebuildQueueIfPlaying()
+
+        // If playing, insert into existing queue without disruption
+        if playbackState.isActive {
+            // Update debug queue to show the new song
+            lastShuffledQueue.append(song)
+
+            Task {
+                do {
+                    try await musicService.insertIntoQueue(songs: [song])
+                    print("🎵 Successfully inserted \(song.title) into queue")
+                } catch {
+                    print("🎵 Failed to insert \(song.title): \(error)")
+                }
+            }
+        }
     }
 
     func addSongs(_ newSongs: [Song]) throws {
@@ -153,11 +207,48 @@ final class ShufflePlayer {
         // Don't rebuild queue during initial load - not playing yet
     }
 
+    /// Add songs and insert into queue if playing (for autofill efficiency)
+    func addSongsWithQueueRebuild(_ newSongs: [Song]) async throws {
+        let uniqueNewSongs = newSongs.filter { !songIds.contains($0.id) }
+
+        let availableCapacity = Self.maxSongs - songs.count
+        guard uniqueNewSongs.count <= availableCapacity else {
+            throw ShufflePlayerError.capacityReached
+        }
+
+        songs.append(contentsOf: uniqueNewSongs)
+        songIds.formUnion(uniqueNewSongs.map(\.id))
+        queueValid = false
+
+        // If playing, insert songs into existing queue without disruption
+        if playbackState.isActive {
+            // Update debug queue to show new songs
+            lastShuffledQueue.append(contentsOf: uniqueNewSongs)
+
+            do {
+                try await musicService.insertIntoQueue(songs: uniqueNewSongs)
+                print("🎵 Successfully inserted \(uniqueNewSongs.count) songs into queue")
+            } catch {
+                print("🎵 Failed to insert songs: \(error)")
+            }
+        }
+    }
+
     func removeSong(id: String) {
+        let isCurrentSong = playbackState.currentSongId == id
+
         songs.removeAll { $0.id == id }
         songIds.remove(id)
         queueValid = false
-        rebuildQueueIfPlaying()
+
+        // If we removed the currently playing song, skip to next
+        if isCurrentSong && playbackState.isActive {
+            Task {
+                try? await musicService.skipToNext()
+            }
+        }
+        // Note: Songs removed that aren't current will still be in MusicKit's queue
+        // They'll be skipped when handlePlaybackStateChange detects they're not in our songs list
     }
 
     func removeAllSongs() {
