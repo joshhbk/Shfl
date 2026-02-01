@@ -76,11 +76,15 @@ struct SongPickerView: View {
                             .progressViewStyle(.circular)
                     } else {
                         Button("Autofill") {
+                            print("🔍 AUTOFILL BUTTON TAPPED")
                             Task {
+                                print("🔍 AUTOFILL TASK STARTED")
                                 let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
                                 let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
                                 let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
+                                print("🔍 AUTOFILL CALLING viewModel.autofill...")
                                 await viewModel.autofill(into: player, using: source)
+                                print("🔍 AUTOFILL viewModel.autofill RETURNED")
                                 // Sync cached IDs after autofill
                                 selectedSongIds = Set(player.allSongs.map(\.id))
                             }

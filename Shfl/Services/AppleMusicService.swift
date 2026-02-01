@@ -151,10 +151,10 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
         let orderedItems = songs.compactMap { itemsById[$0.id] }
 
-        // Insert each song at the tail of the queue (after current queue entries)
-        for item in orderedItems {
-            try await player.queue.insert(item, position: .tail)
-        }
+        // Insert all songs at once to avoid flooding MusicKit with individual requests
+        // MusicKit's insert() accepts MusicItemCollection
+        print("🎵 Inserting \(orderedItems.count) items at queue tail...")
+        try await player.queue.insert(MusicItemCollection(orderedItems), position: .tail)
         print("🎵 insertIntoQueue() completed - inserted \(orderedItems.count) items")
     }
 
