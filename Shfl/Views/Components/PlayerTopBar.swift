@@ -24,20 +24,20 @@ struct PlayerTopBar: View {
         Button(action: onAddTapped) {
             Image(systemName: "music.note.list")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.textColor)
                 .frame(width: 44, height: 44)
         }
-        .modifier(CircularButtonStyle(fallbackColor: theme.bodyGradientTop))
+        .modifier(CircularButtonStyle(textStyle: theme.textStyle))
     }
 
     private var settingsButton: some View {
         Button(action: onSettingsTapped) {
             Image(systemName: "gearshape")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.textColor)
                 .frame(width: 44, height: 44)
         }
-        .modifier(CircularButtonStyle(fallbackColor: theme.bodyGradientTop))
+        .modifier(CircularButtonStyle(textStyle: theme.textStyle))
     }
 }
 
@@ -59,21 +59,35 @@ private struct GlassContainerModifier: ViewModifier {
 
 // MARK: - Circular Button Style
 
-/// Applies liquid glass effect on iOS 26+, solid color background on older versions
+/// Applies liquid glass effect on iOS 26+, material background on older versions
 private struct CircularButtonStyle: ViewModifier {
-    let fallbackColor: Color
+    let textStyle: ShuffleTheme.TextStyle
+
+    private var tintColor: Color {
+        switch textStyle {
+        case .light: return .black.opacity(0.15)
+        case .dark: return .white.opacity(0.15)
+        }
+    }
+
+    private var borderColor: Color {
+        switch textStyle {
+        case .light: return .white.opacity(0.2)
+        case .dark: return .black.opacity(0.15)
+        }
+    }
 
     func body(content: Content) -> some View {
         if #available(iOS 26, macOS 26, *) {
             content
+                .background(tintColor, in: Circle())
                 .glassEffect(.regular.interactive(), in: .circle)
         } else {
             content
-                .background(fallbackColor)
-                .clipShape(Circle())
+                .background(.ultraThinMaterial, in: Circle())
                 .overlay(
                     Circle()
-                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                        .strokeBorder(borderColor, lineWidth: 0.5)
                 )
         }
     }
