@@ -9,11 +9,17 @@ actor MockMusicService: MusicService {
     var shouldThrowOnSkip: Error?
     var librarySongs: [Song] = []
     var setQueueCallCount: Int = 0
+    var playCallCount: Int = 0
+    nonisolated(unsafe) var seekCallCount: Int = 0
+    nonisolated(unsafe) var lastSeekTime: TimeInterval = 0
     var lastQueuedSongs: [Song] = []
     var shouldThrowOnFetch: Error?
 
     /// Configurable duration for testing. Access via currentSongDuration.
     nonisolated(unsafe) var mockDuration: TimeInterval = 180
+
+    /// Configurable playback time for testing position preservation
+    nonisolated(unsafe) var mockPlaybackTime: TimeInterval = 0
 
     private var currentState: PlaybackState = .empty
     private var continuation: AsyncStream<PlaybackState>.Continuation?
@@ -26,7 +32,7 @@ actor MockMusicService: MusicService {
         }
     }
 
-    nonisolated var currentPlaybackTime: TimeInterval { 0 }
+    nonisolated var currentPlaybackTime: TimeInterval { mockPlaybackTime }
     nonisolated var currentSongDuration: TimeInterval { mockDuration }
 
     private func setContinuation(_ cont: AsyncStream<PlaybackState>.Continuation) {
@@ -85,7 +91,14 @@ actor MockMusicService: MusicService {
         }
     }
 
+    func insertIntoQueue(songs: [Song]) async throws {
+        // Append to existing queue without disrupting playback
+        queuedSongs.append(contentsOf: songs)
+        lastQueuedSongs = queuedSongs
+    }
+
     func play() async throws {
+        playCallCount += 1
         if let error = shouldThrowOnPlay {
             throw error
         }
@@ -123,7 +136,14 @@ actor MockMusicService: MusicService {
     }
 
     nonisolated func seek(to time: TimeInterval) {
-        // No-op for testing
+        // Track seek calls for testing using nonisolated(unsafe) vars
+        seekCallCount += 1
+        lastSeekTime = time
+    }
+
+    /// Call this from tests to set mock playback time before adding songs
+    func setMockPlaybackTime(_ time: TimeInterval) {
+        mockPlaybackTime = time
     }
 
     private func updateState(_ state: PlaybackState) {
@@ -142,6 +162,9 @@ actor MockMusicService: MusicService {
 
     func resetQueueTracking() {
         setQueueCallCount = 0
+        playCallCount = 0
+        seekCallCount = 0
+        lastSeekTime = 0
         lastQueuedSongs = []
     }
 }

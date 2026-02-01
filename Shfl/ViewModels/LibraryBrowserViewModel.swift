@@ -211,18 +211,10 @@ final class LibraryBrowserViewModel {
             let excludedIds = Set(player.allSongs.map { $0.id })
             let songs = try await source.fetchSongs(excluding: excludedIds, limit: limit)
 
-            var addedCount = 0
-            for song in songs {
-                do {
-                    try player.addSong(song)
-                    addedCount += 1
-                } catch {
-                    // Stop if we hit capacity
-                    break
-                }
-            }
+            // Use batch method for single queue rebuild
+            try await player.addSongsWithQueueRebuild(songs)
 
-            autofillState = .completed(count: addedCount)
+            autofillState = .completed(count: songs.count)
         } catch {
             autofillState = .error(error.localizedDescription)
         }

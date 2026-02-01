@@ -176,6 +176,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     }
     func searchLibrarySongs(query: String) async throws -> [Song] { [] }
     func setQueue(songs: [Song]) async throws {}
+    func insertIntoQueue(songs: [Song]) async throws {}
     func play() async throws {}
     func pause() async {}
     func skipToNext() async throws {}
