@@ -3,12 +3,18 @@ import SwiftUI
 
 @Observable
 final class MotionManager {
-    private(set) var pitch: Double = 0
-    private(set) var roll: Double = 0
+    private(set) var highlightOffset: CGPoint = .zero
     private(set) var isAvailable: Bool = false
 
+    @ObservationIgnored private var pitch: Double = 0
+    @ObservationIgnored private var roll: Double = 0
+    @ObservationIgnored private var lastUpdateTime: CFTimeInterval = 0
+    @ObservationIgnored private var sensitivity: CGFloat = 1.0
+    @ObservationIgnored private var maxOffset: CGFloat = 220
+
     private let motionManager = CMMotionManager()
-    private let updateInterval: TimeInterval = 1.0 / 30.0  // 30Hz
+    private let sensorUpdateInterval: TimeInterval = 1.0 / 30.0  // 30Hz sensor reads
+    private let uiUpdateInterval: TimeInterval = 1.0 / 20.0  // 20Hz UI updates (throttled)
 
     init() {
         isAvailable = motionManager.isDeviceMotionAvailable
@@ -18,15 +24,35 @@ final class MotionManager {
         stop()
     }
 
-    func start() {
+    func start(sensitivity: CGFloat = 1.0, maxOffset: CGFloat = 220) {
         guard motionManager.isDeviceMotionAvailable else { return }
 
-        motionManager.deviceMotionUpdateInterval = updateInterval
+        self.sensitivity = sensitivity
+        self.maxOffset = maxOffset
+
+        motionManager.deviceMotionUpdateInterval = sensorUpdateInterval
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
-            guard let motion = motion else { return }
-            self?.pitch = motion.attitude.pitch
-            self?.roll = motion.attitude.roll
+            guard let self, let motion else { return }
+            self.pitch = motion.attitude.pitch
+            self.roll = motion.attitude.roll
+
+            // Throttle UI updates to reduce view invalidations
+            let now = CACurrentMediaTime()
+            if now - self.lastUpdateTime >= self.uiUpdateInterval {
+                self.lastUpdateTime = now
+                self.highlightOffset = Self.highlightOffset(
+                    pitch: self.pitch,
+                    roll: self.roll,
+                    sensitivity: self.sensitivity,
+                    maxOffset: self.maxOffset
+                )
+            }
         }
+    }
+
+    func updateSettings(sensitivity: CGFloat, maxOffset: CGFloat) {
+        self.sensitivity = sensitivity
+        self.maxOffset = maxOffset
     }
 
     func stop() {
