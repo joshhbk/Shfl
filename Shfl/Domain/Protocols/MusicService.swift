@@ -56,6 +56,9 @@ protocol MusicService: Sendable {
     /// Restart current song from beginning, or skip to previous if near start
     func restartOrSkipToPrevious() async throws
 
+    /// Seek to a specific time in the current song
+    func seek(to time: TimeInterval)
+
     /// Get current playback state (observable)
     var playbackStateStream: AsyncStream<PlaybackState> { get }
 

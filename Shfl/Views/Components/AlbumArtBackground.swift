@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Full-screen album art background with minimal blur
+/// Full-screen ambient album art background with heavy blur and dark overlay
 struct AlbumArtBackground: View {
     let artworkURL: URL?
     let fallbackColor: Color
-    var blurRadius: CGFloat = 3
+    var blurRadius: CGFloat = 25
+    var overlayOpacity: Double = 0.3
 
     var body: some View {
         GeometryReader { geometry in
@@ -17,7 +18,7 @@ struct AlbumArtBackground: View {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
-                            ProgressView()
+                            EmptyView()
                         case .success(let image):
                             image
                                 .resizable()
@@ -26,6 +27,7 @@ struct AlbumArtBackground: View {
                                 .frame(width: geometry.size.width, height: geometry.size.height)
                                 .clipped()
                                 .blur(radius: blurRadius)
+                                .saturation(0.8)
                         case .failure:
                             EmptyView()
                         @unknown default:
@@ -34,6 +36,9 @@ struct AlbumArtBackground: View {
                     }
                     .transition(.opacity)
                 }
+
+                // Dark overlay for ambient feel
+                Color.black.opacity(overlayOpacity)
             }
             .ignoresSafeArea()
         }

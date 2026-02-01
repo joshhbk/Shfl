@@ -122,6 +122,10 @@ actor MockMusicService: MusicService {
         try await skipToPrevious()
     }
 
+    nonisolated func seek(to time: TimeInterval) {
+        // No-op for testing
+    }
+
     private func updateState(_ state: PlaybackState) {
         currentState = state
         continuation?.yield(state)

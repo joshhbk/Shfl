@@ -160,6 +160,11 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         }
     }
 
+    func seek(to time: TimeInterval) {
+        print("⏩ seek(to: \(time)) called")
+        player.playbackTime = max(0, time)
+    }
+
     private func startObservingPlaybackState() {
         stateObservationTask?.cancel()
         stateObservationTask = Task { [weak self] in

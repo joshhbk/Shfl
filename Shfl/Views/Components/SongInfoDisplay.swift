@@ -8,17 +8,20 @@ struct SongInfoDisplay: View {
     let currentTime: TimeInterval
     let duration: TimeInterval
     let showProgressBar: Bool
+    let onSeek: (TimeInterval) -> Void
 
     init(
         playbackState: PlaybackState,
         currentTime: TimeInterval = 0,
         duration: TimeInterval = 0,
-        showProgressBar: Bool = FeatureFlags.showProgressBar
+        showProgressBar: Bool = FeatureFlags.showProgressBar,
+        onSeek: @escaping (TimeInterval) -> Void = { _ in }
     ) {
         self.playbackState = playbackState
         self.currentTime = currentTime
         self.duration = duration
         self.showProgressBar = showProgressBar
+        self.onSeek = onSeek
     }
 
     var body: some View {
@@ -55,22 +58,23 @@ struct SongInfoDisplay: View {
 
     @ViewBuilder
     private func activeContent(song: Song) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Text(song.title)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(theme.textColor)
                 .lineLimit(1)
             Text(song.artist)
-                .font(.system(size: 14))
+                .font(.system(size: 13))
                 .foregroundStyle(theme.secondaryTextColor)
                 .lineLimit(1)
 
             if showProgressBar {
                 PlaybackProgressBar(
                     currentTime: currentTime,
-                    duration: duration
+                    duration: duration,
+                    onSeek: onSeek
                 )
-                .padding(.top, 8)
+                .padding(.top, 14)
             }
         }
     }

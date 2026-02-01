@@ -43,7 +43,7 @@ struct ShuffleBodyView<Content: View>: View {
             }
         }
         .frame(height: height)
-        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
+        .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8)
     }
 }
 

@@ -8,4 +8,5 @@ struct PlayerActions {
     let onManage: () -> Void
     let onAdd: () -> Void
     let onSettings: () -> Void
+    let onSeek: (TimeInterval) -> Void
 }
