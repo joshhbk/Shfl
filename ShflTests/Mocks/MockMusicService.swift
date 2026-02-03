@@ -9,10 +9,13 @@ actor MockMusicService: MusicService {
     var shouldThrowOnSkip: Error?
     var librarySongs: [Song] = []
     var setQueueCallCount: Int = 0
+    var insertIntoQueueCallCount: Int = 0
+    var replaceUpcomingQueueCallCount: Int = 0
     var playCallCount: Int = 0
     nonisolated(unsafe) var seekCallCount: Int = 0
     nonisolated(unsafe) var lastSeekTime: TimeInterval = 0
     var lastQueuedSongs: [Song] = []
+    var lastInsertedSongs: [Song] = []
     var shouldThrowOnFetch: Error?
 
     /// Configurable duration for testing. Access via currentSongDuration.
@@ -94,12 +97,15 @@ actor MockMusicService: MusicService {
     }
 
     func insertIntoQueue(songs: [Song]) async throws {
+        insertIntoQueueCallCount += 1
+        lastInsertedSongs = songs
         // Append to existing queue without disrupting playback
         queuedSongs.append(contentsOf: songs)
         lastQueuedSongs = queuedSongs
     }
 
     func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws {
+        replaceUpcomingQueueCallCount += 1
         // Replace queue while preserving current song
         queuedSongs = [currentSong] + songs
         lastQueuedSongs = queuedSongs
@@ -172,9 +178,12 @@ actor MockMusicService: MusicService {
 
     func resetQueueTracking() {
         setQueueCallCount = 0
+        insertIntoQueueCallCount = 0
+        replaceUpcomingQueueCallCount = 0
         playCallCount = 0
         seekCallCount = 0
         lastSeekTime = 0
         lastQueuedSongs = []
+        lastInsertedSongs = []
     }
 }
