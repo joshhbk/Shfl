@@ -1,3 +1,4 @@
+import Combine
 import MusicKit
 import SwiftUI
 
@@ -25,14 +26,15 @@ struct SongDisplay: View {
 
 struct SongArtwork: View {
     let songId: String
-    private var loader: ArtworkLoader { ArtworkLoader.shared }
+
+    @State private var artwork: Artwork?
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
             .fill(Color.gray.opacity(0.2))
             .frame(width: 44, height: 44)
             .overlay {
-                if let artwork = loader.artwork(for: songId) {
+                if let artwork {
                     ArtworkImage(artwork, width: 44, height: 44)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
@@ -41,10 +43,18 @@ struct SongArtwork: View {
                 }
             }
             .onAppear {
-                loader.requestArtwork(for: songId)
+                // Check cache first, request if not present
+                artwork = ArtworkCache.shared.artwork(for: songId)
+                if artwork == nil {
+                    ArtworkCache.shared.requestArtwork(for: songId)
+                }
             }
-            // Use song-specific ID so only THIS view updates when its artwork loads
-            .id(loader.artworkVersion(for: songId))
+            .onReceive(
+                NotificationCenter.default.publisher(for: ArtworkCache.artworkDidLoad)
+                    .filter { ($0.userInfo?["songId"] as? String) == songId }
+            ) { _ in
+                artwork = ArtworkCache.shared.artwork(for: songId)
+            }
     }
 }
 

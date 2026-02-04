@@ -4,7 +4,6 @@ struct PlayPauseButton: View {
     let isPlaying: Bool
     let action: () -> Void
     let theme: ShuffleTheme
-    let highlightOffset: CGPoint
     var scale: CGFloat = 1.0
 
     @State private var isPressed = false
@@ -28,7 +27,6 @@ struct PlayPauseButton: View {
                 .colorEffect(
                     ShaderLibrary.shfl_brushedMetal(
                         .float2(buttonSize / 2, buttonSize / 2),
-                        .float2(highlightOffset),
                         .float(theme.brushedMetalIntensity)
                     )
                 )
@@ -75,8 +73,8 @@ struct PlayPauseButton: View {
 
 #Preview("Pink Theme") {
     VStack(spacing: 40) {
-        PlayPauseButton(isPlaying: false, action: {}, theme: .pink, highlightOffset: .zero)
-        PlayPauseButton(isPlaying: true, action: {}, theme: .pink, highlightOffset: .zero)
+        PlayPauseButton(isPlaying: false, action: {}, theme: .pink)
+        PlayPauseButton(isPlaying: true, action: {}, theme: .pink)
     }
     .padding()
     .background(ShuffleTheme.pink.bodyGradient)
@@ -84,8 +82,8 @@ struct PlayPauseButton: View {
 
 #Preview("Silver Theme") {
     VStack(spacing: 40) {
-        PlayPauseButton(isPlaying: false, action: {}, theme: .silver, highlightOffset: .zero)
-        PlayPauseButton(isPlaying: true, action: {}, theme: .silver, highlightOffset: .zero)
+        PlayPauseButton(isPlaying: false, action: {}, theme: .silver)
+        PlayPauseButton(isPlaying: true, action: {}, theme: .silver)
     }
     .padding()
     .background(ShuffleTheme.silver.bodyGradient)
@@ -93,8 +91,8 @@ struct PlayPauseButton: View {
 
 #Preview("Blue Theme") {
     VStack(spacing: 40) {
-        PlayPauseButton(isPlaying: false, action: {}, theme: .blue, highlightOffset: .zero)
-        PlayPauseButton(isPlaying: true, action: {}, theme: .blue, highlightOffset: .zero)
+        PlayPauseButton(isPlaying: false, action: {}, theme: .blue)
+        PlayPauseButton(isPlaying: true, action: {}, theme: .blue)
     }
     .padding()
     .background(ShuffleTheme.blue.bodyGradient)

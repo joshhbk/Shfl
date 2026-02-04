@@ -28,9 +28,10 @@ final class LibraryBrowserViewModel {
     // Search state
     private(set) var searchResults: [Song] = []
     private(set) var searchLoading = false
+    private(set) var hasSearchedOnce = false
 
-    // Shared state
-    var searchText = "" {
+    // Shared state - searchText is NOT observed to avoid keystroke lag
+    @ObservationIgnored var searchText = "" {
         didSet {
             guard searchText != oldValue else { return }
             handleSearchTextChanged()
@@ -92,9 +93,13 @@ final class LibraryBrowserViewModel {
         // Clear results immediately when search is cleared
         if query.isEmpty {
             searchResults = []
+            hasSearchedOnce = false
             searchTask?.cancel()
             return
         }
+
+        // Reset search state for new query
+        hasSearchedOnce = false
 
         // Debounce search
         debounceTask = Task {
@@ -190,6 +195,7 @@ final class LibraryBrowserViewModel {
         }
 
         searchLoading = false
+        hasSearchedOnce = true
     }
 
     func clearError() {

@@ -4,7 +4,6 @@ import SwiftUI
 struct ShuffleBodyView<Content: View>: View {
     @Environment(\.shuffleTheme) private var theme
 
-    let highlightOffset: CGPoint
     var height: CGFloat = 200
     @ViewBuilder let content: () -> Content
 
@@ -21,7 +20,6 @@ struct ShuffleBodyView<Content: View>: View {
                     .colorEffect(
                         ShaderLibrary.shfl_brushedMetal(
                             .float2(bodyWidth / 2, height / 2),
-                            .float2(highlightOffset),
                             .float(theme.brushedMetalIntensity)
                         )
                     )
@@ -53,7 +51,7 @@ struct ShuffleBodyView<Content: View>: View {
 
         VStack {
             Spacer()
-            ShuffleBodyView(highlightOffset: .zero) {
+            ShuffleBodyView {
                 Circle()
                     .fill(.white)
                     .frame(width: 150, height: 150)
@@ -71,7 +69,7 @@ struct ShuffleBodyView<Content: View>: View {
 
         VStack {
             Spacer()
-            ShuffleBodyView(highlightOffset: .zero) {
+            ShuffleBodyView {
                 Circle()
                     .fill(.white)
                     .frame(width: 150, height: 150)

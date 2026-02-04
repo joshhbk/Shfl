@@ -4,7 +4,7 @@ import SwiftUI
 @Observable @MainActor
 final class ThemeController {
     private(set) var currentThemeIndex: Int
-    private(set) var dragOffset: CGFloat = 0
+    @ObservationIgnored private(set) var dragOffset: CGFloat = 0
 
     private let swipeThreshold: CGFloat = 100
 

@@ -1,35 +1,9 @@
 import SwiftUI
 
-private struct BreathingGlow: View {
-    @State private var isBreathing = false
-    let onComplete: () -> Void
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(Color.white)
-            .blur(radius: isBreathing ? 12 : 0)
-            .opacity(isBreathing ? 0.4 : 0.0)
-            .scaleEffect(isBreathing ? 1.05 : 1.0)
-            .animation(
-                .easeInOut(duration: 1.0).repeatCount(2, autoreverses: true),
-                value: isBreathing
-            )
-            .onAppear {
-                isBreathing = true
-            }
-            .task {
-                try? await Task.sleep(for: .seconds(4.0))
-                onComplete()
-            }
-    }
-}
-
 struct CapacityProgressBar: View {
     let current: Int
     let maximum: Int
 
-    @State private var isShowingCelebration = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var progress: Double {
         Self.calculateProgress(current: current, maximum: maximum)
@@ -43,23 +17,15 @@ struct CapacityProgressBar: View {
         HStack(spacing: 12) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    // Glow layer (behind everything)
-                    if isShowingCelebration {
-                        BreathingGlow {
-                            isShowingCelebration = false
-                        }
-                        .frame(width: geometry.size.width, height: 6)
-                    }
-
                     // Track
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.gray.opacity(0.2))
 
-                    // Fill
+                    // Fill - skip animation when clearing to zero
                     RoundedRectangle(cornerRadius: 2)
                         .fill(isFull ? Color.green : Color.blue)
                         .frame(width: geometry.size.width * progress)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: progress)
+                        .animation(progress == 0 ? nil : .spring(response: 0.4, dampingFraction: 0.7), value: progress)
                 }
             }
             .frame(height: 6)
@@ -74,15 +40,8 @@ struct CapacityProgressBar: View {
         .background(Color(.systemGroupedBackground))
         .onChange(of: current) { oldValue, newValue in
             if Self.shouldCelebrate(previous: oldValue, current: newValue, maximum: maximum) {
-                triggerCelebration()
+                HapticFeedback.success.trigger()
             }
-        }
-    }
-
-    private func triggerCelebration() {
-        HapticFeedback.medium.trigger()
-        if !reduceMotion {
-            isShowingCelebration = true
         }
     }
 

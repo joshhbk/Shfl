@@ -7,13 +7,11 @@ struct PlayerView: View {
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
 
-    @Environment(\.motionManager) private var motionManager
     @Environment(\.appSettings) private var appSettings
     @State private var themeController: ThemeController
     @State private var tintProvider = TintedThemeProvider()
     @State private var progressState: PlayerProgressState?
     @State private var colorExtractor = AlbumArtColorExtractor()
-    @State private var highlightOffset: CGPoint = .zero
     @State private var showError = false
     @State private var errorMessage = ""
 
@@ -36,14 +34,13 @@ struct PlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                BrushedMetalBackground(highlightOffset: highlightOffset)
+                BrushedMetalBackground()
 
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
                     isControlsDisabled: player.songCount == 0,
                     currentTime: progressState?.currentTime ?? 0,
                     duration: progressState?.duration ?? 0,
-                    highlightOffset: highlightOffset,
                     actions: actions,
                     showError: showError,
                     errorMessage: errorMessage,
@@ -64,10 +61,6 @@ struct PlayerView: View {
                 progressState = PlayerProgressState(musicService: musicService)
             }
             progressState?.startUpdating()
-            motionManager?.start(
-                sensitivity: themeController.currentTheme.motionSensitivity,
-                maxOffset: 220
-            )
 
             // Initialize tint provider with current theme
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
@@ -78,23 +71,15 @@ struct PlayerView: View {
         }
         .onDisappear {
             progressState?.stopUpdating()
-            motionManager?.stop()
         }
         .onChange(of: player.playbackState) { _, newState in
             handlePlaybackStateChange(newState)
-        }
-        .onChange(of: motionManager?.highlightOffset) { _, newOffset in
-            highlightOffset = newOffset ?? .zero
         }
         .onChange(of: colorExtractor.extractedColor) { _, newColor in
             tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)
         }
         .onChange(of: themeController.currentTheme) { _, newTheme in
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: newTheme)
-            motionManager?.updateSettings(
-                sensitivity: newTheme.motionSensitivity,
-                maxOffset: 220
-            )
             // Sync theme to AppSettings for persistence and Live Activity
             appSettings?.currentThemeId = newTheme.id
         }
@@ -258,7 +243,7 @@ private let previewSong = Song(
 
             Spacer()
 
-            ShuffleBodyView(highlightOffset: .zero, height: 120) {
+            ShuffleBodyView(height: 120) {
                 VStack(spacing: 4) {
                     Text(previewSong.title)
                         .font(.system(size: 18, weight: .semibold))
@@ -279,7 +264,7 @@ private let previewSong = Song(
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
 
-            ShuffleBodyView(highlightOffset: .zero) {
+            ShuffleBodyView {
                 ClickWheelView(
                     isPlaying: true,
                     onPlayPause: {},
@@ -287,7 +272,6 @@ private let previewSong = Song(
                     onSkipBack: {},
                     onVolumeUp: {},
                     onVolumeDown: {},
-                    highlightOffset: .zero,
                     scale: 0.6
                 )
             }

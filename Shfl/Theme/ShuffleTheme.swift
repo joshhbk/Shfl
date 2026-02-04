@@ -9,8 +9,6 @@ struct ShuffleTheme: Identifiable, Equatable {
     let textStyle: TextStyle
     let centerButtonIconColor: Color
     let brushedMetalIntensity: CGFloat
-    let motionEnabled: Bool
-    let motionSensitivity: CGFloat
 
     enum WheelStyle: Equatable {
         case light
@@ -57,9 +55,7 @@ extension ShuffleTheme {
         wheelStyle: .dark,
         textStyle: .dark,
         centerButtonIconColor: .black,
-        brushedMetalIntensity: 1.0,
-        motionEnabled: true,
-        motionSensitivity: 1.0
+        brushedMetalIntensity: 1.0
     )
 
     // iPod Shuffle 4th gen: #0094E1 "Blue Cola"
@@ -71,9 +67,7 @@ extension ShuffleTheme {
         wheelStyle: .light,
         textStyle: .light,
         centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0,
-        motionEnabled: true,
-        motionSensitivity: 1.0
+        brushedMetalIntensity: 1.0
     )
 
     // iPod Shuffle 4th gen: #A0CB3B "Android Green"
@@ -85,9 +79,7 @@ extension ShuffleTheme {
         wheelStyle: .light,
         textStyle: .light,
         centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0,
-        motionEnabled: true,
-        motionSensitivity: 1.0
+        brushedMetalIntensity: 1.0
     )
 
     // iPod Shuffle 4th gen: #FAB71F "Orange-Yellow"
@@ -99,9 +91,7 @@ extension ShuffleTheme {
         wheelStyle: .light,
         textStyle: .light,
         centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0,
-        motionEnabled: true,
-        motionSensitivity: 1.0
+        brushedMetalIntensity: 1.0
     )
 
     // iPod Shuffle 4th gen: #EC5298 "Raspberry Pink"
@@ -113,9 +103,7 @@ extension ShuffleTheme {
         wheelStyle: .light,
         textStyle: .light,
         centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0,
-        motionEnabled: true,
-        motionSensitivity: 1.0
+        brushedMetalIntensity: 1.0
     )
 
     static let allThemes: [ShuffleTheme] = [.silver, .blue, .green, .orange, .pink]

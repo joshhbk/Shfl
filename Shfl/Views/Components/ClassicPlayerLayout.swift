@@ -6,7 +6,6 @@ struct ClassicPlayerLayout: View {
     let isControlsDisabled: Bool
     let currentTime: TimeInterval
     let duration: TimeInterval
-    let highlightOffset: CGPoint
     let actions: PlayerActions
     let showError: Bool
     let errorMessage: String
@@ -53,7 +52,6 @@ struct ClassicPlayerLayout: View {
                 onSkipBack: actions.onSkipBack,
                 onVolumeUp: { VolumeController.increaseVolume() },
                 onVolumeDown: { VolumeController.decreaseVolume() },
-                highlightOffset: highlightOffset,
                 scale: 0.6
             )
             .disabled(isControlsDisabled)
