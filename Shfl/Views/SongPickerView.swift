@@ -94,7 +94,7 @@ struct SongPickerView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Clear") {
-                        player.removeAllSongs()
+                        Task { await player.removeAllSongs() }
                         selectedSongIds.removeAll()
                     }
                     .disabled(selectedSongIds.isEmpty)
@@ -195,7 +195,7 @@ struct SongPickerView: View {
 
     private func toggleSong(_ song: Song) {
         if selectedSongIds.contains(song.id) {
-            player.removeSong(id: song.id)
+            Task { await player.removeSong(id: song.id) }
             selectedSongIds.remove(song.id)
             undoManager.recordAction(.removed, song: song)
         } else {
@@ -218,7 +218,7 @@ struct SongPickerView: View {
     private func handleUndo(_ state: UndoState) {
         switch state.action {
         case .added:
-            player.removeSong(id: state.song.id)
+            Task { await player.removeSong(id: state.song.id) }
             selectedSongIds.remove(state.song.id)
             HapticFeedback.light.trigger()
         case .removed:

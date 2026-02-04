@@ -12,95 +12,60 @@ final class ShufflePlayer {
     static let maxSongs = 120
 
     @ObservationIgnored private let musicService: MusicService
-    private(set) var songs: [Song] = []
-    @ObservationIgnored private var songIds: Set<String> = []
     @ObservationIgnored private var stateTask: Task<Void, Never>?
 
+    /// Single source of truth for queue state
+    private(set) var queueState: QueueState = .empty
+
+    /// Current playback state from MusicKit
     private(set) var playbackState: PlaybackState = .empty
 
-    /// Debug: The last shuffled queue order (for verifying shuffle algorithms)
-    private(set) var lastShuffledQueue: [Song] = []
-    /// Debug: The algorithm used for the last shuffle
-    private(set) var lastUsedAlgorithm: ShuffleAlgorithm = .noRepeat
-
-    @ObservationIgnored private var playedSongIds: Set<String> = []
+    /// Track last observed song for history updates
     @ObservationIgnored private var lastObservedSongId: String?
-    @ObservationIgnored private var queueValid = false
 
-    var songCount: Int { songs.count }
-    var allSongs: [Song] { songs }
-    var capacity: Int { Self.maxSongs }
-    var remainingCapacity: Int { Self.maxSongs - songs.count }
+    /// Flag to suppress history updates during multi-step operations
+    @ObservationIgnored private var suppressHistoryUpdates = false
+
+    // MARK: - Computed Properties (for compatibility)
+
+    var songs: [Song] { queueState.songPool }
+    var songCount: Int { queueState.songCount }
+    var allSongs: [Song] { queueState.songPool }
+    var capacity: Int { QueueState.maxSongs }
+    var remainingCapacity: Int { queueState.remainingCapacity }
+
+    /// Debug: The last shuffled queue order (for verifying shuffle algorithms)
+    var lastShuffledQueue: [Song] { queueState.queueOrder }
+
+    /// Debug: The algorithm used for the last shuffle
+    var lastUsedAlgorithm: ShuffleAlgorithm { queueState.algorithm }
 
     /// Exposed for testing only
-    var playedSongIdsForTesting: Set<String> { playedSongIds }
+    var playedSongIdsForTesting: Set<String> { queueState.playedIds }
 
     // MARK: - Queue State Exposure (for persistence)
 
     /// Current queue order as song IDs (for persistence)
-    var currentQueueOrder: [String] {
-        lastShuffledQueue.map(\.id)
-    }
+    var currentQueueOrder: [String] { queueState.queueOrderIds }
 
     /// Currently played song IDs (for persistence)
-    var currentPlayedSongIds: Set<String> {
-        playedSongIds
-    }
+    var currentPlayedSongIds: Set<String> { queueState.playedIds }
 
     /// Whether there's a valid state that could be restored
-    var hasRestorableState: Bool {
-        !songs.isEmpty && !lastShuffledQueue.isEmpty
-    }
+    var hasRestorableState: Bool { queueState.hasRestorableState }
+
+    // MARK: - Initialization
 
     init(musicService: MusicService) {
         self.musicService = musicService
         observePlaybackState()
     }
 
-    /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
-    func reshuffleWithNewAlgorithm(_ algorithm: ShuffleAlgorithm) async {
-        guard !songs.isEmpty, playbackState.isActive else { return }
-
-        print("🎲 Algorithm changed to \(algorithm.displayName), reshuffling...")
-
-        // Get currently playing song
-        let currentSongId = playbackState.currentSongId
-
-        guard let currentId = currentSongId,
-              let currentSong = songs.first(where: { $0.id == currentId }) else {
-            print("🎲 No current song found, skipping reshuffle")
-            return
-        }
-
-        // Filter out played songs AND the currently playing song
-        let upcomingSongs = songs.filter { song in
-            !playedSongIds.contains(song.id) && song.id != currentSongId
-        }
-
-        let shuffler = QueueShuffler(algorithm: algorithm)
-        let shuffledUpcoming = shuffler.shuffle(upcomingSongs)
-
-        // Build full queue for tracking: current song first, then shuffled upcoming
-        var newQueue: [Song] = [currentSong]
-        newQueue.append(contentsOf: shuffledUpcoming)
-
-        lastShuffledQueue = newQueue
-        lastUsedAlgorithm = algorithm
-
-        print("🎲 New queue order: \(newQueue.map { "\($0.title) by \($0.artist)" })")
-
-        do {
-            // Use replaceUpcomingQueue to preserve current playback position
-            try await musicService.replaceUpcomingQueue(with: shuffledUpcoming, currentSong: currentSong)
-            print("🎲 replaceUpcomingQueue succeeded")
-        } catch {
-            print("🎲 replaceUpcomingQueue FAILED: \(error)")
-        }
-    }
-
     deinit {
         stateTask?.cancel()
     }
+
+    // MARK: - Playback State Observation
 
     private func observePlaybackState() {
         stateTask = Task { @MainActor [weak self] in
@@ -119,7 +84,7 @@ final class ShufflePlayer {
         let resolvedSongId: String?
 
         if let musicKitSong = newState.currentSong,
-           let poolSong = songs.first(where: { $0.title == musicKitSong.title && $0.artist == musicKitSong.artist }) {
+           let poolSong = queueState.songPool.first(where: { $0.title == musicKitSong.title && $0.artist == musicKitSong.artist }) {
             // Found matching song in pool - use pool's ID but keep MusicKit's artwork
             resolvedSongId = poolSong.id
             let mergedSong = Song(
@@ -127,7 +92,7 @@ final class ShufflePlayer {
                 title: musicKitSong.title,
                 artist: musicKitSong.artist,
                 albumTitle: musicKitSong.albumTitle,
-                artworkURL: musicKitSong.artworkURL,  // Keep MusicKit's fresh artwork
+                artworkURL: musicKitSong.artworkURL,
                 playCount: musicKitSong.playCount,
                 lastPlayedDate: musicKitSong.lastPlayedDate
             )
@@ -147,16 +112,18 @@ final class ShufflePlayer {
             resolvedState = newState
         }
 
-        // Song changed - add previous to history
-        if let lastId = lastObservedSongId, lastId != resolvedSongId {
-            playedSongIds.insert(lastId)
+        // Song changed - add previous to history (unless suppressed during operations)
+        if !suppressHistoryUpdates,
+           let lastId = lastObservedSongId,
+           lastId != resolvedSongId {
+            queueState = queueState.markingAsPlayed(id: lastId)
         }
         lastObservedSongId = resolvedSongId
 
         // Clear history on stop/empty/error
         switch resolvedState {
         case .stopped, .empty, .error:
-            playedSongIds.removeAll()
+            queueState = queueState.clearingPlayedHistory()
             lastObservedSongId = nil
         default:
             break
@@ -165,153 +132,116 @@ final class ShufflePlayer {
         playbackState = resolvedState
     }
 
-    private func rebuildQueueIfPlaying() async {
-        guard playbackState.isActive else { return }
+    // MARK: - Algorithm Change
 
-        let currentSongId = playbackState.currentSongId
+    /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
+    func reshuffleWithNewAlgorithm(_ algorithm: ShuffleAlgorithm) async {
+        guard !queueState.isEmpty, playbackState.isActive else { return }
 
-        // Filter out played songs AND currently playing song
-        let upcomingSongs = songs.filter { song in
-            !playedSongIds.contains(song.id) && song.id != currentSongId
+        print("🎲 Algorithm changed to \(algorithm.displayName), reshuffling...")
+
+        guard let currentSong = playbackState.currentSong,
+              queueState.containsSong(id: currentSong.id) else {
+            print("🎲 No current song found, skipping reshuffle")
+            return
         }
 
-        // Read shuffle algorithm from UserDefaults
-        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
-            ?? ShuffleAlgorithm.noRepeat.rawValue
-        let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+        // Update queue state with reshuffled upcoming songs
+        queueState = queueState.reshuffledUpcoming(with: algorithm)
 
-        // Apply shuffle
-        let shuffler = QueueShuffler(algorithm: algorithm)
-        let shuffledUpcoming = shuffler.shuffle(upcomingSongs)
-
-        // Build queue: current song first, then shuffled upcoming
-        var newQueue: [Song] = []
-        if let currentId = currentSongId,
-           let currentSong = songs.first(where: { $0.id == currentId }) {
-            newQueue.append(currentSong)
-        }
-        newQueue.append(contentsOf: shuffledUpcoming)
-
-        guard !newQueue.isEmpty else { return }
-
-        lastShuffledQueue = newQueue
-        lastUsedAlgorithm = algorithm
-
-        // Check if currently playing (vs paused/loading)
-        let isCurrentlyPlaying = playbackState.isPlaying
+        print("🎲 New queue order: \(queueState.queueOrder.map { "\($0.title) by \($0.artist)" })")
 
         do {
-            try await musicService.setQueue(songs: newQueue)
-
-            // Only call play() if we removed the current song (need to start next song)
-            // If still playing the same song, don't call play() - it would restart the song
-            let currentSongWasRemoved = currentSongId != nil &&
-                !songs.contains(where: { $0.id == currentSongId })
-
-            if currentSongWasRemoved || !isCurrentlyPlaying {
-                try await musicService.play()
-            }
+            // Get upcoming songs (exclude current which is at index 0 after reshuffle)
+            let upcomingSongs = Array(queueState.queueOrder.dropFirst())
+            try await musicService.replaceUpcomingQueue(with: upcomingSongs, currentSong: currentSong)
+            print("🎲 replaceUpcomingQueue succeeded")
         } catch {
-            print("🎲 rebuildQueueIfPlaying failed: \(error)")
+            print("🎲 replaceUpcomingQueue FAILED: \(error)")
         }
     }
 
     // MARK: - Song Management
 
     func addSong(_ song: Song) throws {
-        guard songs.count < Self.maxSongs else {
+        print("➕ addSong(\(song.title)): current songCount=\(queueState.songCount), queueOrder=\(queueState.queueOrder.count), isActive=\(playbackState.isActive)")
+        guard let newState = queueState.addingSong(song) else {
+            print("➕ addSong: capacity reached!")
             throw ShufflePlayerError.capacityReached
         }
-        guard !songIds.contains(song.id) else {
+
+        // Check if it was actually added (not a duplicate)
+        guard newState.songCount > queueState.songCount else {
+            print("➕ addSong: already exists, skipping")
             return // Already added
         }
-        songs.append(song)
-        songIds.insert(song.id)
-        queueValid = false
 
-        // If playing, insert into existing queue without disruption
-        if playbackState.isActive {
-            // Update debug queue to show the new song
-            lastShuffledQueue.append(song)
+        queueState = newState
+        print("➕ addSong: added to pool, new songCount=\(queueState.songCount)")
 
+        // If playing, also add to our internal queue order and MusicKit queue
+        if playbackState.isActive && queueState.hasQueue {
+            // Add to our internal queue order
+            queueState = queueState.appendingToQueue(song)
+            print("➕ addSong: appended to queueOrder, now \(queueState.queueOrder.count) songs")
+
+            // Insert into MusicKit queue
             Task {
                 do {
                     try await musicService.insertIntoQueue(songs: [song])
-                    print("🎵 Successfully inserted \(song.title) into queue")
+                    print("🎵 Successfully inserted \(song.title) into MusicKit queue")
                 } catch {
                     print("🎵 Failed to insert \(song.title): \(error)")
                 }
             }
+        } else {
+            print("➕ addSong: playback not active or no queue yet, song only added to pool")
         }
     }
 
     func addSongs(_ newSongs: [Song]) throws {
-        let uniqueNewSongs = newSongs.filter { !songIds.contains($0.id) }
-
-        let availableCapacity = Self.maxSongs - songs.count
-        guard uniqueNewSongs.count <= availableCapacity else {
+        guard let newState = queueState.addingSongs(newSongs) else {
             throw ShufflePlayerError.capacityReached
         }
-
-        songs.append(contentsOf: uniqueNewSongs)
-        songIds.formUnion(uniqueNewSongs.map(\.id))
-        queueValid = false
+        queueState = newState
         // Don't rebuild queue during initial load - not playing yet
     }
 
     /// Add songs and reshuffle queue if playing (interleaves new songs throughout upcoming queue)
     func addSongsWithQueueRebuild(_ newSongs: [Song]) async throws {
         print("🔍 addSongsWithQueueRebuild: Received \(newSongs.count) songs")
-        let uniqueNewSongs = newSongs.filter { !songIds.contains($0.id) }
-        print("🔍 addSongsWithQueueRebuild: \(uniqueNewSongs.count) unique after filtering")
 
-        let availableCapacity = Self.maxSongs - songs.count
-        guard uniqueNewSongs.count <= availableCapacity else {
+        guard let newState = queueState.addingSongs(newSongs) else {
             print("🔍 addSongsWithQueueRebuild: Capacity exceeded!")
             throw ShufflePlayerError.capacityReached
         }
 
-        songs.append(contentsOf: uniqueNewSongs)
-        songIds.formUnion(uniqueNewSongs.map(\.id))
-        queueValid = false
+        let addedCount = newState.songCount - queueState.songCount
+        print("🔍 addSongsWithQueueRebuild: \(addedCount) unique after filtering")
+
+        queueState = newState
         print("🔍 addSongsWithQueueRebuild: Added to internal list, playbackState.isActive = \(playbackState.isActive)")
 
         // If playing, reshuffle to interleave new songs throughout upcoming queue
         if playbackState.isActive {
-            let currentSongId = playbackState.currentSongId
-
-            guard let currentId = currentSongId,
-                  let currentSong = songs.first(where: { $0.id == currentId }) else {
+            guard let currentSong = playbackState.currentSong,
+                  queueState.containsSong(id: currentSong.id) else {
                 print("🔍 addSongsWithQueueRebuild: No current song, skipping reshuffle")
                 return
             }
 
-            // Combine existing upcoming songs (excluding played and current) with new songs
-            let upcomingSongs = songs.filter { song in
-                !playedSongIds.contains(song.id) && song.id != currentSongId
-            }
-
             // Read shuffle algorithm from UserDefaults
-            let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
-                ?? ShuffleAlgorithm.noRepeat.rawValue
-            let algorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+            let algorithm = currentAlgorithm()
 
-            // Shuffle all upcoming songs together (new songs get interleaved)
-            let shuffler = QueueShuffler(algorithm: algorithm)
-            let shuffledUpcoming = shuffler.shuffle(upcomingSongs)
+            // Reshuffle upcoming songs (this excludes played songs and current song)
+            queueState = queueState.reshuffledUpcoming(with: algorithm)
 
-            // Build full queue for tracking: current song first, then shuffled upcoming
-            var newQueue: [Song] = [currentSong]
-            newQueue.append(contentsOf: shuffledUpcoming)
-
-            lastShuffledQueue = newQueue
-            lastUsedAlgorithm = algorithm
-
-            print("🎵 Reshuffling with \(uniqueNewSongs.count) new songs interleaved into \(upcomingSongs.count - uniqueNewSongs.count) existing upcoming")
+            print("🎵 Reshuffling with \(addedCount) new songs interleaved")
 
             do {
-                try await musicService.replaceUpcomingQueue(with: shuffledUpcoming, currentSong: currentSong)
-                print("🎵 Successfully reshuffled queue with \(shuffledUpcoming.count) upcoming songs")
+                let upcomingSongs = Array(queueState.queueOrder.dropFirst())
+                try await musicService.replaceUpcomingQueue(with: upcomingSongs, currentSong: currentSong)
+                print("🎵 Successfully reshuffled queue with \(upcomingSongs.count) upcoming songs")
             } catch {
                 print("🎵 Failed to reshuffle queue: \(error)")
             }
@@ -319,69 +249,94 @@ final class ShufflePlayer {
         print("🔍 addSongsWithQueueRebuild: Complete")
     }
 
-    func removeSong(id: String) {
-        songs.removeAll { $0.id == id }
-        songIds.remove(id)
-        queueValid = false
-        // Note: If this is the currently playing song, MusicKit will continue playing it
-        // since it's already in the queue. The song will finish naturally without skipping.
-        // Songs removed that aren't current will still be in MusicKit's queue but will be
-        // skipped when handlePlaybackStateChange detects they're not in our songs list.
+    func removeSong(id: String) async {
+        let isRemovingCurrentSong = playbackState.currentSongId == id
+        queueState = queueState.removingSong(id: id)
+
+        // Update MusicKit queue if actively playing
+        guard playbackState.isActive else { return }
+
+        if isRemovingCurrentSong {
+            // Removing current song - skip to next
+            do {
+                try await musicService.skipToNext()
+                print("🎵 Skipped to next after removing current song")
+            } catch {
+                print("🎵 Failed to skip after removing current song: \(error)")
+            }
+        } else if let currentSong = playbackState.currentSong,
+                  queueState.containsSong(id: currentSong.id) {
+            // Removing upcoming song - rebuild queue without it
+            let upcomingSongs = queueState.queueOrder.filter { $0.id != currentSong.id }
+            do {
+                try await musicService.replaceUpcomingQueue(with: upcomingSongs, currentSong: currentSong)
+                print("🎵 Removed song \(id) from MusicKit queue")
+            } catch {
+                print("🎵 Failed to remove song from MusicKit queue: \(error)")
+            }
+        }
     }
 
-    func removeAllSongs() {
-        songs.removeAll()
-        songIds.removeAll()
-        playedSongIds.removeAll()
-        lastShuffledQueue.removeAll()
+    func removeAllSongs() async {
+        print("🗑️ removeAllSongs() called: had \(queueState.songCount) songs, queueOrder had \(queueState.queueOrder.count)")
+        queueState = queueState.cleared()
         lastObservedSongId = nil
-        queueValid = false
+
+        // Stop MusicKit playback so it doesn't continue with stale queue
+        await musicService.pause()
+        playbackState = .stopped
+
+        print("🗑️ removeAllSongs() complete: now \(queueState.songCount) songs, queueOrder has \(queueState.queueOrder.count)")
     }
 
     func containsSong(id: String) -> Bool {
-        songIds.contains(id)
+        queueState.containsSong(id: id)
     }
 
     // MARK: - Queue Preparation
 
     func prepareQueue(algorithm: ShuffleAlgorithm? = nil) async throws {
-        guard !songs.isEmpty else { return }
+        guard !queueState.isEmpty else { return }
 
-        // Use provided algorithm or fall back to UserDefaults
-        let effectiveAlgorithm: ShuffleAlgorithm
-        if let algorithm {
-            effectiveAlgorithm = algorithm
-        } else {
-            let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
-            effectiveAlgorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
-        }
+        let effectiveAlgorithm = algorithm ?? currentAlgorithm()
 
-        let shuffler = QueueShuffler(algorithm: effectiveAlgorithm)
-        let shuffledSongs = shuffler.shuffle(songs)
-        lastShuffledQueue = shuffledSongs
-        lastUsedAlgorithm = effectiveAlgorithm
+        print("🎲 prepareQueue: songPool has \(queueState.songCount) songs")
+
+        // Shuffle the queue
+        queueState = queueState.shuffled(with: effectiveAlgorithm)
         print("🎲 Prepared queue with algorithm: \(effectiveAlgorithm.displayName)")
+        print("🎲 prepareQueue: queueOrder now has \(queueState.queueOrder.count) songs")
 
-        try await musicService.setQueue(songs: shuffledSongs)
-        queueValid = true
+        try await musicService.setQueue(songs: queueState.queueOrder)
     }
 
     // MARK: - Playback Control
 
     func play() async throws {
-        guard !songs.isEmpty else { return }
-        playedSongIds.removeAll()
+        print("▶️ play() called: isEmpty=\(queueState.isEmpty), hasQueue=\(queueState.hasQueue), songCount=\(queueState.songCount)")
+        guard !queueState.isEmpty else {
+            print("▶️ play() early return: queue is empty")
+            return
+        }
+
+        // Clear played history for fresh playback
+        queueState = queueState.clearingPlayedHistory()
         lastObservedSongId = nil
 
-        if !queueValid {
+        if !queueState.hasQueue {
+            print("▶️ play() no queue yet, preparing...")
             // Emit loading state for immediate UI feedback
-            if let firstSong = songs.first {
+            if let firstSong = queueState.songPool.first {
                 playbackState = .loading(firstSong)
             }
             try await prepareQueue()
+            print("▶️ play() queue prepared, order has \(queueState.queueOrder.count) songs")
+        } else {
+            print("▶️ play() queue already exists with \(queueState.queueOrder.count) songs")
         }
 
         try await musicService.play()
+        print("▶️ play() complete")
     }
 
     func pause() async {
@@ -407,7 +362,13 @@ final class ShufflePlayer {
         case .playing:
             await pause()
         case .paused:
-            try await musicService.play()
+            // If we have songs but no queue (e.g., after clear + re-add), build queue first
+            if !queueState.isEmpty && !queueState.hasQueue {
+                print("▶️ togglePlayback: paused but no queue, calling play() to rebuild")
+                try await play()
+            } else {
+                try await musicService.play()
+            }
         case .loading:
             // Do nothing while loading
             break
@@ -432,75 +393,36 @@ final class ShufflePlayer {
         playedIds: Set<String>,
         playbackPosition: TimeInterval
     ) async -> Bool {
-        print("🔄 restoreQueue called: songs=\(songs.count), queueOrder=\(queueOrder.count), currentSongId=\(currentSongId ?? "nil")")
+        print("🔄 restoreQueue called: songs=\(queueState.songCount), queueOrder=\(queueOrder.count), currentSongId=\(currentSongId ?? "nil")")
 
-        guard !songs.isEmpty else {
+        guard !queueState.isEmpty else {
             print("🔄 restoreQueue: No songs in pool, returning false")
             return false
         }
 
-        // Build song lookup for O(1) access
-        let songById = Dictionary(uniqueKeysWithValues: songs.map { ($0.id, $0) })
-
-        // Filter queue to only songs that still exist in the pool
-        let validQueueSongs = queueOrder.compactMap { songById[$0] }
-        print("🔄 restoreQueue: validQueueSongs=\(validQueueSongs.count)")
-
-        // If queue is empty after filtering, need fresh shuffle
-        guard !validQueueSongs.isEmpty else {
-            print("🔄 restoreQueue: No valid queue songs, returning false")
+        // Attempt to restore from persisted state
+        guard let restoredState = queueState.restored(
+            queueOrder: queueOrder,
+            currentSongId: currentSongId,
+            playedIds: playedIds
+        ) else {
+            print("🔄 restoreQueue: Failed to restore state, returning false")
             return false
         }
 
-        // Restore played history (only for songs still in pool)
-        let validPlayedIds = playedIds.filter { songById[$0] != nil }
-        playedSongIds = validPlayedIds
+        // Apply restored state
+        queueState = restoredState
+        lastObservedSongId = queueState.currentSongId
+        print("🔄 restoreQueue: Restored state with \(queueState.queueOrder.count) songs, current=\(queueState.currentSong?.title ?? "none")")
 
-        // Reorder queue so current song is first (setQueue always starts from first song)
-        let effectiveQueue: [Song]
-        let effectiveCurrentSong: Song?
-
-        // Debug: log what we're searching for
-        print("🔄 restoreQueue: Looking for currentSongId=\(currentSongId ?? "nil") in \(validQueueSongs.count) songs")
-        if let currentId = currentSongId {
-            let matchingSongs = validQueueSongs.filter { $0.id == currentId }
-            print("🔄 restoreQueue: Found \(matchingSongs.count) matching songs")
-            if matchingSongs.isEmpty {
-                // Log first few song IDs to see what we have
-                let sampleIds = validQueueSongs.prefix(5).map { $0.id }
-                print("🔄 restoreQueue: Sample song IDs in queue: \(sampleIds)")
-            }
-        }
-
-        if let currentId = currentSongId,
-           let currentIndex = validQueueSongs.firstIndex(where: { $0.id == currentId }) {
-            // Current song exists - reorder queue to start from it
-            let fromCurrentSong = Array(validQueueSongs[currentIndex...])
-            let beforeCurrentSong = Array(validQueueSongs[..<currentIndex])
-            effectiveQueue = fromCurrentSong + beforeCurrentSong
-            effectiveCurrentSong = validQueueSongs[currentIndex]
-            lastObservedSongId = currentId
-            print("🔄 restoreQueue: Reordered queue to start at \(effectiveCurrentSong?.title ?? "unknown") (index \(currentIndex))")
-        } else {
-            // Current song missing - start with first available from queue
-            effectiveQueue = validQueueSongs
-            effectiveCurrentSong = validQueueSongs.first
-            lastObservedSongId = effectiveCurrentSong?.id
-            print("🔄 restoreQueue: Current song not found, starting from first song: \(effectiveCurrentSong?.title ?? "unknown") (id=\(effectiveCurrentSong?.id ?? "nil"))")
-        }
-
-        // Update debug state
-        lastShuffledQueue = effectiveQueue
-        // Read shuffle algorithm from UserDefaults for lastUsedAlgorithm
-        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
-            ?? ShuffleAlgorithm.noRepeat.rawValue
-        lastUsedAlgorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+        // Suppress history updates during the restore sequence
+        suppressHistoryUpdates = true
+        defer { suppressHistoryUpdates = false }
 
         // Set the queue in MusicKit
         do {
-            print("🔄 restoreQueue: Setting queue with \(effectiveQueue.count) songs, first=\(effectiveQueue.first?.title ?? "none")")
-            try await musicService.setQueue(songs: effectiveQueue)
-            queueValid = true
+            print("🔄 restoreQueue: Setting queue with \(queueState.queueOrder.count) songs")
+            try await musicService.setQueue(songs: queueState.queueOrder)
 
             // Brief play to load the song (required for seek to work and metadata to load)
             print("🔄 restoreQueue: Playing briefly to load song...")
@@ -528,5 +450,13 @@ final class ShufflePlayer {
     /// Resumes playback after restoration (call after restoreQueue succeeds)
     func resumeAfterRestore() async throws {
         try await musicService.play()
+    }
+
+    // MARK: - Helpers
+
+    private func currentAlgorithm() -> ShuffleAlgorithm {
+        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
+            ?? ShuffleAlgorithm.noRepeat.rawValue
+        return ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
     }
 }

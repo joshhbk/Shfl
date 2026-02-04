@@ -50,7 +50,7 @@ struct ManageView: View {
                     SongDisplay(song: song)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                player.removeSong(id: song.id)
+                                Task { await player.removeSong(id: song.id) }
                             } label: {
                                 Label("Remove", systemImage: "trash")
                             }
