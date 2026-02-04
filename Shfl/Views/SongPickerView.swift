@@ -148,14 +148,43 @@ struct SongPickerView: View {
     @ViewBuilder
     private var searchList: some View {
         if !viewModel.searchResults.isEmpty {
-            // Have results - show them
-            songList(songs: viewModel.searchResults, isPaginated: false)
+            // Have results - show them with pagination
+            searchResultsList
         } else if viewModel.searchLoading || !viewModel.hasSearchedOnce {
             // Loading or waiting for debounce - show skeleton
             skeletonList
         } else {
             // Search completed with no results
             ContentUnavailableView.search(text: searchText)
+        }
+    }
+
+    private var searchResultsList: some View {
+        let isAtCapacity = selectedSongIds.count >= player.capacity
+
+        return ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(viewModel.searchResults) { song in
+                    SongRow(
+                        song: song,
+                        isSelected: selectedSongIds.contains(song.id),
+                        isAtCapacity: isAtCapacity,
+                        onToggle: { toggleSong(song) }
+                    )
+                    .equatable()
+                    Divider().padding(.leading, 72)
+                }
+
+                if viewModel.hasMoreSearchResults {
+                    ProgressView()
+                        .padding()
+                        .onAppear {
+                            Task {
+                                await viewModel.loadMoreSearchResults()
+                            }
+                        }
+                }
+            }
         }
     }
 

@@ -35,8 +35,8 @@ protocol MusicService: Sendable {
         offset: Int
     ) async throws -> LibraryPage
 
-    /// Search user's library for songs matching query
-    func searchLibrarySongs(query: String) async throws -> [Song]
+    /// Search user's library for songs matching query with pagination
+    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage
 
     /// Set the playback queue with songs and shuffle them
     func setQueue(songs: [Song]) async throws

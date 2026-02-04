@@ -165,7 +165,9 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     func fetchLibrarySongs(sortedBy: SortOption, limit: Int, offset: Int) async throws -> LibraryPage {
         LibraryPage(songs: [], hasMore: false)
     }
-    func searchLibrarySongs(query: String) async throws -> [Song] { [] }
+    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        LibraryPage(songs: [], hasMore: false)
+    }
     func setQueue(songs: [Song]) async throws {}
     func insertIntoQueue(songs: [Song]) async throws {}
     func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws {}

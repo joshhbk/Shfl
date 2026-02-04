@@ -29,6 +29,10 @@ final class LibraryBrowserViewModel {
     private(set) var searchResults: [Song] = []
     private(set) var searchLoading = false
     private(set) var hasSearchedOnce = false
+    private(set) var hasMoreSearchResults = true
+    @ObservationIgnored private var searchOffset = 0
+    @ObservationIgnored private var isLoadingMoreSearch = false
+    @ObservationIgnored private var currentSearchQuery = ""
 
     // Shared state - searchText is NOT observed to avoid keystroke lag
     @ObservationIgnored var searchText = "" {
@@ -185,10 +189,19 @@ final class LibraryBrowserViewModel {
         }
 
         searchLoading = true
+        searchOffset = 0
+        currentSearchQuery = query
 
         do {
-            searchResults = try await musicService.searchLibrarySongs(query: query)
-            print("🔎 Got \(searchResults.count) search results")
+            let page = try await musicService.searchLibrarySongs(
+                query: query,
+                limit: pageSize,
+                offset: 0
+            )
+            searchResults = page.songs
+            hasMoreSearchResults = page.hasMore
+            searchOffset = page.songs.count
+            print("🔎 Got \(searchResults.count) search results, hasMore: \(hasMoreSearchResults)")
         } catch {
             print("🔎 Search error: \(error)")
             errorMessage = error.localizedDescription
@@ -196,6 +209,29 @@ final class LibraryBrowserViewModel {
 
         searchLoading = false
         hasSearchedOnce = true
+    }
+
+    func loadMoreSearchResults() async {
+        guard hasMoreSearchResults, !isLoadingMoreSearch, !currentSearchQuery.isEmpty else { return }
+
+        isLoadingMoreSearch = true
+
+        do {
+            let page = try await musicService.searchLibrarySongs(
+                query: currentSearchQuery,
+                limit: pageSize,
+                offset: searchOffset
+            )
+            searchResults.append(contentsOf: page.songs)
+            hasMoreSearchResults = page.hasMore
+            searchOffset += page.songs.count
+            print("🔎 Loaded \(page.songs.count) more search results, total: \(searchResults.count)")
+        } catch {
+            print("🔎 Load more search error: \(error)")
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingMoreSearch = false
     }
 
     func clearError() {

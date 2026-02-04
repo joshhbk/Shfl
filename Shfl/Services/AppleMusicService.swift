@@ -86,13 +86,16 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
-    func searchLibrarySongs(query: String) async throws -> [Song] {
+    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        // Note: MusicLibrarySearchRequest doesn't support offset-based pagination.
+        // We fetch with a higher limit and slice the results to simulate offset.
+        // This is a workaround since MusicKit's nextBatch() requires storing the collection.
         var request = MusicLibrarySearchRequest(term: query, types: [MusicKit.Song.self])
-        request.limit = 50
+        request.limit = offset + limit
 
         let response = try await request.response()
 
-        return response.songs.map { musicKitSong in
+        let allSongs = response.songs.map { musicKitSong in
             Song(
                 id: musicKitSong.id.rawValue,
                 title: musicKitSong.title,
@@ -103,6 +106,16 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
                 lastPlayedDate: musicKitSong.lastPlayedDate
             )
         }
+
+        // Slice to get only the requested page
+        let startIndex = min(offset, allSongs.count)
+        let endIndex = min(offset + limit, allSongs.count)
+        let songs = Array(allSongs[startIndex..<endIndex])
+
+        // hasMore if we got a full page (same logic as browse pagination)
+        let hasMore = songs.count == limit
+
+        return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
     func setQueue(songs: [Song]) async throws {
