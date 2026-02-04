@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct SongRow: View {
+struct SongRow: View, Equatable {
     let song: Song
     let isSelected: Bool
     let isAtCapacity: Bool
@@ -8,6 +8,13 @@ struct SongRow: View {
 
     @State private var isPressed = false
     @State private var showNope = false
+
+    // Equatable - ignore closure, compare only data that affects rendering
+    static func == (lhs: SongRow, rhs: SongRow) -> Bool {
+        lhs.song.id == rhs.song.id &&
+        lhs.isSelected == rhs.isSelected &&
+        lhs.isAtCapacity == rhs.isAtCapacity
+    }
 
     init(
         song: Song,
@@ -32,7 +39,6 @@ struct SongRow: View {
                     .font(.system(size: 22))
                     .foregroundStyle(isSelected ? .blue : .gray.opacity(0.3))
                     .scaleEffect(isPressed ? 0.9 : 1.0)
-                    .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isSelected)
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
@@ -42,7 +48,7 @@ struct SongRow: View {
             .offset(x: showNope ? -8 : 0)
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.2, dampingFraction: 0.5), value: isSelected)
+        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isSelected)
         .animation(.default, value: showNope)
     }
 

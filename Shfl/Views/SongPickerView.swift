@@ -8,6 +8,7 @@ struct SongPickerView: View {
     @State private var viewModel: LibraryBrowserViewModel
     @State private var undoManager = SongUndoManager()
     @State private var selectedSongIds: Set<String> = []
+    @State private var searchText = ""
 
     @Environment(\.appSettings) private var appSettings
 
@@ -30,10 +31,9 @@ struct SongPickerView: View {
                     CapacityProgressBar(current: selectedSongIds.count, maximum: player.capacity)
 
                     Group {
-                        switch viewModel.currentMode {
-                        case .browse:
+                        if searchText.isEmpty {
                             browseList
-                        case .search:
+                        } else {
                             searchList
                         }
                     }
@@ -70,7 +70,7 @@ struct SongPickerView: View {
             .navigationTitle("Add Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarLeading) {
                     if viewModel.autofillState == .loading {
                         ProgressView()
                             .progressViewStyle(.circular)
@@ -92,17 +92,25 @@ struct SongPickerView: View {
                         .disabled(selectedSongIds.count >= player.capacity)
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Clear") {
                         Task { await player.removeAllSongs() }
-                        selectedSongIds.removeAll()
+                        // Disable animations for bulk clear to avoid 120 concurrent spring animations
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            selectedSongIds.removeAll()
+                        }
                     }
                     .disabled(selectedSongIds.isEmpty)
                 }
             }
-            .searchable(text: Bindable(viewModel).searchText, prompt: "Search your library")
+            .searchable(text: $searchText, prompt: "Search your library")
             .task {
                 await viewModel.loadInitialPage()
+            }
+            .onChange(of: searchText) { _, newValue in
+                viewModel.searchText = newValue
             }
             .onChange(of: appSettings?.librarySortOption) { _, newOption in
                 if let newOption {
@@ -139,18 +147,15 @@ struct SongPickerView: View {
 
     @ViewBuilder
     private var searchList: some View {
-        if viewModel.searchLoading {
-            skeletonList
-        } else if viewModel.searchResults.isEmpty && !viewModel.searchText.isEmpty {
-            ContentUnavailableView.search(text: viewModel.searchText)
-        } else if viewModel.searchResults.isEmpty {
-            ContentUnavailableView(
-                "Search Your Library",
-                systemImage: "magnifyingglass",
-                description: Text("Type to search your Apple Music library")
-            )
-        } else {
+        if !viewModel.searchResults.isEmpty {
+            // Have results - show them
             songList(songs: viewModel.searchResults, isPaginated: false)
+        } else if viewModel.searchLoading || !viewModel.hasSearchedOnce {
+            // Loading or waiting for debounce - show skeleton
+            skeletonList
+        } else {
+            // Search completed with no results
+            ContentUnavailableView.search(text: searchText)
         }
     }
 
@@ -177,6 +182,7 @@ struct SongPickerView: View {
                         isAtCapacity: isAtCapacity,
                         onToggle: { toggleSong(song) }
                     )
+                    .equatable()
                     Divider().padding(.leading, 72)
                 }
 

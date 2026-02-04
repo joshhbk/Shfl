@@ -1,35 +1,29 @@
+import Foundation
 import MusicKit
-import SwiftUI
 
-/// Lazy artwork loader with rate limiting to avoid overwhelming MusicKit
-@Observable
+/// Non-observable artwork storage to prevent observation fan-out.
+/// Views query this directly; changes are signaled via NotificationCenter
+/// so only the specific view for that song updates.
 @MainActor
-final class ArtworkLoader {
-    static let shared = ArtworkLoader()
+final class ArtworkCache {
+    static let shared = ArtworkCache()
 
-    @ObservationIgnored private var cache: [String: Artwork] = [:]
-    @ObservationIgnored private var pending: Set<String> = []
-    @ObservationIgnored private var loadQueue: [String] = []
-    @ObservationIgnored private var isProcessing = false
+    /// Notification posted when a specific song's artwork is loaded.
+    /// userInfo contains "songId": String
+    static let artworkDidLoad = Notification.Name("ArtworkCacheDidLoad")
 
-    /// Per-song version tracking for granular view updates.
-    /// Only the specific SongArtwork view will re-render when its artwork loads.
-    private(set) var artworkVersions: [String: Int] = [:]
+    private var cache: [String: Artwork] = [:]
+    private var pending: Set<String> = []
+    private var loadQueue: [String] = []
+    private var isProcessing = false
 
     private init() {}
-
-    /// Returns a stable version number for a song's artwork.
-    /// Increments when artwork is loaded, causing only that view to update.
-    func artworkVersion(for songId: String) -> Int {
-        artworkVersions[songId, default: 0]
-    }
 
     func artwork(for songId: String) -> Artwork? {
         cache[songId]
     }
 
     func requestArtwork(for songId: String) {
-        // Already cached or pending
         guard cache[songId] == nil, !pending.contains(songId) else { return }
 
         pending.insert(songId)
@@ -43,7 +37,6 @@ final class ArtworkLoader {
         isProcessing = true
 
         Task {
-            // Process in small batches with delays
             while !loadQueue.isEmpty {
                 let batch = Array(loadQueue.prefix(5))
                 loadQueue.removeFirst(min(5, loadQueue.count))
@@ -69,8 +62,12 @@ final class ArtworkLoader {
                 let songId = song.id.rawValue
                 if let artwork = song.artwork {
                     cache[songId] = artwork
-                    // Increment only this song's version to trigger its view update
-                    artworkVersions[songId, default: 0] += 1
+                    // Post notification for this specific song only
+                    NotificationCenter.default.post(
+                        name: Self.artworkDidLoad,
+                        object: nil,
+                        userInfo: ["songId": songId]
+                    )
                 }
                 pending.remove(songId)
             }
