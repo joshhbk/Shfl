@@ -23,8 +23,8 @@ final class MockMusicService: MusicService, @unchecked Sendable {
         LibraryPage(songs: [], hasMore: false)
     }
 
-    func searchLibrarySongs(query: String) async throws -> [Song] {
-        []
+    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        LibraryPage(songs: [], hasMore: false)
     }
 
     func setQueue(songs: [Song]) async throws {}
