@@ -4,11 +4,10 @@ import SwiftUI
 struct PlayerControlsPanel: View {
     let isPlaying: Bool
     let isDisabled: Bool
-    let highlightOffset: CGPoint
     let actions: PlayerActions
 
     var body: some View {
-        ShuffleBodyView(highlightOffset: highlightOffset) {
+        ShuffleBodyView {
             ClickWheelView(
                 isPlaying: isPlaying,
                 onPlayPause: actions.onPlayPause,
@@ -16,7 +15,6 @@ struct PlayerControlsPanel: View {
                 onSkipBack: actions.onSkipBack,
                 onVolumeUp: { VolumeController.increaseVolume() },
                 onVolumeDown: { VolumeController.decreaseVolume() },
-                highlightOffset: highlightOffset,
                 scale: 0.6
             )
             .disabled(isDisabled)

@@ -10,14 +10,3 @@ extension EnvironmentValues {
         set { self[ShuffleThemeKey.self] = newValue }
     }
 }
-
-private struct MotionManagerKey: EnvironmentKey {
-    static let defaultValue: MotionManager? = nil
-}
-
-extension EnvironmentValues {
-    var motionManager: MotionManager? {
-        get { self[MotionManagerKey.self] }
-        set { self[MotionManagerKey.self] = newValue }
-    }
-}

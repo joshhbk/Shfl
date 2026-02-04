@@ -27,7 +27,6 @@ static float shfl_noise(float2 st) {
     float2 position,
     half4 color,
     float2 center,
-    float2 highlightOffset,
     float intensity
 ) {
     // Subtle grain texture - no directional pattern

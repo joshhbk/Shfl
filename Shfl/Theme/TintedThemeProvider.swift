@@ -20,9 +20,7 @@ final class TintedThemeProvider {
             wheelStyle: .dark,
             textStyle: .dark,
             centerButtonIconColor: .black,
-            brushedMetalIntensity: 1.0,
-            motionEnabled: true,
-            motionSensitivity: 1.0
+            brushedMetalIntensity: 1.0
         )
         self.baseTheme = defaultTheme
         self.computedTheme = defaultTheme
@@ -66,9 +64,7 @@ final class TintedThemeProvider {
                 wheelStyle: wheelStyle,
                 textStyle: textStyle,
                 centerButtonIconColor: iconColor,
-                brushedMetalIntensity: theme.brushedMetalIntensity,
-                motionEnabled: theme.motionEnabled,
-                motionSensitivity: theme.motionSensitivity
+                brushedMetalIntensity: theme.brushedMetalIntensity
             )
         }
     }
