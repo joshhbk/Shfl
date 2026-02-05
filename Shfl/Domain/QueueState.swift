@@ -79,6 +79,26 @@ struct QueueState: Equatable, Sendable {
     /// Whether there are songs before the current one.
     var hasPrevious: Bool { currentIndex > 0 }
 
+    /// Whether the queue is out of sync with the song pool.
+    /// True when songs have been added to or removed from the pool since the queue was built.
+    var isQueueStale: Bool {
+        guard hasQueue else { return false }
+        let queueIds = Set(queueOrder.map(\.id))
+        return queueIds != poolIds
+    }
+
+    /// Invalidate the queue while preserving the song pool.
+    /// Used when the algorithm changes while not playing.
+    func invalidatingQueue() -> QueueState {
+        QueueState(
+            songPool: songPool,
+            queueOrder: [],
+            playedIds: [],
+            currentIndex: 0,
+            algorithm: algorithm
+        )
+    }
+
     // MARK: - Query Methods
 
     /// Check if a song is in the pool.
@@ -145,6 +165,17 @@ struct QueueState: Equatable, Sendable {
     /// Remove all songs and reset state.
     func cleared() -> QueueState {
         .empty
+    }
+
+    /// Remove a song from queueOrder only (keep in pool). Used for rollback when MusicKit insert fails.
+    func removingFromQueueOnly(id: String) -> QueueState {
+        QueueState(
+            songPool: songPool,
+            queueOrder: queueOrder.filter { $0.id != id },
+            playedIds: playedIds,
+            currentIndex: currentIndex,
+            algorithm: algorithm
+        )
     }
 
     // MARK: - Queue Mutations

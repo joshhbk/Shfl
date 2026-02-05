@@ -85,6 +85,13 @@ final class AppViewModel {
                 let state = self.player.playbackState
                 self.scrobbleTracker.onPlaybackStateChanged(state)
 
+                // Persist when the current song changes (covers skip, natural advance, etc.)
+                let currentSongId = state.currentSongId
+                if currentSongId != self.lastPersistedSongId, state.isActive {
+                    self.persistPlaybackState()
+                    self.lastPersistedSongId = currentSongId
+                }
+
                 // Wait until playbackState changes using Observation
                 await withCheckedContinuation { continuation in
                     withObservationTracking {

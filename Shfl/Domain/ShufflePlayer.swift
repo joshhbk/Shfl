@@ -143,7 +143,14 @@ final class ShufflePlayer {
 
     /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
     func reshuffleWithNewAlgorithm(_ algorithm: ShuffleAlgorithm) async {
-        guard !queueState.isEmpty, playbackState.isActive else { return }
+        guard !queueState.isEmpty else { return }
+
+        // If not actively playing, invalidate the queue so next play() rebuilds with the new algorithm
+        guard playbackState.isActive else {
+            print("🎲 Algorithm changed to \(algorithm.displayName) while not active, invalidating queue")
+            queueState = queueState.invalidatingQueue()
+            return
+        }
 
         print("🎲 Algorithm changed to \(algorithm.displayName), reshuffling...")
 
@@ -192,13 +199,15 @@ final class ShufflePlayer {
             queueState = queueState.appendingToQueue(song)
             print("➕ addSong: appended to queueOrder, now \(queueState.queueOrder.count) songs")
 
-            // Insert into MusicKit queue
+            // Insert into MusicKit queue (with rollback on failure)
             Task {
                 do {
                     try await musicService.insertIntoQueue(songs: [song])
                     print("🎵 Successfully inserted \(song.title) into MusicKit queue")
                 } catch {
-                    print("🎵 Failed to insert \(song.title): \(error)")
+                    // Rollback: remove from queue order since MusicKit doesn't have it
+                    queueState = queueState.removingFromQueueOnly(id: song.id)
+                    print("⚠️ Rolled back \(song.title) from queue after insert failure: \(error)")
                 }
             }
         } else {
@@ -320,7 +329,7 @@ final class ShufflePlayer {
     // MARK: - Playback Control
 
     func play() async throws {
-        print("▶️ play() called: isEmpty=\(queueState.isEmpty), hasQueue=\(queueState.hasQueue), songCount=\(queueState.songCount)")
+        print("▶️ play() called: isEmpty=\(queueState.isEmpty), hasQueue=\(queueState.hasQueue), isQueueStale=\(queueState.isQueueStale), songCount=\(queueState.songCount)")
         guard !queueState.isEmpty else {
             print("▶️ play() early return: queue is empty")
             return
@@ -330,13 +339,13 @@ final class ShufflePlayer {
         queueState = queueState.clearingPlayedHistory()
         lastObservedSongId = nil
 
-        if !queueState.hasQueue {
-            print("▶️ play() no queue yet, preparing...")
-            // Emit loading state for immediate UI feedback
-            if let firstSong = queueState.songPool.first {
+        if !queueState.hasQueue || queueState.isQueueStale {
+            print("▶️ play() queue needs (re)build, preparing...")
+            try await prepareQueue()
+            // Emit loading with the actual first song from shuffled queue
+            if let firstSong = queueState.currentSong {
                 playbackState = .loading(firstSong)
             }
-            try await prepareQueue()
             print("▶️ play() queue prepared, order has \(queueState.queueOrder.count) songs")
         } else {
             print("▶️ play() queue already exists with \(queueState.queueOrder.count) songs")

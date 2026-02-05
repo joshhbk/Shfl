@@ -16,6 +16,7 @@ actor MockMusicService: MusicService {
     nonisolated(unsafe) var lastSeekTime: TimeInterval = 0
     var lastQueuedSongs: [Song] = []
     var lastInsertedSongs: [Song] = []
+    var shouldThrowOnInsert: Error?
     var shouldThrowOnFetch: Error?
 
     /// Configurable duration for testing. Access via currentSongDuration.
@@ -102,6 +103,9 @@ actor MockMusicService: MusicService {
     }
 
     func insertIntoQueue(songs: [Song]) async throws {
+        if let error = shouldThrowOnInsert {
+            throw error
+        }
         insertIntoQueueCallCount += 1
         lastInsertedSongs = songs
         // Append to existing queue without disrupting playback
@@ -179,6 +183,10 @@ actor MockMusicService: MusicService {
 
     func simulatePlaybackState(_ state: PlaybackState) {
         updateState(state)
+    }
+
+    func setShouldThrowOnInsert(_ error: Error?) {
+        shouldThrowOnInsert = error
     }
 
     func resetQueueTracking() {
