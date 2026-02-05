@@ -342,6 +342,73 @@ final class QueueStateTests: XCTestCase {
         XCTAssertTrue(shuffled.hasRestorableState)
     }
 
+    // MARK: - Queue-Only Removal (Rollback)
+
+    func testRemovingFromQueueOnlyKeepsPool() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        let state = QueueState.empty.addingSongs(songs)!.shuffled()
+
+        let newState = state.removingFromQueueOnly(id: "2")
+
+        // Song should still be in pool
+        XCTAssertTrue(newState.containsSong(id: "2"), "Song should remain in pool")
+        // But not in queue
+        XCTAssertFalse(newState.queueOrder.contains { $0.id == "2" }, "Song should be removed from queue")
+        // Other queue items preserved
+        XCTAssertEqual(newState.queueOrder.count, 2)
+    }
+
+    // MARK: - Queue Invalidation
+
+    func testInvalidatingQueueKeepsPool() {
+        let songs = (1...5).map { makeSong(id: "\($0)") }
+        let state = QueueState.empty.addingSongs(songs)!.shuffled()
+
+        let invalidated = state.invalidatingQueue()
+
+        XCTAssertEqual(invalidated.songCount, 5, "Pool should be preserved")
+        XCTAssertFalse(invalidated.hasQueue, "Queue should be cleared")
+        XCTAssertTrue(invalidated.playedIds.isEmpty, "Played history should be cleared")
+        XCTAssertTrue(invalidated.containsSong(id: "1"), "Songs should still be in pool")
+    }
+
+    // MARK: - Queue Staleness
+
+    func testIsQueueStaleWhenPoolChanged() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        var state = QueueState.empty.addingSongs(songs)!.shuffled()
+
+        // Add a new song to pool (not in queue)
+        state = state.addingSong(makeSong(id: "4"))!
+
+        XCTAssertTrue(state.isQueueStale, "Queue should be stale when pool has songs not in queue")
+    }
+
+    func testIsQueueStaleReturnsFalseWhenSynced() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        let state = QueueState.empty.addingSongs(songs)!.shuffled()
+
+        XCTAssertFalse(state.isQueueStale, "Queue should not be stale when pool matches queue")
+    }
+
+    func testIsQueueStaleReturnsFalseWhenNoQueue() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        let state = QueueState.empty.addingSongs(songs)!
+
+        XCTAssertFalse(state.isQueueStale, "Should not be stale when there's no queue")
+    }
+
+    func testIsQueueStaleWhenSongRemoved() {
+        let songs = (1...5).map { makeSong(id: "\($0)") }
+        var state = QueueState.empty.addingSongs(songs)!.shuffled()
+
+        // Remove a song (removes from both pool and queue)
+        state = state.removingSong(id: "3")
+
+        // After removing from both, they should be in sync
+        XCTAssertFalse(state.isQueueStale, "Should not be stale after removing from both pool and queue")
+    }
+
     // MARK: - Equatable
 
     func testEquatable() {

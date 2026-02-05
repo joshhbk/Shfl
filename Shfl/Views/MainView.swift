@@ -4,6 +4,7 @@ import SwiftData
 struct MainView: View {
     @State private var viewModel: AppViewModel
     @State private var appSettings: AppSettings
+    @Environment(\.scenePhase) private var scenePhase
 
     init(musicService: MusicService, modelContext: ModelContext) {
         let settings = AppSettings()
@@ -40,6 +41,12 @@ struct MainView: View {
         }
         .task {
             await viewModel.onAppear()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active {
+                viewModel.persistSongs()
+                viewModel.persistPlaybackState()
+            }
         }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
             Task {
