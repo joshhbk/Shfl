@@ -4,6 +4,7 @@ struct CapacityProgressBar: View {
     let current: Int
     let maximum: Int
 
+    @State private var pulseOpacity: Double = 0
 
     private var progress: Double {
         Self.calculateProgress(current: current, maximum: maximum)
@@ -25,7 +26,8 @@ struct CapacityProgressBar: View {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(isFull ? Color.green : Color.blue)
                         .frame(width: geometry.size.width * progress)
-                        .animation(progress == 0 ? nil : .spring(response: 0.4, dampingFraction: 0.7), value: progress)
+                        .brightness(pulseOpacity * 0.3)
+                        .animation(progress == 0 ? nil : .spring(response: 0.35, dampingFraction: 0.65), value: progress)
                 }
             }
             .frame(height: 6)
@@ -41,6 +43,17 @@ struct CapacityProgressBar: View {
         .onChange(of: current) { oldValue, newValue in
             if Self.shouldCelebrate(previous: oldValue, current: newValue, maximum: maximum) {
                 HapticFeedback.success.trigger()
+            }
+
+            // Pulse on add (not on clear)
+            if newValue > oldValue && newValue > 0 {
+                HapticFeedback.light.trigger()
+                withAnimation(.easeIn(duration: 0.1)) {
+                    pulseOpacity = 1
+                }
+                withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                    pulseOpacity = 0
+                }
             }
         }
     }

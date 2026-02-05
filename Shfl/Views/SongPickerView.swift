@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum BrowseMode: String, CaseIterable {
+    case songs = "Songs"
+    case artists = "Artists"
+    case playlists = "Playlists"
+}
+
 struct SongPickerView: View {
     var player: ShufflePlayer
     let musicService: MusicService
@@ -9,6 +15,7 @@ struct SongPickerView: View {
     @State private var undoManager = SongUndoManager()
     @State private var selectedSongIds: Set<String> = []
     @State private var searchText = ""
+    @State private var browseMode: BrowseMode = .songs
 
     @Environment(\.appSettings) private var appSettings
 
@@ -29,96 +36,42 @@ struct SongPickerView: View {
             ZStack(alignment: .bottom) {
                 Group {
                     if searchText.isEmpty {
-                        browseList
+                        browseContent
                     } else {
                         searchList
                     }
                 }
 
-                if let undoState = undoManager.currentState {
-                    UndoPill(
-                        state: undoState,
-                        onUndo: { handleUndo(undoState) },
-                        onDismiss: { undoManager.dismiss() }
-                    )
-                    .padding(.bottom, 16)
-                }
-
-                if showAutofillBanner {
-                    Text(autofillMessage)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 16)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .onAppear {
-                            Task {
-                                try? await Task.sleep(for: .seconds(2))
-                                withAnimation {
-                                    viewModel.resetAutofillState()
-                                }
-                            }
-                        }
-                }
+                overlayPills
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                CapacityProgressBar(current: selectedSongIds.count, maximum: player.capacity)
+                VStack(spacing: 0) {
+                    CapacityProgressBar(current: selectedSongIds.count, maximum: player.capacity)
+                    headerBar
+                    browseModePickerBar
+                }
             }
             .navigationTitle("Add Songs")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        Menu {
-                            Picker("Sort", selection: Binding(
-                                get: { appSettings?.librarySortOption ?? .mostPlayed },
-                                set: { appSettings?.librarySortOption = $0 }
-                            )) {
-                                ForEach(SortOption.allCases, id: \.self) { option in
-                                    Text(option.displayName).tag(option)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down")
-                        }
-
-                        Button {
-                            Task {
-                                let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
-                                let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
-                                let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
-                                await viewModel.autofill(into: player, using: source)
-                                selectedSongIds = Set(player.allSongs.map(\.id))
-                            }
-                        } label: {
-                            Text("Autofill")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading)
-
-                        Button(role: .destructive) {
-                            Task { await player.removeAllSongs() }
-                            var transaction = Transaction()
-                            transaction.disablesAnimations = true
-                            withTransaction(transaction) {
-                                selectedSongIds.removeAll()
-                            }
-                        } label: {
-                            Text("Clear")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(selectedSongIds.isEmpty)
-                    }
-                }
-            }
             .searchable(text: $searchText, prompt: "Search your library")
             .task {
                 await viewModel.loadInitialPage()
             }
             .onChange(of: searchText) { _, newValue in
                 viewModel.searchText = newValue
+            }
+            .onChange(of: browseMode) { _, newMode in
+                viewModel.browseMode = newMode
+                Task {
+                    switch newMode {
+                    case .songs:
+                        await viewModel.loadInitialPage()
+                    case .artists:
+                        await viewModel.loadInitialArtists()
+                    case .playlists:
+                        await viewModel.loadInitialPlaylists()
+                    }
+                }
             }
             .onChange(of: appSettings?.librarySortOption) { _, newOption in
                 if let newOption {
@@ -138,6 +91,105 @@ struct SongPickerView: View {
         }
     }
 
+    // MARK: - Header Bar (Autofill, Clear, Sort)
+
+    private var headerBar: some View {
+        HStack(spacing: 12) {
+            if browseMode == .songs {
+                sortMenu
+            }
+
+            Spacer()
+
+            Button {
+                Task {
+                    let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
+                    let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
+                    let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
+                    await viewModel.autofill(into: player, using: source)
+                    selectedSongIds = Set(player.allSongs.map(\.id))
+                }
+            } label: {
+                Text("Autofill")
+            }
+            .buttonStyle(.bordered)
+            .disabled(selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading)
+
+            Button(role: .destructive) {
+                Task { await player.removeAllSongs() }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    selectedSongIds.removeAll()
+                }
+            } label: {
+                Text("Clear")
+            }
+            .buttonStyle(.bordered)
+            .disabled(selectedSongIds.isEmpty)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - Browse Mode Picker
+
+    private var browseModePickerBar: some View {
+        Picker("Browse", selection: $browseMode) {
+            ForEach(BrowseMode.allCases, id: \.self) { mode in
+                Text(mode.rawValue).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: Binding(
+                get: { appSettings?.librarySortOption ?? .mostPlayed },
+                set: { appSettings?.librarySortOption = $0 }
+            )) {
+                ForEach(SortOption.allCases, id: \.self) { option in
+                    Text(option.displayName).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+    }
+
+    // MARK: - Browse Content
+
+    @ViewBuilder
+    private var browseContent: some View {
+        switch browseMode {
+        case .songs:
+            browseList
+        case .artists:
+            ArtistListView(
+                viewModel: viewModel,
+                musicService: musicService,
+                selectedSongIds: $selectedSongIds,
+                isAtCapacity: selectedSongIds.count >= player.capacity,
+                onToggleSong: { toggleSong($0) }
+            )
+        case .playlists:
+            PlaylistListView(
+                viewModel: viewModel,
+                musicService: musicService,
+                selectedSongIds: $selectedSongIds,
+                isAtCapacity: selectedSongIds.count >= player.capacity,
+                onToggleSong: { toggleSong($0) }
+            )
+        }
+    }
+
+    // MARK: - Song Browse List
+
     @ViewBuilder
     private var browseList: some View {
         if viewModel.browseLoading && viewModel.browseSongs.isEmpty {
@@ -153,21 +205,32 @@ struct SongPickerView: View {
         }
     }
 
+    // MARK: - Search
+
     @ViewBuilder
     private var searchList: some View {
+        switch browseMode {
+        case .songs:
+            songSearchList
+        case .artists:
+            artistSearchList
+        case .playlists:
+            playlistSearchList
+        }
+    }
+
+    @ViewBuilder
+    private var songSearchList: some View {
         if !viewModel.searchResults.isEmpty {
-            // Have results - show them with pagination
-            searchResultsList
+            songSearchResultsList
         } else if viewModel.searchLoading || !viewModel.hasSearchedOnce {
-            // Loading or waiting for debounce - show skeleton
             skeletonList
         } else {
-            // Search completed with no results
             ContentUnavailableView.search(text: searchText)
         }
     }
 
-    private var searchResultsList: some View {
+    private var songSearchResultsList: some View {
         let isAtCapacity = selectedSongIds.count >= player.capacity
 
         return ScrollView {
@@ -195,6 +258,56 @@ struct SongPickerView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private var artistSearchList: some View {
+        if !viewModel.artistSearchResults.isEmpty {
+            artistSearchResultsList
+        } else if viewModel.artistSearchLoading || !viewModel.hasArtistSearchedOnce {
+            skeletonList
+        } else {
+            ContentUnavailableView.search(text: searchText)
+        }
+    }
+
+    private var artistSearchResultsList: some View {
+        ArtistListView(
+            viewModel: viewModel,
+            musicService: musicService,
+            selectedSongIds: $selectedSongIds,
+            isAtCapacity: selectedSongIds.count >= player.capacity,
+            onToggleSong: { toggleSong($0) },
+            searchResults: viewModel.artistSearchResults,
+            hasMoreSearchResults: viewModel.hasMoreArtistSearchResults,
+            onLoadMore: { Task { await viewModel.loadMoreArtistSearchResults() } }
+        )
+    }
+
+    @ViewBuilder
+    private var playlistSearchList: some View {
+        if !viewModel.playlistSearchResults.isEmpty {
+            playlistSearchResultsList
+        } else if viewModel.playlistSearchLoading || !viewModel.hasPlaylistSearchedOnce {
+            skeletonList
+        } else {
+            ContentUnavailableView.search(text: searchText)
+        }
+    }
+
+    private var playlistSearchResultsList: some View {
+        PlaylistListView(
+            viewModel: viewModel,
+            musicService: musicService,
+            selectedSongIds: $selectedSongIds,
+            isAtCapacity: selectedSongIds.count >= player.capacity,
+            onToggleSong: { toggleSong($0) },
+            searchResults: viewModel.playlistSearchResults,
+            hasMoreSearchResults: viewModel.hasMorePlaylistSearchResults,
+            onLoadMore: { Task { await viewModel.loadMorePlaylistSearchResults() } }
+        )
+    }
+
+    // MARK: - Shared Components
 
     private var skeletonList: some View {
         ScrollView {
@@ -235,6 +348,43 @@ struct SongPickerView: View {
             }
         }
     }
+
+    // MARK: - Overlay Pills
+
+    @ViewBuilder
+    private var overlayPills: some View {
+        VStack(spacing: 8) {
+            if let undoState = undoManager.currentState {
+                UndoPill(
+                    state: undoState,
+                    onUndo: { handleUndo(undoState) },
+                    onDismiss: { undoManager.dismiss() }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if showAutofillBanner {
+                Text(autofillMessage)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onAppear {
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
+                            withAnimation {
+                                viewModel.resetAutofillState()
+                            }
+                        }
+                    }
+            }
+        }
+        .padding(.bottom, 16)
+    }
+
+    // MARK: - Actions
 
     private func toggleSong(_ song: Song) {
         if selectedSongIds.contains(song.id) {
@@ -286,5 +436,3 @@ struct SongPickerView: View {
         return ""
     }
 }
-
-

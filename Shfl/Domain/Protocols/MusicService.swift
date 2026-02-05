@@ -21,6 +21,16 @@ struct LibraryPage: Sendable {
     let hasMore: Bool
 }
 
+struct ArtistPage: Sendable {
+    let artists: [Artist]
+    let hasMore: Bool
+}
+
+struct PlaylistPage: Sendable {
+    let playlists: [Playlist]
+    let hasMore: Bool
+}
+
 protocol MusicService: Sendable {
     /// Request authorization to access Apple Music
     func requestAuthorization() async -> Bool
@@ -37,6 +47,24 @@ protocol MusicService: Sendable {
 
     /// Search user's library for songs matching query with pagination
     func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage
+
+    /// Search user's library for artists matching query with pagination
+    func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage
+
+    /// Search user's library for playlists matching query with pagination
+    func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage
+
+    /// Fetch artists from user's library with pagination
+    func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage
+
+    /// Fetch playlists from user's library with pagination
+    func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage
+
+    /// Fetch songs by a specific artist name with pagination
+    func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage
+
+    /// Fetch songs from a specific playlist by ID with pagination
+    func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage
 
     /// Set the playback queue with songs and shuffle them
     func setQueue(songs: [Song]) async throws

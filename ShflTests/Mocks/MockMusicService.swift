@@ -69,6 +69,73 @@ actor MockMusicService: MusicService {
         return LibraryPage(songs: pageItems, hasMore: hasMore)
     }
 
+    var libraryArtists: [Artist] = []
+    var libraryPlaylists: [Playlist] = []
+    var artistSongs: [String: [Song]] = [:]
+    var playlistSongs: [String: [Song]] = [:]
+
+    func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
+        if let error = shouldThrowOnSearch { throw error }
+        let filtered = libraryArtists.filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+        }
+        let startIndex = min(offset, filtered.count)
+        let endIndex = min(offset + limit, filtered.count)
+        let pageItems = Array(filtered[startIndex..<endIndex])
+        let hasMore = endIndex < filtered.count
+        return ArtistPage(artists: pageItems, hasMore: hasMore)
+    }
+
+    func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
+        if let error = shouldThrowOnSearch { throw error }
+        let filtered = libraryPlaylists.filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+        }
+        let startIndex = min(offset, filtered.count)
+        let endIndex = min(offset + limit, filtered.count)
+        let pageItems = Array(filtered[startIndex..<endIndex])
+        let hasMore = endIndex < filtered.count
+        return PlaylistPage(playlists: pageItems, hasMore: hasMore)
+    }
+
+    func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
+        if let error = shouldThrowOnFetch { throw error }
+        let startIndex = min(offset, libraryArtists.count)
+        let endIndex = min(offset + limit, libraryArtists.count)
+        let pageItems = Array(libraryArtists[startIndex..<endIndex])
+        let hasMore = endIndex < libraryArtists.count
+        return ArtistPage(artists: pageItems, hasMore: hasMore)
+    }
+
+    func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
+        if let error = shouldThrowOnFetch { throw error }
+        let startIndex = min(offset, libraryPlaylists.count)
+        let endIndex = min(offset + limit, libraryPlaylists.count)
+        let pageItems = Array(libraryPlaylists[startIndex..<endIndex])
+        let hasMore = endIndex < libraryPlaylists.count
+        return PlaylistPage(playlists: pageItems, hasMore: hasMore)
+    }
+
+    func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        if let error = shouldThrowOnFetch { throw error }
+        let songs = artistSongs[artistName] ?? librarySongs.filter { $0.artist == artistName }
+        let startIndex = min(offset, songs.count)
+        let endIndex = min(offset + limit, songs.count)
+        let pageItems = Array(songs[startIndex..<endIndex])
+        let hasMore = endIndex < songs.count
+        return LibraryPage(songs: pageItems, hasMore: hasMore)
+    }
+
+    func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        if let error = shouldThrowOnFetch { throw error }
+        let songs = playlistSongs[playlistId] ?? []
+        let startIndex = min(offset, songs.count)
+        let endIndex = min(offset + limit, songs.count)
+        let pageItems = Array(songs[startIndex..<endIndex])
+        let hasMore = endIndex < songs.count
+        return LibraryPage(songs: pageItems, hasMore: hasMore)
+    }
+
     func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
         if let error = shouldThrowOnSearch {
             throw error

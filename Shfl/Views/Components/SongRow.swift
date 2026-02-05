@@ -8,6 +8,8 @@ struct SongRow: View, Equatable {
 
     @State private var isPressed = false
     @State private var showNope = false
+    @State private var showGlow = false
+    @State private var checkmarkBounce = false
 
     // Equatable - ignore closure, compare only data that affects rendering
     static func == (lhs: SongRow, rhs: SongRow) -> Bool {
@@ -38,11 +40,15 @@ struct SongRow: View, Equatable {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
                     .foregroundStyle(isSelected ? .blue : .gray.opacity(0.3))
-                    .scaleEffect(isPressed ? 0.9 : 1.0)
+                    .scaleEffect(checkmarkBounce ? 1.2 : (isPressed ? 0.9 : 1.0))
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
             .background(Self.backgroundColor(isSelected: isSelected))
+            .overlay(
+                Color.blue.opacity(showGlow ? 0.15 : 0)
+                    .animation(.easeOut(duration: 0.4), value: showGlow)
+            )
             .contentShape(Rectangle())
             .opacity(Self.rowOpacity(isSelected: isSelected, isAtCapacity: isAtCapacity))
             .offset(x: showNope ? -8 : 0)
@@ -70,6 +76,22 @@ struct SongRow: View, Equatable {
             HapticFeedback.light.trigger()
         } else {
             HapticFeedback.medium.trigger()
+
+            // Glow flash on add
+            showGlow = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                showGlow = false
+            }
+
+            // Checkmark bounce on add
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                checkmarkBounce = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                    checkmarkBounce = false
+                }
+            }
         }
 
         onToggle()

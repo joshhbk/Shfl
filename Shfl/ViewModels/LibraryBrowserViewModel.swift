@@ -26,7 +26,23 @@ final class LibraryBrowserViewModel {
     private(set) var hasLoadedOnce = false
     var sortOption: SortOption
 
-    // Search state
+    // Artist browse state
+    private(set) var artists: [Artist] = []
+    private(set) var artistsLoading = true
+    private(set) var hasMoreArtists = true
+    @ObservationIgnored private var hasLoadedArtists = false
+    @ObservationIgnored private var artistOffset = 0
+    @ObservationIgnored private var isLoadingMoreArtists = false
+
+    // Playlist browse state
+    private(set) var playlists: [Playlist] = []
+    private(set) var playlistsLoading = true
+    private(set) var hasMorePlaylists = true
+    @ObservationIgnored private var hasLoadedPlaylists = false
+    @ObservationIgnored private var playlistOffset = 0
+    @ObservationIgnored private var isLoadingMorePlaylists = false
+
+    // Song search state
     private(set) var searchResults: [Song] = []
     private(set) var searchLoading = false
     private(set) var hasSearchedOnce = false
@@ -34,6 +50,30 @@ final class LibraryBrowserViewModel {
     @ObservationIgnored private var searchOffset = 0
     @ObservationIgnored private var isLoadingMoreSearch = false
     @ObservationIgnored private var currentSearchQuery = ""
+
+    // Artist search state
+    private(set) var artistSearchResults: [Artist] = []
+    private(set) var artistSearchLoading = false
+    private(set) var hasArtistSearchedOnce = false
+    private(set) var hasMoreArtistSearchResults = true
+    @ObservationIgnored private var artistSearchOffset = 0
+    @ObservationIgnored private var isLoadingMoreArtistSearch = false
+
+    // Playlist search state
+    private(set) var playlistSearchResults: [Playlist] = []
+    private(set) var playlistSearchLoading = false
+    private(set) var hasPlaylistSearchedOnce = false
+    private(set) var hasMorePlaylistSearchResults = true
+    @ObservationIgnored private var playlistSearchOffset = 0
+    @ObservationIgnored private var isLoadingMorePlaylistSearch = false
+
+    // Browse mode — set by the view so search knows what to search for
+    @ObservationIgnored var browseMode: BrowseMode = .songs {
+        didSet {
+            guard browseMode != oldValue, !searchText.isEmpty else { return }
+            handleSearchTextChanged()
+        }
+    }
 
     // Shared state - searchText is NOT observed to avoid keystroke lag
     @ObservationIgnored var searchText = "" {
@@ -118,23 +158,39 @@ final class LibraryBrowserViewModel {
         if query.isEmpty {
             searchResults = []
             hasSearchedOnce = false
+            artistSearchResults = []
+            hasArtistSearchedOnce = false
+            playlistSearchResults = []
+            hasPlaylistSearchedOnce = false
             searchTask?.cancel()
             return
         }
 
-        // Reset search state for new query
-        hasSearchedOnce = false
+        // Reset search state for new query based on mode
+        switch browseMode {
+        case .songs: hasSearchedOnce = false
+        case .artists: hasArtistSearchedOnce = false
+        case .playlists: hasPlaylistSearchedOnce = false
+        }
 
         // Debounce search
+        let mode = browseMode
         debounceTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
             guard !Task.isCancelled else { return }
 
-            print("🔎 Debounced search triggered for: '\(query)'")
+            print("🔎 Debounced search triggered for: '\(query)' (mode: \(mode))")
 
             searchTask?.cancel()
             searchTask = Task {
-                await performSearch(query: query)
+                switch mode {
+                case .songs:
+                    await performSearch(query: query)
+                case .artists:
+                    await performArtistSearch(query: query)
+                case .playlists:
+                    await performPlaylistSearch(query: query)
+                }
             }
         }
     }
@@ -254,8 +310,190 @@ final class LibraryBrowserViewModel {
         isLoadingMoreSearch = false
     }
 
+    // MARK: - Artist Search Methods
+
+    func performArtistSearch(query: String) async {
+        guard !query.isEmpty else {
+            artistSearchResults = []
+            return
+        }
+
+        artistSearchLoading = true
+        artistSearchOffset = 0
+        currentSearchQuery = query
+
+        do {
+            let page = try await musicService.searchLibraryArtists(
+                query: query,
+                limit: pageSize,
+                offset: 0
+            )
+            artistSearchResults = page.artists
+            hasMoreArtistSearchResults = page.hasMore
+            artistSearchOffset = page.artists.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        artistSearchLoading = false
+        hasArtistSearchedOnce = true
+    }
+
+    func loadMoreArtistSearchResults() async {
+        guard hasMoreArtistSearchResults, !isLoadingMoreArtistSearch, !currentSearchQuery.isEmpty else { return }
+
+        isLoadingMoreArtistSearch = true
+
+        do {
+            let page = try await musicService.searchLibraryArtists(
+                query: currentSearchQuery,
+                limit: pageSize,
+                offset: artistSearchOffset
+            )
+            artistSearchResults.append(contentsOf: page.artists)
+            hasMoreArtistSearchResults = page.hasMore
+            artistSearchOffset += page.artists.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingMoreArtistSearch = false
+    }
+
+    // MARK: - Playlist Search Methods
+
+    func performPlaylistSearch(query: String) async {
+        guard !query.isEmpty else {
+            playlistSearchResults = []
+            return
+        }
+
+        playlistSearchLoading = true
+        playlistSearchOffset = 0
+        currentSearchQuery = query
+
+        do {
+            let page = try await musicService.searchLibraryPlaylists(
+                query: query,
+                limit: pageSize,
+                offset: 0
+            )
+            playlistSearchResults = page.playlists
+            hasMorePlaylistSearchResults = page.hasMore
+            playlistSearchOffset = page.playlists.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        playlistSearchLoading = false
+        hasPlaylistSearchedOnce = true
+    }
+
+    func loadMorePlaylistSearchResults() async {
+        guard hasMorePlaylistSearchResults, !isLoadingMorePlaylistSearch, !currentSearchQuery.isEmpty else { return }
+
+        isLoadingMorePlaylistSearch = true
+
+        do {
+            let page = try await musicService.searchLibraryPlaylists(
+                query: currentSearchQuery,
+                limit: pageSize,
+                offset: playlistSearchOffset
+            )
+            playlistSearchResults.append(contentsOf: page.playlists)
+            hasMorePlaylistSearchResults = page.hasMore
+            playlistSearchOffset += page.playlists.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingMorePlaylistSearch = false
+    }
+
     func clearError() {
         errorMessage = nil
+    }
+
+    // MARK: - Artist Browse Methods
+
+    func loadInitialArtists() async {
+        guard !hasLoadedArtists else {
+            artistsLoading = false
+            return
+        }
+
+        artistsLoading = true
+        artistOffset = 0
+
+        do {
+            let page = try await musicService.fetchLibraryArtists(limit: pageSize, offset: 0)
+            artists = page.artists
+            hasMoreArtists = page.hasMore
+            artistOffset = page.artists.count
+            hasLoadedArtists = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        artistsLoading = false
+    }
+
+    func loadMoreArtists() async {
+        guard hasMoreArtists, !isLoadingMoreArtists else { return }
+
+        isLoadingMoreArtists = true
+
+        do {
+            let page = try await musicService.fetchLibraryArtists(limit: pageSize, offset: artistOffset)
+            artists.append(contentsOf: page.artists)
+            hasMoreArtists = page.hasMore
+            artistOffset += page.artists.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingMoreArtists = false
+    }
+
+    // MARK: - Playlist Browse Methods
+
+    func loadInitialPlaylists() async {
+        guard !hasLoadedPlaylists else {
+            playlistsLoading = false
+            return
+        }
+
+        playlistsLoading = true
+        playlistOffset = 0
+
+        do {
+            let page = try await musicService.fetchLibraryPlaylists(limit: pageSize, offset: 0)
+            playlists = page.playlists
+            hasMorePlaylists = page.hasMore
+            playlistOffset = page.playlists.count
+            hasLoadedPlaylists = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        playlistsLoading = false
+    }
+
+    func loadMorePlaylists() async {
+        guard hasMorePlaylists, !isLoadingMorePlaylists else { return }
+
+        isLoadingMorePlaylists = true
+
+        do {
+            let page = try await musicService.fetchLibraryPlaylists(limit: pageSize, offset: playlistOffset)
+            playlists.append(contentsOf: page.playlists)
+            hasMorePlaylists = page.hasMore
+            playlistOffset += page.playlists.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingMorePlaylists = false
     }
 
     // MARK: - Autofill Methods
