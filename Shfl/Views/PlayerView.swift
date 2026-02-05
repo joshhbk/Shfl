@@ -38,6 +38,7 @@ struct PlayerView: View {
 
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
+                    hasSongs: player.songCount > 0,
                     isControlsDisabled: player.songCount == 0,
                     currentTime: progressState?.currentTime ?? 0,
                     duration: progressState?.duration ?? 0,

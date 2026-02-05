@@ -68,14 +68,19 @@ actor MockMusicService: MusicService {
         return LibraryPage(songs: pageItems, hasMore: hasMore)
     }
 
-    func searchLibrarySongs(query: String) async throws -> [Song] {
+    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
         if let error = shouldThrowOnSearch {
             throw error
         }
-        return librarySongs.filter {
+        let filtered = librarySongs.filter {
             $0.title.localizedCaseInsensitiveContains(query) ||
             $0.artist.localizedCaseInsensitiveContains(query)
         }
+        let startIndex = min(offset, filtered.count)
+        let endIndex = min(offset + limit, filtered.count)
+        let pageItems = Array(filtered[startIndex..<endIndex])
+        let hasMore = endIndex < filtered.count
+        return LibraryPage(songs: pageItems, hasMore: hasMore)
     }
 
     func setQueue(songs: [Song]) async throws {
