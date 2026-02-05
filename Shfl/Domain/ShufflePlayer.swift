@@ -77,6 +77,13 @@ final class ShufflePlayer {
     }
 
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
+        // If the queue is empty, ignore any MusicKit states with songs (they're stale)
+        if queueState.isEmpty && newState.currentSong != nil {
+            playbackState = .empty
+            lastObservedSongId = nil
+            return
+        }
+
         // MusicKit returns catalog IDs for queue entries, but our song pool uses library IDs.
         // Look up the song in our pool by title+artist to get the correct library ID,
         // but keep MusicKit's fresh artwork URL.
@@ -284,7 +291,7 @@ final class ShufflePlayer {
 
         // Stop MusicKit playback so it doesn't continue with stale queue
         await musicService.pause()
-        playbackState = .stopped
+        playbackState = .empty
 
         print("🗑️ removeAllSongs() complete: now \(queueState.songCount) songs, queueOrder has \(queueState.queueOrder.count)")
     }
