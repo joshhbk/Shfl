@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 @Observable
 @MainActor
@@ -78,13 +79,32 @@ final class LibraryBrowserViewModel {
         guard newOption != sortOption else { return }
 
         sortOption = newOption
-        hasLoadedOnce = false
-        browseSongs = []
         currentOffset = 0
         hasMorePages = true
 
         Task {
-            await loadInitialPage()
+            await loadSortedPage()
+        }
+    }
+
+    /// Loads a fresh page with current sort, animating the transition
+    private func loadSortedPage() async {
+        do {
+            let page = try await musicService.fetchLibrarySongs(
+                sortedBy: sortOption,
+                limit: pageSize,
+                offset: 0
+            )
+
+            withAnimation(.smooth) {
+                browseSongs = page.songs
+            }
+
+            hasMorePages = page.hasMore
+            currentOffset = page.songs.count
+            hasLoadedOnce = true
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

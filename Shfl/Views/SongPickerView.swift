@@ -27,15 +27,11 @@ struct SongPickerView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                VStack(spacing: 0) {
-                    CapacityProgressBar(current: selectedSongIds.count, maximum: player.capacity)
-
-                    Group {
-                        if searchText.isEmpty {
-                            browseList
-                        } else {
-                            searchList
-                        }
+                Group {
+                    if searchText.isEmpty {
+                        browseList
+                    } else {
+                        searchList
                     }
                 }
 
@@ -45,7 +41,7 @@ struct SongPickerView: View {
                         onUndo: { handleUndo(undoState) },
                         onDismiss: { undoManager.dismiss() }
                     )
-                    .padding(.bottom, 32)
+                    .padding(.bottom, 16)
                 }
 
                 if showAutofillBanner {
@@ -55,7 +51,7 @@ struct SongPickerView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 32)
+                        .padding(.bottom, 16)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .onAppear {
                             Task {
@@ -67,42 +63,54 @@ struct SongPickerView: View {
                         }
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                CapacityProgressBar(current: selectedSongIds.count, maximum: player.capacity)
+            }
             .navigationTitle("Add Songs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if viewModel.autofillState == .loading {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                    } else {
-                        Button("Autofill") {
-                            print("🔍 AUTOFILL BUTTON TAPPED")
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 16) {
+                        Menu {
+                            Picker("Sort", selection: Binding(
+                                get: { appSettings?.librarySortOption ?? .mostPlayed },
+                                set: { appSettings?.librarySortOption = $0 }
+                            )) {
+                                ForEach(SortOption.allCases, id: \.self) { option in
+                                    Text(option.displayName).tag(option)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down")
+                        }
+
+                        Button {
                             Task {
-                                print("🔍 AUTOFILL TASK STARTED")
                                 let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
                                 let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
                                 let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
-                                print("🔍 AUTOFILL CALLING viewModel.autofill...")
                                 await viewModel.autofill(into: player, using: source)
-                                print("🔍 AUTOFILL viewModel.autofill RETURNED")
-                                // Sync cached IDs after autofill
                                 selectedSongIds = Set(player.allSongs.map(\.id))
                             }
+                        } label: {
+                            Text("Autofill")
                         }
-                        .disabled(selectedSongIds.count >= player.capacity)
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Clear") {
-                        Task { await player.removeAllSongs() }
-                        // Disable animations for bulk clear to avoid 120 concurrent spring animations
-                        var transaction = Transaction()
-                        transaction.disablesAnimations = true
-                        withTransaction(transaction) {
-                            selectedSongIds.removeAll()
+                        .buttonStyle(.bordered)
+                        .disabled(selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading)
+
+                        Button(role: .destructive) {
+                            Task { await player.removeAllSongs() }
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                selectedSongIds.removeAll()
+                            }
+                        } label: {
+                            Text("Clear")
                         }
+                        .buttonStyle(.bordered)
+                        .disabled(selectedSongIds.isEmpty)
                     }
-                    .disabled(selectedSongIds.isEmpty)
                 }
             }
             .searchable(text: $searchText, prompt: "Search your library")
@@ -278,3 +286,5 @@ struct SongPickerView: View {
         return ""
     }
 }
+
+
