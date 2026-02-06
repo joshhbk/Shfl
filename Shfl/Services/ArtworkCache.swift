@@ -12,9 +12,15 @@ final class ArtworkCache {
     /// userInfo contains "songId": String
     static let artworkDidLoad = Notification.Name("ArtworkCacheDidLoad")
 
+    enum ArtworkType {
+        case song
+        case artist
+        case playlist
+    }
+
     private var cache: [String: Artwork] = [:]
     private var pending: Set<String> = []
-    private var loadQueue: [String] = []
+    private var loadQueue: [(id: String, type: ArtworkType)] = []
     private var isProcessing = false
 
     private init() {}
@@ -24,10 +30,14 @@ final class ArtworkCache {
     }
 
     func requestArtwork(for songId: String) {
-        guard cache[songId] == nil, !pending.contains(songId) else { return }
+        requestArtwork(for: songId, type: .song)
+    }
 
-        pending.insert(songId)
-        loadQueue.append(songId)
+    func requestArtwork(for id: String, type: ArtworkType) {
+        guard cache[id] == nil, !pending.contains(id) else { return }
+
+        pending.insert(id)
+        loadQueue.append((id: id, type: type))
         processQueue()
     }
 
@@ -41,7 +51,20 @@ final class ArtworkCache {
                 let batch = Array(loadQueue.prefix(5))
                 loadQueue.removeFirst(min(5, loadQueue.count))
 
-                await loadBatch(batch)
+                // Group by type for efficient batching
+                let songItems = batch.filter { $0.type == .song }
+                let artistItems = batch.filter { $0.type == .artist }
+                let playlistItems = batch.filter { $0.type == .playlist }
+
+                if !songItems.isEmpty {
+                    await loadSongBatch(songItems.map(\.id))
+                }
+                if !artistItems.isEmpty {
+                    await loadArtistBatch(artistItems.map(\.id))
+                }
+                if !playlistItems.isEmpty {
+                    await loadPlaylistBatch(playlistItems.map(\.id))
+                }
 
                 // Small delay between batches to avoid overwhelming MusicKit
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
@@ -50,7 +73,7 @@ final class ArtworkCache {
         }
     }
 
-    private func loadBatch(_ songIds: [String]) async {
+    private func loadSongBatch(_ songIds: [String]) async {
         let ids = songIds.map { MusicItemID($0) }
 
         var request = MusicLibraryRequest<MusicKit.Song>()
@@ -62,7 +85,6 @@ final class ArtworkCache {
                 let songId = song.id.rawValue
                 if let artwork = song.artwork {
                     cache[songId] = artwork
-                    // Post notification for this specific song only
                     NotificationCenter.default.post(
                         name: Self.artworkDidLoad,
                         object: nil,
@@ -72,8 +94,61 @@ final class ArtworkCache {
                 pending.remove(songId)
             }
         } catch {
-            // Remove from pending on error so they can retry
             for id in songIds {
+                pending.remove(id)
+            }
+        }
+    }
+
+    private func loadArtistBatch(_ artistIds: [String]) async {
+        let ids = artistIds.map { MusicItemID($0) }
+
+        var request = MusicLibraryRequest<MusicKit.Artist>()
+        request.filter(matching: \.id, memberOf: ids)
+
+        do {
+            let response = try await request.response()
+            for artist in response.items {
+                let artistId = artist.id.rawValue
+                if let artwork = artist.artwork {
+                    cache[artistId] = artwork
+                    NotificationCenter.default.post(
+                        name: Self.artworkDidLoad,
+                        object: nil,
+                        userInfo: ["songId": artistId]
+                    )
+                }
+                pending.remove(artistId)
+            }
+        } catch {
+            for id in artistIds {
+                pending.remove(id)
+            }
+        }
+    }
+
+    private func loadPlaylistBatch(_ playlistIds: [String]) async {
+        let ids = playlistIds.map { MusicItemID($0) }
+
+        var request = MusicLibraryRequest<MusicKit.Playlist>()
+        request.filter(matching: \.id, memberOf: ids)
+
+        do {
+            let response = try await request.response()
+            for playlist in response.items {
+                let playlistId = playlist.id.rawValue
+                if let artwork = playlist.artwork {
+                    cache[playlistId] = artwork
+                    NotificationCenter.default.post(
+                        name: Self.artworkDidLoad,
+                        object: nil,
+                        userInfo: ["songId": playlistId]
+                    )
+                }
+                pending.remove(playlistId)
+            }
+        } catch {
+            for id in playlistIds {
                 pending.remove(id)
             }
         }
