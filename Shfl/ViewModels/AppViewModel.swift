@@ -13,6 +13,7 @@ final class AppViewModel {
     @ObservationIgnored private let appSettings: AppSettings
 
     var isAuthorized = false
+    var isShuffling = false
     var isLoading = true
     var loadingMessage = "Loading..."
     var showingManage = false
@@ -162,6 +163,24 @@ final class AppViewModel {
         } catch {
             print("Failed to save songs: \(error)")
         }
+    }
+
+    func shuffleAll() async {
+        isShuffling = true
+        do {
+            let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
+            let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
+            let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
+            let songs = try await source.fetchSongs(excluding: Set(), limit: ShufflePlayer.maxSongs)
+            try player.addSongs(songs)
+            try await player.play()
+            persistSongs()
+        } catch {
+            print("Failed to shuffle all: \(error)")
+        }
+        // Clear after play() returns — view guards isShuffling in both
+        // the empty and loading slots to keep the spinner visible until .playing
+        isShuffling = false
     }
 
     func openManage() {

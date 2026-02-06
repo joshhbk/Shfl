@@ -11,6 +11,9 @@ struct SongInfoDisplay: View {
     let showProgressBar: Bool
     let onSeek: (TimeInterval) -> Void
     let onAddSongs: () -> Void
+    let onShuffle: () -> Void
+    let isShuffling: Bool
+    let onPlayPause: () -> Void
 
     init(
         playbackState: PlaybackState,
@@ -19,7 +22,10 @@ struct SongInfoDisplay: View {
         duration: TimeInterval = 0,
         showProgressBar: Bool = FeatureFlags.showProgressBar,
         onSeek: @escaping (TimeInterval) -> Void = { _ in },
-        onAddSongs: @escaping () -> Void = {}
+        onAddSongs: @escaping () -> Void = {},
+        onShuffle: @escaping () -> Void = {},
+        isShuffling: Bool = false,
+        onPlayPause: @escaping () -> Void = {}
     ) {
         self.playbackState = playbackState
         self.hasSongs = hasSongs
@@ -28,20 +34,26 @@ struct SongInfoDisplay: View {
         self.showProgressBar = showProgressBar
         self.onSeek = onSeek
         self.onAddSongs = onAddSongs
+        self.onShuffle = onShuffle
+        self.isShuffling = isShuffling
+        self.onPlayPause = onPlayPause
     }
 
     var body: some View {
         PlaybackStateContent(
             playbackState: playbackState,
             loading: { _ in
-                // Show skeleton during loading for cleaner transition to playing
-                idleContent
+                if isShuffling {
+                    emptyContent
+                } else {
+                    idleContent
+                }
             },
             active: { song in
                 activeContent(song: song)
             },
             empty: {
-                if hasSongs {
+                if hasSongs && !isShuffling {
                     idleContent
                 } else {
                     emptyContent
@@ -90,12 +102,22 @@ struct SongInfoDisplay: View {
         }
     }
 
+    private var idleContentHeight: CGFloat {
+        showProgressBar ? 80 : 33
+    }
+
     @ViewBuilder
     private var idleContent: some View {
-        // Reserve space for song info area (no visible content in idle state)
-        // Song name and artist will animate in when playback starts
-        Color.clear
-            .frame(height: showProgressBar ? 20 + 13 + 14 + 33 : 20 + 13) // title + artist + progress bar space
+        Button(action: onPlayPause) {
+            Label("Play", systemImage: "play.fill")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(ctaTextColor)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(ctaBackgroundColor, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(height: idleContentHeight)
     }
 
     @ViewBuilder
@@ -105,16 +127,47 @@ struct SongInfoDisplay: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(theme.textColor)
 
-            Button(action: onAddSongs) {
-                Label("Add Songs", systemImage: "plus")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(ctaTextColor)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(ctaBackgroundColor, in: Capsule())
+            HStack(spacing: 12) {
+                shuffleButton
+                addSongsButton
             }
-            .buttonStyle(.plain)
         }
+    }
+
+    private var shuffleButton: some View {
+        Button(action: onShuffle) {
+            shuffleButtonLabel
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(ctaBackgroundColor, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isShuffling)
+    }
+
+    @ViewBuilder
+    private var shuffleButtonLabel: some View {
+        if isShuffling {
+            ProgressView()
+                .tint(ctaTextColor)
+        } else {
+            Label("Shuffle", systemImage: "shuffle")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(ctaTextColor)
+        }
+    }
+
+    private var addSongsButton: some View {
+        Button(action: onAddSongs) {
+            Label("Add Songs", systemImage: "plus")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(ctaTextColor)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(ctaBackgroundColor, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isShuffling)
     }
 
     /// CTA button background - contrasts with theme

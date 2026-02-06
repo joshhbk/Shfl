@@ -29,7 +29,9 @@ struct MainView: View {
                     initialThemeId: appSettings.currentThemeId,
                     onManageTapped: { viewModel.openManage() },
                     onAddTapped: { viewModel.openPickerDirect() },
-                    onSettingsTapped: { viewModel.openSettings() }
+                    onSettingsTapped: { viewModel.openSettings() },
+                    onShuffle: { Task { await viewModel.shuffleAll() } },
+                    isShuffling: viewModel.isShuffling
                 )
             } else {
                 authorizationView
