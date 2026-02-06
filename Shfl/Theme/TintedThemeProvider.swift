@@ -10,6 +10,9 @@ final class TintedThemeProvider {
     /// The base theme before tinting (for reference)
     private var baseTheme: ShuffleTheme
 
+    /// Tracks whether we have ever had an album color — first tint uses a longer animation
+    private var hasHadAlbumColor = false
+
     init() {
         // Start with a default silver theme; will be updated immediately on appear
         let defaultTheme = ShuffleTheme(
@@ -36,6 +39,7 @@ final class TintedThemeProvider {
 
         guard let albumColor else {
             // No album color - use pure theme
+            hasHadAlbumColor = false
             withAnimation(.easeInOut(duration: 0.3)) {
                 computedTheme = theme
             }
@@ -55,7 +59,12 @@ final class TintedThemeProvider {
         // Determine wheel/text styles based on blended color luminance
         let (wheelStyle, textStyle, iconColor) = ColorBlending.determineStyles(for: blendedTop)
 
-        withAnimation(.easeInOut(duration: 0.3)) {
+        // First tint (e.g. from empty/idle → playing) uses a longer, gentler animation
+        // so the color wash feels intentional rather than a sudden shift
+        let duration: Double = hasHadAlbumColor ? 0.3 : 0.8
+        hasHadAlbumColor = true
+
+        withAnimation(.easeInOut(duration: duration)) {
             computedTheme = ShuffleTheme(
                 id: theme.id,
                 name: theme.name,

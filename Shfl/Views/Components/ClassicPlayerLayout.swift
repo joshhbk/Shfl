@@ -50,7 +50,10 @@ struct ClassicPlayerLayout: View {
                 currentTime: currentTime,
                 duration: duration,
                 onSeek: actions.onSeek,
-                onAddSongs: actions.onAdd
+                onAddSongs: actions.onAdd,
+                onShuffle: actions.onShuffle,
+                isShuffling: actions.isShuffling,
+                onPlayPause: actions.onPlayPause
             )
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 32)

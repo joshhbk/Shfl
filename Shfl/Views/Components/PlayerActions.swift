@@ -9,4 +9,6 @@ struct PlayerActions {
     let onAdd: () -> Void
     let onSettings: () -> Void
     let onSeek: (TimeInterval) -> Void
+    let onShuffle: () -> Void
+    let isShuffling: Bool
 }

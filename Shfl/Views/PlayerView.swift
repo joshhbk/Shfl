@@ -6,6 +6,8 @@ struct PlayerView: View {
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
+    let onShuffle: () -> Void
+    let isShuffling: Bool
 
     @Environment(\.appSettings) private var appSettings
     @State private var themeController: ThemeController
@@ -21,13 +23,17 @@ struct PlayerView: View {
         initialThemeId: String? = nil,
         onManageTapped: @escaping () -> Void,
         onAddTapped: @escaping () -> Void = {},
-        onSettingsTapped: @escaping () -> Void = {}
+        onSettingsTapped: @escaping () -> Void = {},
+        onShuffle: @escaping () -> Void = {},
+        isShuffling: Bool = false
     ) {
         self.player = player
         self.musicService = musicService
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
+        self.onShuffle = onShuffle
+        self.isShuffling = isShuffling
         self._themeController = State(wrappedValue: ThemeController(themeId: initialThemeId))
     }
 
@@ -96,7 +102,9 @@ struct PlayerView: View {
             onManage: onManageTapped,
             onAdd: onAddTapped,
             onSettings: onSettingsTapped,
-            onSeek: handleSeek
+            onSeek: handleSeek,
+            onShuffle: onShuffle,
+            isShuffling: isShuffling
         )
     }
 
