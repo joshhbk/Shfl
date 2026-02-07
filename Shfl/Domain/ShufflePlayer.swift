@@ -340,7 +340,7 @@ final class ShufflePlayer {
     // MARK: - Song Management
 
     func addSong(_ song: Song) throws {
-        print("➕ addSong(\(song.title)): current songCount=\(queueState.songCount), queueOrder=\(queueState.queueOrder.count), isActive=\(playbackState.isActive)")
+        print("➕ addSong(id=\(song.id)): current songCount=\(queueState.songCount), queueOrder=\(queueState.queueOrder.count), isActive=\(playbackState.isActive)")
         guard let newState = queueState.addingSong(song) else {
             print("➕ addSong: capacity reached!")
             throw ShufflePlayerError.capacityReached
@@ -365,11 +365,11 @@ final class ShufflePlayer {
             Task {
                 do {
                     try await musicService.insertIntoQueue(songs: [song])
-                    print("🎵 Successfully inserted \(song.title) into MusicKit queue")
+                    print("🎵 Successfully inserted song id \(song.id) into MusicKit queue")
                 } catch {
                     // Rollback: remove from queue order since MusicKit doesn't have it
                     queueState = queueState.removingFromQueueOnly(id: song.id)
-                    print("⚠️ Rolled back \(song.title) from queue after insert failure: \(error)")
+                    print("⚠️ Rolled back song id \(song.id) from queue after insert failure: \(error)")
                 }
             }
         } else {
