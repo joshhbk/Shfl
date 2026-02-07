@@ -11,109 +11,107 @@ final class PlaybackCoordinator {
     private let player: ShufflePlayer
     private let appSettings: AppSettings
 
-    private var commandInFlight = false
-    private var waitingContinuations: [CheckedContinuation<Void, Never>] = []
+    /// Serializes command execution without manual continuation management.
+    private var commandQueue: Task<Void, Never> = Task { }
 
     init(player: ShufflePlayer, appSettings: AppSettings) {
         self.player = player
         self.appSettings = appSettings
     }
 
-    private func acquireCommandLock() async {
-        guard commandInFlight else {
-            commandInFlight = true
-            return
+    private func enqueue<T>(_ operation: @escaping @MainActor () async throws -> T) async throws -> T {
+        let previous = self.commandQueue
+        let task = Task<T, Error> { @MainActor in
+            await previous.value
+            return try await operation()
         }
-
-        await withCheckedContinuation { continuation in
-            waitingContinuations.append(continuation)
+        self.commandQueue = Task {
+            _ = await task.result
         }
+        return try await task.value
     }
 
-    private func releaseCommandLock() {
-        if let continuation = waitingContinuations.first {
-            waitingContinuations.removeFirst()
-            continuation.resume()
-            return
+    private func enqueue<T>(_ operation: @escaping @MainActor () async -> T) async -> T {
+        let previous = self.commandQueue
+        let task = Task<T, Never> { @MainActor in
+            await previous.value
+            return await operation()
         }
-        commandInFlight = false
-    }
-
-    private func withCommandLock<T>(_ operation: () async throws -> T) async rethrows -> T {
-        await acquireCommandLock()
-        defer { releaseCommandLock() }
-        return try await operation()
+        self.commandQueue = Task {
+            _ = await task.value
+        }
+        return await task.value
     }
 
     func seedSongs(_ songs: [Song]) async throws {
-        try await withCommandLock {
-            try player.addSongs(songs)
+        try await enqueue { [self] in
+            try self.player.addSongs(songs)
         }
     }
 
     func prepareQueue() async throws {
-        try await withCommandLock {
-            try await player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
+        try await enqueue { [self] in
+            try await self.player.prepareQueue(algorithm: self.appSettings.shuffleAlgorithm)
         }
     }
 
     func play() async throws {
-        try await withCommandLock {
-            try await player.play(algorithm: appSettings.shuffleAlgorithm)
+        try await enqueue { [self] in
+            try await self.player.play(algorithm: self.appSettings.shuffleAlgorithm)
         }
     }
 
     func pause() async {
-        await withCommandLock {
-            await player.pause()
+        await enqueue { [self] in
+            await self.player.pause()
         }
     }
 
     func togglePlayback() async throws {
-        try await withCommandLock {
-            try await player.togglePlayback(algorithm: appSettings.shuffleAlgorithm)
+        try await enqueue { [self] in
+            try await self.player.togglePlayback(algorithm: self.appSettings.shuffleAlgorithm)
         }
     }
 
     func skipToNext() async throws {
-        try await withCommandLock {
-            try await player.skipToNext()
+        try await enqueue { [self] in
+            try await self.player.skipToNext()
         }
     }
 
     func restartOrSkipToPrevious() async throws {
-        try await withCommandLock {
-            try await player.restartOrSkipToPrevious()
+        try await enqueue { [self] in
+            try await self.player.restartOrSkipToPrevious()
         }
     }
 
     func addSong(_ song: Song) async throws {
-        try await withCommandLock {
-            try await player.addSong(song)
+        try await enqueue { [self] in
+            try await self.player.addSong(song)
         }
     }
 
     func addSongsWithQueueRebuild(_ songs: [Song]) async throws {
-        try await withCommandLock {
-            try await player.addSongsWithQueueRebuild(songs, algorithm: appSettings.shuffleAlgorithm)
+        try await enqueue { [self] in
+            try await self.player.addSongsWithQueueRebuild(songs, algorithm: self.appSettings.shuffleAlgorithm)
         }
     }
 
     func removeSong(id: String) async {
-        await withCommandLock {
-            await player.removeSong(id: id)
+        await enqueue { [self] in
+            await self.player.removeSong(id: id)
         }
     }
 
     func removeAllSongs() async {
-        await withCommandLock {
-            await player.removeAllSongs()
+        await enqueue { [self] in
+            await self.player.removeAllSongs()
         }
     }
 
     func reshuffleAlgorithm(_ algorithm: ShuffleAlgorithm) async {
-        await withCommandLock {
-            await player.reshuffleWithNewAlgorithm(algorithm)
+        await enqueue { [self] in
+            await self.player.reshuffleWithNewAlgorithm(algorithm)
         }
     }
 
@@ -123,8 +121,8 @@ final class PlaybackCoordinator {
         playedIds: Set<String>,
         playbackPosition: TimeInterval
     ) async -> Bool {
-        await withCommandLock {
-            await player.restoreSession(
+        await enqueue { [self] in
+            await self.player.restoreSession(
                 queueOrder: queueOrder,
                 currentSongId: currentSongId,
                 playedIds: playedIds,

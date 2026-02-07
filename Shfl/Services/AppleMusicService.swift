@@ -271,7 +271,7 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
     func setQueue(songs: [Song]) async throws {
         print("🎵 setQueue() called with \(songs.count) songs")
-        print("🎵 Song IDs requested: \(songs.map { "\($0.title): \($0.id)" })")
+        print("🎵 Song IDs requested: \(songs.map(\.id))")
         let ids = songs.map { MusicItemID($0.id) }
 
         // Use MusicLibraryRequest instead of MusicCatalogResourceRequest
@@ -280,7 +280,7 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("🎵 Fetching songs from library...")
         let response = try await request.response()
         print("🎵 Got \(response.items.count) songs from library")
-        print("🎵 Song IDs found: \(response.items.map { "\($0.title): \($0.id.rawValue)" } )")
+        print("🎵 Song IDs found: \(response.items.map { $0.id.rawValue })")
 
         guard !response.items.isEmpty else {
             print("🎵 No songs found, returning")
@@ -296,7 +296,7 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         if !missingSongs.isEmpty {
             print("⚠️ WARNING: \(missingSongs.count) songs NOT found in library:")
             for song in missingSongs {
-                print("⚠️   - \(song.title) by \(song.artist) (ID: \(song.id))")
+                print("⚠️   - missing song ID: \(song.id)")
             }
         }
 
@@ -304,12 +304,12 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: orderedItems.first)
         player.queue = queue
         player.state.shuffleMode = .off  // We handle shuffling ourselves
-        print("🎵 setQueue() completed with \(orderedItems.count) items, starting at \(orderedItems.first?.title ?? "nil")")
+        print("🎵 setQueue() completed with \(orderedItems.count) items, starting at id=\(orderedItems.first?.id.rawValue ?? "nil")")
     }
 
     func insertIntoQueue(songs: [Song]) async throws {
         guard !songs.isEmpty else { return }
-        print("🎵 insertIntoQueue() called with \(songs.count) songs: \(songs.map { $0.title })")
+        print("🎵 insertIntoQueue() called with \(songs.count) songs: \(songs.map(\.id))")
 
         let ids = songs.map { MusicItemID($0.id) }
 
@@ -331,7 +331,7 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         if !missingSongs.isEmpty {
             print("⚠️ WARNING: \(missingSongs.count) songs NOT found for insert:")
             for song in missingSongs {
-                print("⚠️   - \(song.title) by \(song.artist) (ID: \(song.id))")
+                print("⚠️   - missing song ID: \(song.id)")
             }
         }
 

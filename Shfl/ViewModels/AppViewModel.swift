@@ -299,7 +299,6 @@ final class AppViewModel {
 
         #if DEBUG
         print("💾 Persisting state:")
-        print("💾   currentState: \(currentState)")
         print("💾   currentSongId: \(currentSongId ?? "nil")")
         print("💾   currentSongTitle: \(currentSongTitle)")
         print("💾   playbackTime: \(playbackTime)")

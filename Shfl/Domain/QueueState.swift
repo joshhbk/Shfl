@@ -18,9 +18,6 @@ struct QueueState: Equatable, Sendable {
     /// The shuffle algorithm used for this queue.
     let algorithm: ShuffleAlgorithm
 
-    /// Fast lookup set for song pool IDs.
-    private let poolIds: Set<String>
-
     // MARK: - Initialization
 
     init(
@@ -35,7 +32,6 @@ struct QueueState: Equatable, Sendable {
         self.playedIds = playedIds
         self.currentIndex = currentIndex
         self.algorithm = algorithm
-        self.poolIds = Set(songPool.map(\.id))
     }
 
     /// Empty initial state.
@@ -84,6 +80,7 @@ struct QueueState: Equatable, Sendable {
     var isQueueStale: Bool {
         guard hasQueue else { return false }
         let queueIds = Set(queueOrder.map(\.id))
+        let poolIds = Set(songPool.map(\.id))
         return queueIds != poolIds
     }
 
@@ -104,7 +101,7 @@ struct QueueState: Equatable, Sendable {
 
     /// Check if a song is in the pool.
     func containsSong(id: String) -> Bool {
-        poolIds.contains(id)
+        songPool.contains(where: { $0.id == id })
     }
 
     /// Check if a song has been played.
@@ -118,7 +115,7 @@ struct QueueState: Equatable, Sendable {
     /// Returns nil if at capacity or song already exists.
     func addingSong(_ song: Song) -> QueueState? {
         guard songPool.count < Self.maxSongs else { return nil }
-        guard !poolIds.contains(song.id) else { return self }
+        guard !containsSong(id: song.id) else { return self }
 
         return QueueState(
             songPool: songPool + [song],
@@ -132,7 +129,8 @@ struct QueueState: Equatable, Sendable {
     /// Add multiple songs to the pool.
     /// Returns nil if exceeds capacity.
     func addingSongs(_ songs: [Song]) -> QueueState? {
-        let uniqueNewSongs = songs.filter { !poolIds.contains($0.id) }
+        let existingIds = Set(songPool.map(\.id))
+        let uniqueNewSongs = songs.filter { !existingIds.contains($0.id) }
         guard songPool.count + uniqueNewSongs.count <= Self.maxSongs else { return nil }
 
         return QueueState(
