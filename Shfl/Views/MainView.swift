@@ -17,8 +17,6 @@ struct MainView: View {
     }
 
     var body: some View {
-        @Bindable var viewModel = viewModel
-
         Group {
             if viewModel.isLoading {
                 loadingView
@@ -58,7 +56,10 @@ struct MainView: View {
                 await viewModel.onShuffleAlgorithmChanged(newAlgorithm)
             }
         }
-        .sheet(isPresented: $viewModel.showingManage) {
+        .sheet(isPresented: Binding(
+            get: { viewModel.showingManage },
+            set: { viewModel.showingManage = $0 }
+        )) {
             ManageView(
                 player: viewModel.player,
                 onAddTapped: { viewModel.openPicker() },
@@ -68,7 +69,10 @@ struct MainView: View {
                 onDismiss: { viewModel.closeManage() }
             )
             .environment(\.appSettings, appSettings)
-            .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
+            .sheet(isPresented: Binding(
+                get: { viewModel.showingPicker },
+                set: { viewModel.showingPicker = $0 }
+            ), onDismiss: { viewModel.closePicker() }) {
                 SongPickerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
@@ -81,7 +85,10 @@ struct MainView: View {
                 .environment(\.appSettings, appSettings)
             }
         }
-        .sheet(isPresented: $viewModel.showingPickerDirect, onDismiss: { viewModel.closePickerDirect() }) {
+        .sheet(isPresented: Binding(
+            get: { viewModel.showingPickerDirect },
+            set: { viewModel.showingPickerDirect = $0 }
+        ), onDismiss: { viewModel.closePickerDirect() }) {
             SongPickerView(
                 player: viewModel.player,
                 musicService: viewModel.musicService,
@@ -90,10 +97,13 @@ struct MainView: View {
                 onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
                 onRemoveAllSongs: { await viewModel.removeAllSongs() },
                 onDismiss: { viewModel.closePickerDirect() }
-            )
+                )
             .environment(\.appSettings, appSettings)
         }
-        .sheet(isPresented: $viewModel.showingSettings) {
+        .sheet(isPresented: Binding(
+            get: { viewModel.showingSettings },
+            set: { viewModel.showingSettings = $0 }
+        )) {
             SettingsView()
                 .environment(\.appSettings, appSettings)
                 .environment(\.shufflePlayer, viewModel.player)
