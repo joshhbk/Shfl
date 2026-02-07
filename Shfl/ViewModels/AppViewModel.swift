@@ -13,6 +13,7 @@ final class AppViewModel {
     @ObservationIgnored private let playbackStateRepository: PlaybackStateRepository
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
     @ObservationIgnored private let appSettings: AppSettings
+    @ObservationIgnored private let lifecyclePersistenceHook: (() -> Void)?
 
     var isAuthorized = false
     var isShuffling = false
@@ -27,7 +28,12 @@ final class AppViewModel {
     /// Whether playback state was restored from persistence
     private(set) var didRestorePlaybackState = false
 
-    init(musicService: MusicService, modelContext: ModelContext, appSettings: AppSettings) {
+    init(
+        musicService: MusicService,
+        modelContext: ModelContext,
+        appSettings: AppSettings,
+        lifecyclePersistenceHook: (() -> Void)? = nil
+    ) {
         self.musicService = musicService
         let player = ShufflePlayer(musicService: musicService)
         self.player = player
@@ -35,6 +41,7 @@ final class AppViewModel {
         self.repository = SongRepository(modelContext: modelContext)
         self.playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
         self.appSettings = appSettings
+        self.lifecyclePersistenceHook = lifecyclePersistenceHook
 
         // Setup scrobbling
         self.lastFMTransport = LastFMTransport(
@@ -70,13 +77,17 @@ final class AppViewModel {
         ) { [weak self] _ in
             // Dispatch to MainActor synchronously since we're on main queue
             MainActor.assumeIsolated {
-                guard let self else { return }
-                print("📱 App entering background - persisting state...")
-                self.persistSongs()
-                self.persistPlaybackState()
-                print("📱 State persisted")
+                self?.handleDidEnterBackground()
             }
         }
+    }
+
+    func handleDidEnterBackground() {
+        print("📱 App entering background - persisting state...")
+        persistSongs()
+        persistPlaybackState()
+        lifecyclePersistenceHook?()
+        print("📱 State persisted")
     }
 
     private func startObservingPlaybackState() {
