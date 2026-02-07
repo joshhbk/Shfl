@@ -588,9 +588,7 @@ final class ShufflePlayerTests: XCTestCase {
 
     // MARK: - Queue Rebuild with Shuffle Algorithm
 
-    func testAddSongDuringPlaybackAppliesShuffleAlgorithm() async throws {
-        UserDefaults.standard.set("artistSpacing", forKey: "shuffleAlgorithm")
-
+    func testAddSongsWithQueueRebuildDuringPlaybackAppliesInjectedShuffleAlgorithm() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist A", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
@@ -599,7 +597,7 @@ final class ShufflePlayerTests: XCTestCase {
         await mockService.resetQueueTracking()
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist B", albumTitle: "Album", artworkURL: nil)
-        try await player.addSong(song2)
+        try await player.addSongsWithQueueRebuild([song2], algorithm: .artistSpacing)
         try await Task.sleep(nanoseconds: 100_000_000)
 
         let usedAlgorithm = await player.lastUsedAlgorithm
@@ -693,8 +691,8 @@ final class ShufflePlayerTests: XCTestCase {
 
     // MARK: - Batch Add Operation
 
-    /// Documents current behavior: addSongsWithQueueRebuild uses replaceUpcomingQueue (not setQueue)
-    func testAddSongsWithQueueRebuildCallsReplaceUpcomingQueueOnce() async throws {
+    /// Documents current behavior: addSongsWithQueueRebuild uses replaceQueue (not setQueue)
+    func testAddSongsWithQueueRebuildCallsReplaceQueueOnce() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
@@ -708,11 +706,11 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSongsWithQueueRebuild(newSongs)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let replaceCallCount = await mockService.replaceUpcomingQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Batch add should call replaceUpcomingQueue once")
+        let replaceCallCount = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallCount, 1, "Batch add should call replaceQueue once")
 
         let setQueueCallCount = await mockService.setQueueCallCount
-        XCTAssertEqual(setQueueCallCount, 0, "setQueue should NOT be called - uses replaceUpcomingQueue instead")
+        XCTAssertEqual(setQueueCallCount, 0, "setQueue should NOT be called - uses replaceQueue instead")
     }
 
     func testAddSongsWithQueueRebuildIncludesAllSongs() async throws {
@@ -848,6 +846,8 @@ final class ShufflePlayerTests: XCTestCase {
         await mockService.simulatePlaybackState(.stopped)
         try await Task.sleep(nanoseconds: 100_000_000)
 
+        await mockService.resetQueueTracking()
+
         // Change algorithm while NOT active (mimic real flow: settings change + view onChange)
         UserDefaults.standard.set("artistSpacing", forKey: "shuffleAlgorithm")
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
@@ -855,6 +855,8 @@ final class ShufflePlayerTests: XCTestCase {
         // Queue should be invalidated
         let hasQueue = await player.lastShuffledQueue.isEmpty
         XCTAssertTrue(hasQueue, "Queue should be invalidated after algorithm change while not active")
+        let playCallCount = await mockService.playCallCount
+        XCTAssertEqual(playCallCount, 0, "Algorithm change while not active should not auto-play")
 
         await mockService.resetQueueTracking()
 
@@ -890,7 +892,7 @@ final class ShufflePlayerTests: XCTestCase {
         let usedAlgorithm = await player.lastUsedAlgorithm
         XCTAssertEqual(usedAlgorithm, .artistSpacing, "Algorithm should be updated")
 
-        // Queue should be rebuilt (replaceUpcomingQueue was called internally)
+        // Queue should be rebuilt (replaceQueue was called internally)
         let queuedSongs = await mockService.lastQueuedSongs
         XCTAssertFalse(queuedSongs.isEmpty, "Queue should be rebuilt with new algorithm")
     }
@@ -947,6 +949,21 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertFalse(queuedIds.contains(currentSong.id), "Played song should be excluded from reshuffle")
     }
 
+    func testDuplicateMetadataSongsUseIDFirstMapping() async throws {
+        let songA = Song(id: "a", title: "Same Title", artist: "Same Artist", albumTitle: "Album A", artworkURL: nil)
+        let songB = Song(id: "b", title: "Same Title", artist: "Same Artist", albumTitle: "Album B", artworkURL: nil)
+        try await player.addSong(songA)
+        try await player.addSong(songB)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.simulatePlaybackState(.playing(songB))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let resolvedId = await player.playbackState.currentSongId
+        XCTAssertEqual(resolvedId, "b", "Playback mapping should prioritize exact ID before metadata fallback")
+    }
+
     // MARK: - Queue Restoration
 
     /// Tests that restoreQueue restores played history correctly.
@@ -975,6 +992,8 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Verify restoration succeeded
         XCTAssertTrue(success, "Restore should succeed")
+        let playCallCount = await mockService.playCallCount
+        XCTAssertEqual(playCallCount, 0, "Restoration should not auto-start playback")
 
         // Get played history
         let restoredPlayedIds = await player.playedSongIdsForTesting
@@ -985,7 +1004,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertFalse(restoredPlayedIds.contains("3"), "Current song should not be in history")
     }
 
-    func testRestoreQueueReordersToStartFromCurrentSong() async throws {
+    func testRestoreQueuePreservesPersistedQueueOrder() async throws {
         let songs = (1...5).map { i in
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
@@ -1002,7 +1021,9 @@ final class ShufflePlayerTests: XCTestCase {
         )
 
         let queuedSongs = await mockService.lastQueuedSongs
-        XCTAssertEqual(queuedSongs.first?.id, "3", "Queue should start from current song")
+        XCTAssertEqual(queuedSongs.map(\.id), queueOrder, "Restore should preserve full persisted queue order")
+        let currentSongId = await player.playbackState.currentSongId
+        XCTAssertEqual(currentSongId, "3", "Current song should be restored within preserved queue order")
     }
 
     func testRestoreQueueFailsWithEmptySongs() async throws {
@@ -1042,6 +1063,120 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertFalse(queuedIds.contains("2"), "Invalid song 2 should be filtered out")
     }
 
+    func testRestoreQueueDoesNotAutoStartPlayback() async throws {
+        let songs = (1...3).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+
+        await mockService.resetQueueTracking()
+
+        let success = await player.restoreQueue(
+            queueOrder: ["1", "2", "3"],
+            currentSongId: "2",
+            playedIds: ["1"],
+            playbackPosition: 42
+        )
+
+        XCTAssertTrue(success, "Restore should succeed with valid state")
+        let playCallCount = await mockService.playCallCount
+        XCTAssertEqual(playCallCount, 0, "Restoring session should never trigger play()")
+        let pauseCallCount = await mockService.pauseCallCount
+        XCTAssertEqual(pauseCallCount, 0, "Restoring session should not force an extra pause() after queue restore")
+    }
+
+    func testRestoreQueueSetsPausedCurrentSongState() async throws {
+        let songs = (1...3).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+
+        let success = await player.restoreQueue(
+            queueOrder: ["1", "2", "3"],
+            currentSongId: "2",
+            playedIds: ["1"],
+            playbackPosition: 15
+        )
+        XCTAssertTrue(success, "Restore should succeed with valid state")
+
+        let state = await player.playbackState
+        guard case .paused(let song) = state else {
+            XCTFail("Expected paused state with current song after restore, got \(state)")
+            return
+        }
+        XCTAssertEqual(song.id, "2", "Restored current song should remain visible while paused")
+    }
+
+    func testRestoreQueuePreservesHydratedCurrentSongMetadata() async throws {
+        let songs = [
+            Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil),
+            Song(id: "2", title: "Queue Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil),
+            Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        ]
+        for song in songs {
+            try await player.addSong(song)
+        }
+
+        let hydratedArtwork = URL(string: "https://example.com/artwork.jpg")
+        let hydratedSong = Song(
+            id: "2",
+            title: "Hydrated Song 2",
+            artist: "Artist",
+            albumTitle: "Hydrated Album",
+            artworkURL: hydratedArtwork
+        )
+        await mockService.simulatePlaybackState(.paused(hydratedSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let success = await player.restoreQueue(
+            queueOrder: ["1", "2", "3"],
+            currentSongId: "2",
+            playedIds: ["1"],
+            playbackPosition: 20
+        )
+        XCTAssertTrue(success, "Restore should succeed with valid state")
+
+        let state = await player.playbackState
+        guard case .paused(let song) = state else {
+            XCTFail("Expected paused state with current song after restore, got \(state)")
+            return
+        }
+        XCTAssertEqual(song.id, "2")
+        XCTAssertEqual(song.title, "Hydrated Song 2", "Restore should keep transport-hydrated title when IDs match")
+        XCTAssertEqual(song.artworkURL, hydratedArtwork, "Restore should keep transport-hydrated artwork when IDs match")
+    }
+
+    func testTogglePlaybackAfterRestoreReappliesSavedPosition() async throws {
+        let songs = (1...3).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+
+        let success = await player.restoreQueue(
+            queueOrder: ["1", "2", "3"],
+            currentSongId: "2",
+            playedIds: ["1"],
+            playbackPosition: 42
+        )
+        XCTAssertTrue(success, "Restore should succeed with valid state")
+
+        await mockService.resetQueueTracking()
+
+        try await player.togglePlayback()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let seekCount = await mockService.seekCallCount
+        let lastSeekTime = await mockService.lastSeekTime
+        XCTAssertEqual(seekCount, 1, "First explicit play after restore should apply saved playback position")
+        XCTAssertEqual(lastSeekTime, 42, accuracy: 0.001, "Restore position should be re-applied on explicit play")
+    }
+
     // MARK: - Remove Song Queue Updates
 
     /// Verifies that removing an upcoming song updates the MusicKit queue.
@@ -1063,9 +1198,9 @@ final class ShufflePlayerTests: XCTestCase {
         await player.removeSong(id: songToRemove)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        // Verify replaceUpcomingQueue was called to update MusicKit
-        let replaceCallCount = await mockService.replaceUpcomingQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Should call replaceUpcomingQueue when removing upcoming song")
+        // Verify replaceQueue was called to update MusicKit
+        let replaceCallCount = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallCount, 1, "Should call replaceQueue when removing upcoming song")
 
         // Verify removed song is not in the new queue
         let lastQueued = await mockService.lastQueuedSongs
@@ -1095,5 +1230,53 @@ final class ShufflePlayerTests: XCTestCase {
         // Should have skipped to the next song
         let newCurrentSongId = await player.playbackState.currentSongId
         XCTAssertNotEqual(newCurrentSongId, currentSongId, "Should have skipped to a different song")
+    }
+
+    func testInterleavedMutationsKeepQueueAndTransportConsistent() async throws {
+        let songs = (1...5).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist \(i)", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let song6 = Song(id: "6", title: "Song 6", artist: "Artist 6", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song6)
+        await player.removeSong(id: "2")
+        await player.reshuffleWithNewAlgorithm(.artistSpacing)
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        let internalQueue = await player.lastShuffledQueue.map(\.id)
+        let transportQueue = await mockService.lastQueuedSongs.map(\.id)
+        XCTAssertEqual(
+            Set(internalQueue),
+            Set(transportQueue),
+            "Interleaved operations should keep domain queue and transport queue in sync"
+        )
+    }
+
+    func testReplaceQueueFailureKeepsStateRecoverable() async throws {
+        let songs = (1...4).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.setShouldThrowOnReplace(NSError(domain: "test", code: 99))
+        await player.reshuffleWithNewAlgorithm(.artistSpacing)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // State should remain usable despite failed queue mutation.
+        await mockService.setShouldThrowOnReplace(nil)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let state = await player.playbackState
+        XCTAssertTrue(state.isActive, "Player should remain recoverable after queue mutation failure")
     }
 }

@@ -1,15 +1,11 @@
 import SwiftUI
 
 struct LastFMSettingsView: View {
+    @Environment(\.lastFMTransport) private var transport
     @State private var isConnected = false
     @State private var username: String?
     @State private var isConnecting = false
     @State private var errorMessage: String?
-
-    private let transport = LastFMTransport(
-        apiKey: LastFMConfig.apiKey,
-        sharedSecret: LastFMConfig.sharedSecret
-    )
 
     var body: some View {
         List {
@@ -83,6 +79,7 @@ struct LastFMSettingsView: View {
     }
 
     private func checkConnectionStatus() async {
+        guard let transport else { return }
         if let session = await transport.storedSession() {
             isConnected = true
             username = session.username
@@ -94,6 +91,7 @@ struct LastFMSettingsView: View {
 
     @MainActor
     private func connect() async {
+        guard let transport else { return }
         isConnecting = true
         errorMessage = nil
 
@@ -111,6 +109,7 @@ struct LastFMSettingsView: View {
     }
 
     private func disconnect() async {
+        guard let transport else { return }
         do {
             try await transport.disconnect()
             isConnected = false

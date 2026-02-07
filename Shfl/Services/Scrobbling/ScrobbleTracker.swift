@@ -10,7 +10,7 @@ final class ScrobbleTracker {
     private var accumulatedPlayTime: TimeInterval = 0
     private var hasScrobbledCurrentSong = false
     private var isPlaying = false
-    private var checkTimer: Timer?
+    private var timerTask: Task<Void, Never>?
 
     init(scrobbleManager: ScrobbleManager, musicService: any MusicService) {
         self.scrobbleManager = scrobbleManager
@@ -18,7 +18,7 @@ final class ScrobbleTracker {
     }
 
     deinit {
-        checkTimer?.invalidate()
+        timerTask?.cancel()
     }
 
     // MARK: - Threshold Calculation (nonisolated static for testability)
@@ -76,16 +76,18 @@ final class ScrobbleTracker {
 
     private func startTimer() {
         stopTimer()
-        checkTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+        timerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { break }
                 self?.checkAndScrobble()
             }
         }
     }
 
     private func stopTimer() {
-        checkTimer?.invalidate()
-        checkTimer = nil
+        timerTask?.cancel()
+        timerTask = nil
     }
 
     private func resetTracking() {
@@ -122,7 +124,9 @@ final class ScrobbleTracker {
         let threshold = Self.scrobbleThreshold(forDurationSeconds: durationSeconds)
         let totalPlayTime = totalElapsedPlayTime()
 
+        #if DEBUG
         print("[Scrobble] ⏱️ Progress: \(Int(totalPlayTime))s / \(threshold)s threshold")
+        #endif
 
         if Int(totalPlayTime) >= threshold {
             hasScrobbledCurrentSong = true

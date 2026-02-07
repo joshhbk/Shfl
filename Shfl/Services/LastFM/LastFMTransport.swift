@@ -83,6 +83,10 @@ actor LastFMTransport: ScrobbleTransport {
         try await authenticator.clearSession()
     }
 
+    func shutdown() {
+        networkMonitor.cancel()
+    }
+
     // MARK: - Private
 
     private func setupNetworkMonitoring() {

@@ -111,7 +111,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         let player = ShufflePlayer(musicService: mockService)
         let source = LibraryAutofillSource(musicService: mockService)
 
-        await viewModel.autofill(into: player, using: source)
+        await viewModel.autofill(into: player, using: source) { songs in
+            try await player.addSongsWithQueueRebuild(songs)
+        }
 
         XCTAssertEqual(player.songCount, 50)
         XCTAssertEqual(viewModel.autofillState, .completed(count: 50))
@@ -130,7 +132,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
 
         let source = LibraryAutofillSource(musicService: mockService)
-        await viewModel.autofill(into: player, using: source)
+        await viewModel.autofill(into: player, using: source) { songs in
+            try await player.addSongsWithQueueRebuild(songs)
+        }
 
         // Should only add 20 more (120 - 100)
         XCTAssertEqual(player.songCount, 120)
@@ -149,7 +153,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         try? player.addSong(songs[1])
 
         let source = LibraryAutofillSource(musicService: mockService)
-        await viewModel.autofill(into: player, using: source)
+        await viewModel.autofill(into: player, using: source) { songs in
+            try await player.addSongsWithQueueRebuild(songs)
+        }
 
         // Should add 8 new songs (10 - 2 already added)
         XCTAssertEqual(player.songCount, 10)
@@ -164,7 +170,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
 
         let source = LibraryAutofillSource(musicService: mockService)
-        await viewModel.autofill(into: player, using: source)
+        await viewModel.autofill(into: player, using: source) { songs in
+            try await player.addSongsWithQueueRebuild(songs)
+        }
 
         XCTAssertEqual(viewModel.autofillState, .completed(count: 0))
     }
@@ -178,7 +186,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
         // Start autofill
         let task = Task {
-            await viewModel.autofill(into: player, using: source)
+            await viewModel.autofill(into: player, using: source) { songs in
+                try await player.addSongsWithQueueRebuild(songs)
+            }
         }
 
         // Note: In real implementation we'd need to check loading state during execution

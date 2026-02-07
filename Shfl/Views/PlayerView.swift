@@ -6,6 +6,9 @@ struct PlayerView: View {
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
+    let onPlayPauseTapped: () -> Void
+    let onSkipForwardTapped: () -> Void
+    let onSkipBackTapped: () -> Void
     let onShuffle: () -> Void
     let isShuffling: Bool
 
@@ -24,6 +27,9 @@ struct PlayerView: View {
         onManageTapped: @escaping () -> Void,
         onAddTapped: @escaping () -> Void = {},
         onSettingsTapped: @escaping () -> Void = {},
+        onPlayPauseTapped: @escaping () -> Void = {},
+        onSkipForwardTapped: @escaping () -> Void = {},
+        onSkipBackTapped: @escaping () -> Void = {},
         onShuffle: @escaping () -> Void = {},
         isShuffling: Bool = false
     ) {
@@ -32,6 +38,9 @@ struct PlayerView: View {
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
+        self.onPlayPauseTapped = onPlayPauseTapped
+        self.onSkipForwardTapped = onSkipForwardTapped
+        self.onSkipBackTapped = onSkipBackTapped
         self.onShuffle = onShuffle
         self.isShuffling = isShuffling
         self._themeController = State(wrappedValue: ThemeController(themeId: initialThemeId))
@@ -113,21 +122,15 @@ struct PlayerView: View {
     }
 
     private func handlePlayPause() {
-        Task {
-            try? await player.togglePlayback()
-        }
+        onPlayPauseTapped()
     }
 
     private func handleSkipForward() {
-        Task {
-            try? await player.skipToNext()
-        }
+        onSkipForwardTapped()
     }
 
     private func handleSkipBack() {
-        Task {
-            try? await player.restartOrSkipToPrevious()
-        }
+        onSkipBackTapped()
     }
 
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
@@ -197,7 +200,7 @@ private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
     }
     func setQueue(songs: [Song]) async throws {}
     func insertIntoQueue(songs: [Song]) async throws {}
-    func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws {}
+    func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {}
     func play() async throws {}
     func pause() async {}
     func skipToNext() async throws {}
