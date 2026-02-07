@@ -340,40 +340,32 @@ final class ShufflePlayer {
     // MARK: - Song Management
 
     func addSong(_ song: Song) throws {
-        print("➕ addSong(id=\(song.id)): current songCount=\(queueState.songCount), queueOrder=\(queueState.queueOrder.count), isActive=\(playbackState.isActive)")
         guard let newState = queueState.addingSong(song) else {
-            print("➕ addSong: capacity reached!")
             throw ShufflePlayerError.capacityReached
         }
 
         // Check if it was actually added (not a duplicate)
         guard newState.songCount > queueState.songCount else {
-            print("➕ addSong: already exists, skipping")
             return // Already added
         }
 
         queueState = newState
-        print("➕ addSong: added to pool, new songCount=\(queueState.songCount)")
 
         // If playing, also add to our internal queue order and MusicKit queue
         if playbackState.isActive && queueState.hasQueue {
             // Add to our internal queue order
             queueState = queueState.appendingToQueue(song)
-            print("➕ addSong: appended to queueOrder, now \(queueState.queueOrder.count) songs")
 
             // Insert into MusicKit queue (with rollback on failure)
             Task {
                 do {
                     try await musicService.insertIntoQueue(songs: [song])
-                    print("🎵 Successfully inserted song id \(song.id) into MusicKit queue")
                 } catch {
                     // Rollback: remove from queue order since MusicKit doesn't have it
                     queueState = queueState.removingFromQueueOnly(id: song.id)
-                    print("⚠️ Rolled back song id \(song.id) from queue after insert failure: \(error)")
+                    print("⚠️ Rolled back failed queue insert for one song: \(error)")
                 }
             }
-        } else {
-            print("➕ addSong: playback not active or no queue yet, song only added to pool")
         }
     }
 
