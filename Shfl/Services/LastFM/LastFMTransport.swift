@@ -8,6 +8,7 @@ actor LastFMTransport: ScrobbleTransport {
     private let networkMonitor: NWPathMonitor
 
     private var isNetworkAvailable = true
+    private var hasStartedNetworkMonitoring = false
 
     init(
         apiKey: String,
@@ -24,7 +25,9 @@ actor LastFMTransport: ScrobbleTransport {
         self.queue = LastFMQueue(storageURL: queueURL)
         self.networkMonitor = NWPathMonitor()
 
-        setupNetworkMonitoring()
+        Task { [weak self] in
+            await self?.startNetworkMonitoringIfNeeded()
+        }
     }
 
     var isAuthenticated: Bool {
@@ -89,7 +92,10 @@ actor LastFMTransport: ScrobbleTransport {
 
     // MARK: - Private
 
-    private func setupNetworkMonitoring() {
+    private func startNetworkMonitoringIfNeeded() {
+        guard !hasStartedNetworkMonitoring else { return }
+        hasStartedNetworkMonitoring = true
+
         networkMonitor.pathUpdateHandler = { [weak self] path in
             Task { [weak self] in
                 guard let self = self else { return }
