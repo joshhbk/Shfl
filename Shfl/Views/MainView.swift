@@ -17,6 +17,8 @@ struct MainView: View {
     }
 
     var body: some View {
+        let coordinator = viewModel.playbackCoordinator
+
         Group {
             if viewModel.isLoading {
                 loadingView
@@ -28,9 +30,9 @@ struct MainView: View {
                     onManageTapped: { viewModel.openManage() },
                     onAddTapped: { viewModel.openPickerDirect() },
                     onSettingsTapped: { viewModel.openSettings() },
-                    onPlayPauseTapped: { Task { await viewModel.togglePlayback() } },
-                    onSkipForwardTapped: { Task { await viewModel.skipToNext() } },
-                    onSkipBackTapped: { Task { await viewModel.restartOrSkipToPrevious() } },
+                    onPlayPauseTapped: { Task { try? await coordinator.togglePlayback() } },
+                    onSkipForwardTapped: { Task { try? await coordinator.skipToNext() } },
+                    onSkipBackTapped: { Task { try? await coordinator.restartOrSkipToPrevious() } },
                     onShuffle: { Task { await viewModel.shuffleAll() } },
                     isShuffling: viewModel.isShuffling
                 )
@@ -64,7 +66,7 @@ struct MainView: View {
                 player: viewModel.player,
                 onAddTapped: { viewModel.openPicker() },
                 onRemoveSong: { songId in
-                    Task { await viewModel.removeSong(id: songId) }
+                    Task { await coordinator.removeSong(id: songId) }
                 },
                 onDismiss: { viewModel.closeManage() }
             )
@@ -76,10 +78,10 @@ struct MainView: View {
                 SongPickerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
-                    onAddSong: { song in try await viewModel.addSong(song) },
-                    onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
-                    onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
-                    onRemoveAllSongs: { await viewModel.removeAllSongs() },
+                    onAddSong: { song in try await coordinator.addSong(song) },
+                    onAddSongsWithQueueRebuild: { songs in try await coordinator.addSongsWithQueueRebuild(songs) },
+                    onRemoveSong: { songId in await coordinator.removeSong(id: songId) },
+                    onRemoveAllSongs: { await coordinator.removeAllSongs() },
                     onDismiss: { viewModel.closePicker() }
                 )
                 .environment(\.appSettings, appSettings)
@@ -92,12 +94,12 @@ struct MainView: View {
             SongPickerView(
                 player: viewModel.player,
                 musicService: viewModel.musicService,
-                onAddSong: { song in try await viewModel.addSong(song) },
-                onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
-                onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
-                onRemoveAllSongs: { await viewModel.removeAllSongs() },
+                onAddSong: { song in try await coordinator.addSong(song) },
+                onAddSongsWithQueueRebuild: { songs in try await coordinator.addSongsWithQueueRebuild(songs) },
+                onRemoveSong: { songId in await coordinator.removeSong(id: songId) },
+                onRemoveAllSongs: { await coordinator.removeAllSongs() },
                 onDismiss: { viewModel.closePickerDirect() }
-                )
+            )
             .environment(\.appSettings, appSettings)
         }
         .sheet(isPresented: Binding(
