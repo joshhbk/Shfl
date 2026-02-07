@@ -74,7 +74,7 @@ struct SongPickerView: View {
             }
             .onChange(of: browseMode) { _, newMode in
                 viewModel.browseMode = newMode
-                Task {
+                Task { @MainActor in
                     switch newMode {
                     case .songs:
                         await viewModel.loadInitialPage()
@@ -114,7 +114,7 @@ struct SongPickerView: View {
             Spacer()
 
             Button {
-                Task {
+                Task { @MainActor in
                     let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
                     let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
                     let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
@@ -134,7 +134,7 @@ struct SongPickerView: View {
             .disabled(selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading)
 
             Button(role: .destructive) {
-                Task { await onRemoveAllSongs() }
+                Task { @MainActor in await onRemoveAllSongs() }
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
@@ -268,7 +268,7 @@ struct SongPickerView: View {
                     ProgressView()
                         .padding()
                         .onAppear {
-                            Task {
+                            Task { @MainActor in
                                 await viewModel.loadMoreSearchResults()
                             }
                         }
@@ -297,7 +297,7 @@ struct SongPickerView: View {
             onToggleSong: { toggleSong($0) },
             searchResults: viewModel.artistSearchResults,
             hasMoreSearchResults: viewModel.hasMoreArtistSearchResults,
-            onLoadMore: { Task { await viewModel.loadMoreArtistSearchResults() } }
+            onLoadMore: { Task { @MainActor in await viewModel.loadMoreArtistSearchResults() } }
         )
     }
 
@@ -321,7 +321,7 @@ struct SongPickerView: View {
             onToggleSong: { toggleSong($0) },
             searchResults: viewModel.playlistSearchResults,
             hasMoreSearchResults: viewModel.hasMorePlaylistSearchResults,
-            onLoadMore: { Task { await viewModel.loadMorePlaylistSearchResults() } }
+            onLoadMore: { Task { @MainActor in await viewModel.loadMorePlaylistSearchResults() } }
         )
     }
 
@@ -358,7 +358,7 @@ struct SongPickerView: View {
                     ProgressView()
                         .padding()
                         .onAppear {
-                            Task {
+                            Task { @MainActor in
                                 await viewModel.loadMorePages()
                             }
                         }
@@ -390,7 +390,7 @@ struct SongPickerView: View {
                     .background(.ultraThinMaterial, in: Capsule())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .onAppear {
-                        Task {
+                        Task { @MainActor in
                             try? await Task.sleep(for: .seconds(2))
                             withAnimation {
                                 viewModel.resetAutofillState()
@@ -406,11 +406,11 @@ struct SongPickerView: View {
 
     private func toggleSong(_ song: Song) {
         if selectedSongIds.contains(song.id) {
-            Task { await onRemoveSong(song.id) }
+            Task { @MainActor in await onRemoveSong(song.id) }
             selectedSongIds.remove(song.id)
             undoManager.recordAction(.removed, song: song)
         } else {
-            Task {
+            Task { @MainActor in
                 do {
                     try await onAddSong(song)
                     selectedSongIds.insert(song.id)
@@ -431,11 +431,11 @@ struct SongPickerView: View {
     private func handleUndo(_ state: UndoState) {
         switch state.action {
         case .added:
-            Task { await onRemoveSong(state.song.id) }
+            Task { @MainActor in await onRemoveSong(state.song.id) }
             selectedSongIds.remove(state.song.id)
             HapticFeedback.light.trigger()
         case .removed:
-            Task {
+            Task { @MainActor in
                 try? await onAddSong(state.song)
                 selectedSongIds.insert(state.song.id)
                 HapticFeedback.medium.trigger()

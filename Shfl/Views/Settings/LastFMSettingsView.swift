@@ -101,6 +101,8 @@ struct LastFMSettingsView: View {
             username = session.username
         } catch LastFMAuthError.cancelled {
             // User cancelled, no error to show
+        } catch let error as LastFMAuthError {
+            errorMessage = error.localizedDescription
         } catch {
             errorMessage = "Failed to connect. Please try again."
         }
