@@ -9,10 +9,10 @@ enum BrowseMode: String, CaseIterable {
 struct SongPickerView: View {
     var player: ShufflePlayer
     let musicService: MusicService
-    let onAddSong: (Song) async throws -> Void
-    let onAddSongsWithQueueRebuild: ([Song]) async throws -> Void
-    let onRemoveSong: (String) async -> Void
-    let onRemoveAllSongs: () async -> Void
+    let onAddSong: @MainActor (Song) async throws -> Void
+    let onAddSongsWithQueueRebuild: @MainActor ([Song]) async throws -> Void
+    let onRemoveSong: @MainActor (String) async -> Void
+    let onRemoveAllSongs: @MainActor () async -> Void
     let onDismiss: () -> Void
 
     @State private var viewModel: LibraryBrowserViewModel
@@ -26,10 +26,10 @@ struct SongPickerView: View {
     init(
         player: ShufflePlayer,
         musicService: MusicService,
-        onAddSong: @escaping (Song) async throws -> Void,
-        onAddSongsWithQueueRebuild: @escaping ([Song]) async throws -> Void,
-        onRemoveSong: @escaping (String) async -> Void,
-        onRemoveAllSongs: @escaping () async -> Void,
+        onAddSong: @escaping @MainActor (Song) async throws -> Void,
+        onAddSongsWithQueueRebuild: @escaping @MainActor ([Song]) async throws -> Void,
+        onRemoveSong: @escaping @MainActor (String) async -> Void,
+        onRemoveAllSongs: @escaping @MainActor () async -> Void,
         onDismiss: @escaping () -> Void
     ) {
         self.player = player

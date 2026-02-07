@@ -3,7 +3,7 @@ import SwiftUI
 struct ManageView: View {
     var player: ShufflePlayer
     let onAddTapped: () -> Void
-    let onRemoveSong: (String) -> Void
+    let onRemoveSong: @MainActor (String) -> Void
     let onDismiss: () -> Void
 
     var body: some View {
