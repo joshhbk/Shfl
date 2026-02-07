@@ -128,7 +128,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         let player = ShufflePlayer(musicService: mockService)
         // Add 100 songs first
         for i in 1...100 {
-            try? player.addSong(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+            try? await player.addSong(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
 
         let source = LibraryAutofillSource(musicService: mockService)
@@ -149,8 +149,8 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
         let player = ShufflePlayer(musicService: mockService)
         // Pre-add some songs that are also in library
-        try? player.addSong(songs[0])
-        try? player.addSong(songs[1])
+        try? await player.addSong(songs[0])
+        try? await player.addSong(songs[1])
 
         let source = LibraryAutofillSource(musicService: mockService)
         await viewModel.autofill(into: player, using: source) { songs in
@@ -166,7 +166,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         let player = ShufflePlayer(musicService: mockService)
         // Fill to capacity
         for i in 1...120 {
-            try? player.addSong(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+            try? await player.addSong(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
 
         let source = LibraryAutofillSource(musicService: mockService)
