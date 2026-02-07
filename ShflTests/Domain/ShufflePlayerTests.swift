@@ -624,7 +624,7 @@ final class ShufflePlayerTests: XCTestCase {
 
     // MARK: - MusicKit Insertion Rollback
 
-    func testAddSongDuringPlaybackRollsBackOnInsertFailure() async throws {
+    func testAddSongDuringPlaybackRollsBackOnInsertFailureBeforeReturn() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
@@ -636,9 +636,6 @@ final class ShufflePlayerTests: XCTestCase {
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
 
-        // Wait for the fire-and-forget Task to complete and roll back
-        try await Task.sleep(nanoseconds: 200_000_000)
-
         // song2 should be in pool (still available for future plays)
         let containsSong = await player.containsSong(id: "2")
         XCTAssertTrue(containsSong, "Song should remain in pool after insert failure")
@@ -646,6 +643,29 @@ final class ShufflePlayerTests: XCTestCase {
         // But NOT in the queue order (rolled back)
         let queue = await player.lastShuffledQueue
         XCTAssertFalse(queue.contains { $0.id == "2" }, "Song should be rolled back from queue after insert failure")
+    }
+
+    func testAddSongDuringPlaybackAwaitsTransportInsertionBeforeReturn() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.setInsertIntoQueueDelay(nanoseconds: 300_000_000)
+
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let start = Date()
+        try await player.addSong(song2)
+        let elapsed = Date().timeIntervalSince(start)
+
+        XCTAssertGreaterThanOrEqual(
+            elapsed,
+            0.25,
+            "addSong should not return until insertIntoQueue completes"
+        )
+
+        let insertCallCount = await mockService.insertIntoQueueCallCount
+        XCTAssertEqual(insertCallCount, 1, "addSong should perform exactly one transport insertion")
     }
 
     // MARK: - Playback Position Preservation

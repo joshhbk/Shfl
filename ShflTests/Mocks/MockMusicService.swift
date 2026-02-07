@@ -20,6 +20,7 @@ actor MockMusicService: MusicService {
     var shouldThrowOnInsert: Error?
     var shouldThrowOnReplace: Error?
     var shouldThrowOnFetch: Error?
+    var insertIntoQueueDelayNanoseconds: UInt64 = 0
 
     /// Configurable duration for testing. Access via currentSongDuration.
     nonisolated(unsafe) var mockDuration: TimeInterval = 180
@@ -172,6 +173,9 @@ actor MockMusicService: MusicService {
     }
 
     func insertIntoQueue(songs: [Song]) async throws {
+        if insertIntoQueueDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: insertIntoQueueDelayNanoseconds)
+        }
         if let error = shouldThrowOnInsert {
             throw error
         }
@@ -274,6 +278,10 @@ actor MockMusicService: MusicService {
         shouldThrowOnReplace = error
     }
 
+    func setInsertIntoQueueDelay(nanoseconds: UInt64) {
+        insertIntoQueueDelayNanoseconds = nanoseconds
+    }
+
     func resetQueueTracking() {
         setQueueCallCount = 0
         insertIntoQueueCallCount = 0
@@ -285,5 +293,6 @@ actor MockMusicService: MusicService {
         lastQueuedSongs = []
         lastInsertedSongs = []
         shouldThrowOnReplace = nil
+        insertIntoQueueDelayNanoseconds = 0
     }
 }
