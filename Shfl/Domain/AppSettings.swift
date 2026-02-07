@@ -50,6 +50,10 @@ private struct ShufflePlayerKey: EnvironmentKey {
     static let defaultValue: ShufflePlayer? = nil
 }
 
+private struct LastFMTransportKey: EnvironmentKey {
+    static let defaultValue: LastFMTransport? = nil
+}
+
 extension EnvironmentValues {
     var appSettings: AppSettings? {
         get { self[AppSettingsKey.self] }
@@ -59,5 +63,10 @@ extension EnvironmentValues {
     var shufflePlayer: ShufflePlayer? {
         get { self[ShufflePlayerKey.self] }
         set { self[ShufflePlayerKey.self] = newValue }
+    }
+
+    var lastFMTransport: LastFMTransport? {
+        get { self[LastFMTransportKey.self] }
+        set { self[LastFMTransportKey.self] = newValue }
     }
 }

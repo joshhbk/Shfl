@@ -269,10 +269,8 @@ final class QueueStateTests: XCTestCase {
 
         XCTAssertNotNil(restoredState)
         XCTAssertEqual(restoredState?.currentSongId, "4")
-        // Queue is reordered so current song is first (MusicKit always starts from first song)
-        XCTAssertEqual(restoredState?.currentIndex, 0)
-        // Queue order should be rotated: [4, 5, 1, 2, 3]
-        XCTAssertEqual(restoredState?.queueOrderIds, ["4", "5", "1", "2", "3"])
+        XCTAssertEqual(restoredState?.currentIndex, 1)
+        XCTAssertEqual(restoredState?.queueOrderIds, ["3", "4", "5", "1", "2"])
         XCTAssertTrue(restoredState?.hasPlayed(id: "3") ?? false)
     }
 
@@ -317,6 +315,21 @@ final class QueueStateTests: XCTestCase {
         )
 
         XCTAssertNil(restoredState, "Should fail when no valid songs in queue")
+    }
+
+    func testRestoredFallsBackToFirstSongWhenCurrentMissing() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        let state = QueueState.empty.addingSongs(songs)!
+
+        let restoredState = state.restored(
+            queueOrder: ["1", "2", "3"],
+            currentSongId: "missing",
+            playedIds: []
+        )
+
+        XCTAssertNotNil(restoredState)
+        XCTAssertEqual(restoredState?.currentIndex, 0)
+        XCTAssertEqual(restoredState?.currentSongId, "1")
     }
 
     // MARK: - Persistence Helpers

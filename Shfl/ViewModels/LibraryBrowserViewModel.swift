@@ -498,7 +498,11 @@ final class LibraryBrowserViewModel {
 
     // MARK: - Autofill Methods
 
-    func autofill(into player: ShufflePlayer, using source: AutofillSource) async {
+    func autofill(
+        into player: ShufflePlayer,
+        using source: AutofillSource,
+        addSongs: ([Song]) async throws -> Void
+    ) async {
         let limit = player.remainingCapacity
         print("🔍 Autofill: Starting with limit \(limit)")
         guard limit > 0 else {
@@ -515,9 +519,9 @@ final class LibraryBrowserViewModel {
             let songs = try await source.fetchSongs(excluding: excludedIds, limit: limit)
             print("🔍 Autofill: Fetched \(songs.count) songs")
 
-            print("🔍 Autofill: Calling addSongsWithQueueRebuild...")
-            try await player.addSongsWithQueueRebuild(songs)
-            print("🔍 Autofill: addSongsWithQueueRebuild complete")
+            print("🔍 Autofill: Applying songs to queue...")
+            try await addSongs(songs)
+            print("🔍 Autofill: song application complete")
 
             autofillState = .completed(count: songs.count)
             print("🔍 Autofill: Complete!")

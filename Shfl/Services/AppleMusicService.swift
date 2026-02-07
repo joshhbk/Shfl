@@ -6,12 +6,18 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
     private let player = ApplicationMusicPlayer.shared
     private var stateObservationTask: Task<Void, Never>?
     private var continuation: AsyncStream<PlaybackState>.Continuation?
+    private var cachedStream: AsyncStream<PlaybackState>?
 
     var playbackStateStream: AsyncStream<PlaybackState> {
-        AsyncStream { [weak self] continuation in
+        if let cachedStream {
+            return cachedStream
+        }
+        let stream = AsyncStream { [weak self] continuation in
             self?.continuation = continuation
             self?.startObservingPlaybackState()
         }
+        cachedStream = stream
+        return stream
     }
 
     var currentPlaybackTime: TimeInterval {
@@ -336,22 +342,17 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         print("🎵 insertIntoQueue() completed - inserted \(orderedItems.count) items")
     }
 
-    func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws {
-        print("🎵 replaceUpcomingQueue() called with \(songs.count) upcoming songs")
+    func replaceQueue(queue songs: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {
+        print("🎵 replaceQueue() called with queue=\(songs.count), startAtSongId=\(startAtSongId ?? "nil")")
 
-        // Save current playback position and state
         let savedPlaybackTime = player.playbackTime
-        let wasPlaying = player.state.playbackStatus == .playing
-        print("🎵 Saving playback time: \(savedPlaybackTime), wasPlaying: \(wasPlaying)")
 
-        // Pause first to avoid audible skip
-        if wasPlaying {
-            player.pause()
+        guard !songs.isEmpty else {
+            print("🎵 replaceQueue() no songs to queue, returning")
+            return
         }
 
-        // Build full queue: current song + upcoming songs
-        let allSongs = [currentSong] + songs
-        let ids = allSongs.map { MusicItemID($0.id) }
+        let ids = songs.map { MusicItemID($0.id) }
 
         var request = MusicLibraryRequest<MusicKit.Song>()
         request.filter(matching: \.id, memberOf: ids)
@@ -364,25 +365,37 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
         // Reorder response items to match our desired order
         let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
-        let orderedItems = allSongs.compactMap { itemsById[$0.id] }
+        let orderedItems = songs.compactMap { itemsById[$0.id] }
 
-        // Set the new queue starting from the current song
-        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: orderedItems.first)
+        guard !orderedItems.isEmpty else {
+            print("🎵 replaceQueue() no resolved MusicKit items, returning")
+            return
+        }
+
+        let startItem = startAtSongId.flatMap { id in
+            orderedItems.first(where: { $0.id.rawValue == id })
+        } ?? orderedItems.first
+
+        // Install full queue while selecting the desired current entry.
+        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: startItem)
         player.queue = queue
         player.state.shuffleMode = .off
 
-        // Resume playback if it was playing, then seek
-        if wasPlaying {
+        switch policy {
+        case .forcePlaying:
             try await player.play()
-            // Seek AFTER play() - setting before gets ignored
             player.playbackTime = savedPlaybackTime
-            print("🎵 Resumed playback at \(savedPlaybackTime)")
-        } else {
+            print("🎵 Queue updated in playing state at \(savedPlaybackTime)")
+        case .forcePaused:
+            // Prime the entry so metadata (artwork/duration) is available without autoplay.
+            try? await player.prepareToPlay()
+            player.pause()
             player.playbackTime = savedPlaybackTime
-            print("🎵 Queue updated at \(savedPlaybackTime) (paused)")
+            print("🎵 Queue updated in paused state at \(savedPlaybackTime)")
         }
 
-        print("🎵 replaceUpcomingQueue() completed with \(orderedItems.count) items")
+        emitCurrentState()
+        print("🎵 replaceQueue() completed with \(orderedItems.count) items")
     }
 
     func play() async throws {
@@ -456,12 +469,16 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
 
     private func emitCurrentState() {
         let state = mapPlaybackState()
+        #if DEBUG
         print("📻 Emitting state: \(state)")
+        #endif
         continuation?.yield(state)
     }
 
     private func mapPlaybackState() -> PlaybackState {
+        #if DEBUG
         print("📻 Mapping state - playbackStatus: \(player.state.playbackStatus)")
+        #endif
         guard let currentEntry = player.queue.currentEntry else {
             return .empty
         }
@@ -486,7 +503,9 @@ final class AppleMusicService: MusicService, @unchecked Sendable {
         case .paused:
             return .paused(song)
         case .stopped:
-            return .stopped
+            // MusicKit can report `.stopped` while a queue entry is loaded (for example after queue restore).
+            // Surface that as paused-with-song so UI can show now-playing metadata without auto-playing.
+            return .paused(song)
         case .interrupted:
             return .paused(song)
         case .seekingForward, .seekingBackward:

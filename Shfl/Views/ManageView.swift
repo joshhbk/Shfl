@@ -3,6 +3,7 @@ import SwiftUI
 struct ManageView: View {
     var player: ShufflePlayer
     let onAddTapped: () -> Void
+    let onRemoveSong: (String) -> Void
     let onDismiss: () -> Void
 
     var body: some View {
@@ -50,7 +51,7 @@ struct ManageView: View {
                     SongDisplay(song: song)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                Task { await player.removeSong(id: song.id) }
+                                onRemoveSong(song.id)
                             } label: {
                                 Label("Remove", systemImage: "trash")
                             }

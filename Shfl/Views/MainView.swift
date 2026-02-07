@@ -30,6 +30,9 @@ struct MainView: View {
                     onManageTapped: { viewModel.openManage() },
                     onAddTapped: { viewModel.openPickerDirect() },
                     onSettingsTapped: { viewModel.openSettings() },
+                    onPlayPauseTapped: { Task { await viewModel.togglePlayback() } },
+                    onSkipForwardTapped: { Task { await viewModel.skipToNext() } },
+                    onSkipBackTapped: { Task { await viewModel.restartOrSkipToPrevious() } },
                     onShuffle: { Task { await viewModel.shuffleAll() } },
                     isShuffling: viewModel.isShuffling
                 )
@@ -52,13 +55,16 @@ struct MainView: View {
         }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
             Task {
-                await viewModel.player.reshuffleWithNewAlgorithm(newAlgorithm)
+                await viewModel.onShuffleAlgorithmChanged(newAlgorithm)
             }
         }
         .sheet(isPresented: $viewModel.showingManage) {
             ManageView(
                 player: viewModel.player,
                 onAddTapped: { viewModel.openPicker() },
+                onRemoveSong: { songId in
+                    Task { await viewModel.removeSong(id: songId) }
+                },
                 onDismiss: { viewModel.closeManage() }
             )
             .environment(\.appSettings, appSettings)
@@ -66,6 +72,10 @@ struct MainView: View {
                 SongPickerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
+                    onAddSong: { song in try await viewModel.addSong(song) },
+                    onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
+                    onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
+                    onRemoveAllSongs: { await viewModel.removeAllSongs() },
                     onDismiss: { viewModel.closePicker() }
                 )
                 .environment(\.appSettings, appSettings)
@@ -75,6 +85,10 @@ struct MainView: View {
             SongPickerView(
                 player: viewModel.player,
                 musicService: viewModel.musicService,
+                onAddSong: { song in try await viewModel.addSong(song) },
+                onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
+                onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
+                onRemoveAllSongs: { await viewModel.removeAllSongs() },
                 onDismiss: { viewModel.closePickerDirect() }
             )
             .environment(\.appSettings, appSettings)
@@ -83,6 +97,7 @@ struct MainView: View {
             SettingsView()
                 .environment(\.appSettings, appSettings)
                 .environment(\.shufflePlayer, viewModel.player)
+                .environment(\.lastFMTransport, viewModel.lastFMTransport)
         }
         .alert("Authorization Required", isPresented: .init(
             get: { viewModel.authorizationError != nil },

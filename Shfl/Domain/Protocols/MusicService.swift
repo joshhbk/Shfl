@@ -31,6 +31,13 @@ struct PlaylistPage: Sendable {
     let hasMore: Bool
 }
 
+enum QueueApplyPolicy: Sendable {
+    /// Ensure queue mutation ends in a playing state.
+    case forcePlaying
+    /// Ensure queue mutation ends in paused state.
+    case forcePaused
+}
+
 protocol MusicService: Sendable {
     /// Request authorization to access Apple Music
     func requestAuthorization() async -> Bool
@@ -72,8 +79,12 @@ protocol MusicService: Sendable {
     /// Insert songs into the existing queue without disrupting playback
     func insertIntoQueue(songs: [Song]) async throws
 
-    /// Replace the upcoming queue without disrupting the current song's playback position
-    func replaceUpcomingQueue(with songs: [Song], currentSong: Song) async throws
+    /// Replace queue entries with explicit playback behavior.
+    /// - Parameters:
+    ///   - queue: Full queue order to install in transport
+    ///   - startAtSongId: Song ID that should be selected as current entry after replacement
+    ///   - policy: Explicit playback behavior to apply after queue replacement
+    func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws
 
     /// Start playback
     func play() async throws

@@ -9,6 +9,10 @@ enum BrowseMode: String, CaseIterable {
 struct SongPickerView: View {
     var player: ShufflePlayer
     let musicService: MusicService
+    let onAddSong: (Song) async throws -> Void
+    let onAddSongsWithQueueRebuild: ([Song]) async throws -> Void
+    let onRemoveSong: (String) async -> Void
+    let onRemoveAllSongs: () async -> Void
     let onDismiss: () -> Void
 
     @State private var viewModel: LibraryBrowserViewModel
@@ -22,10 +26,18 @@ struct SongPickerView: View {
     init(
         player: ShufflePlayer,
         musicService: MusicService,
+        onAddSong: @escaping (Song) async throws -> Void,
+        onAddSongsWithQueueRebuild: @escaping ([Song]) async throws -> Void,
+        onRemoveSong: @escaping (String) async -> Void,
+        onRemoveAllSongs: @escaping () async -> Void,
         onDismiss: @escaping () -> Void
     ) {
         self.player = player
         self.musicService = musicService
+        self.onAddSong = onAddSong
+        self.onAddSongsWithQueueRebuild = onAddSongsWithQueueRebuild
+        self.onRemoveSong = onRemoveSong
+        self.onRemoveAllSongs = onRemoveAllSongs
         self.onDismiss = onDismiss
         self._viewModel = State(wrappedValue: LibraryBrowserViewModel(musicService: musicService))
         self._selectedSongIds = State(wrappedValue: Set(player.allSongs.map(\.id)))
@@ -106,7 +118,13 @@ struct SongPickerView: View {
                     let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
                     let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
                     let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
-                    await viewModel.autofill(into: player, using: source)
+                    await viewModel.autofill(
+                        into: player,
+                        using: source,
+                        addSongs: { songs in
+                            try await onAddSongsWithQueueRebuild(songs)
+                        }
+                    )
                     selectedSongIds = Set(player.allSongs.map(\.id))
                 }
             } label: {
@@ -116,7 +134,7 @@ struct SongPickerView: View {
             .disabled(selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading)
 
             Button(role: .destructive) {
-                Task { await player.removeAllSongs() }
+                Task { await onRemoveAllSongs() }
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
@@ -388,22 +406,24 @@ struct SongPickerView: View {
 
     private func toggleSong(_ song: Song) {
         if selectedSongIds.contains(song.id) {
-            Task { await player.removeSong(id: song.id) }
+            Task { await onRemoveSong(song.id) }
             selectedSongIds.remove(song.id)
             undoManager.recordAction(.removed, song: song)
         } else {
-            do {
-                try player.addSong(song)
-                selectedSongIds.insert(song.id)
-                undoManager.recordAction(.added, song: song)
+            Task {
+                do {
+                    try await onAddSong(song)
+                    selectedSongIds.insert(song.id)
+                    undoManager.recordAction(.added, song: song)
 
-                if CapacityProgressBar.isMilestone(selectedSongIds.count) {
-                    HapticFeedback.milestone.trigger()
+                    if CapacityProgressBar.isMilestone(selectedSongIds.count) {
+                        HapticFeedback.milestone.trigger()
+                    }
+                } catch ShufflePlayerError.capacityReached {
+                    // Handled by SongRow's nope animation
+                } catch {
+                    // Other errors handled by alert
                 }
-            } catch ShufflePlayerError.capacityReached {
-                // Handled by SongRow's nope animation
-            } catch {
-                // Other errors handled by alert
             }
         }
     }
@@ -411,13 +431,15 @@ struct SongPickerView: View {
     private func handleUndo(_ state: UndoState) {
         switch state.action {
         case .added:
-            Task { await player.removeSong(id: state.song.id) }
+            Task { await onRemoveSong(state.song.id) }
             selectedSongIds.remove(state.song.id)
             HapticFeedback.light.trigger()
         case .removed:
-            try? player.addSong(state.song)
-            selectedSongIds.insert(state.song.id)
-            HapticFeedback.medium.trigger()
+            Task {
+                try? await onAddSong(state.song)
+                selectedSongIds.insert(state.song.id)
+                HapticFeedback.medium.trigger()
+            }
         }
         undoManager.dismiss()
     }

@@ -89,13 +89,14 @@ struct QueueState: Equatable, Sendable {
 
     /// Invalidate the queue while preserving the song pool.
     /// Used when the algorithm changes while not playing.
-    func invalidatingQueue() -> QueueState {
-        QueueState(
+    func invalidatingQueue(using algorithm: ShuffleAlgorithm? = nil) -> QueueState {
+        let effectiveAlgorithm = algorithm ?? self.algorithm
+        return QueueState(
             songPool: songPool,
             queueOrder: [],
             playedIds: [],
             currentIndex: 0,
-            algorithm: algorithm
+            algorithm: effectiveAlgorithm
         )
     }
 
@@ -187,6 +188,20 @@ struct QueueState: Equatable, Sendable {
             queueOrder: queueOrder + [song],
             playedIds: playedIds,
             currentIndex: currentIndex,
+            algorithm: algorithm
+        )
+    }
+
+    /// Align current index to an observed song ID while preserving queue order/history.
+    func settingCurrentSong(id: String) -> QueueState {
+        guard let newIndex = queueOrder.firstIndex(where: { $0.id == id }) else { return self }
+        guard newIndex != currentIndex else { return self }
+
+        return QueueState(
+            songPool: songPool,
+            queueOrder: queueOrder,
+            playedIds: playedIds,
+            currentIndex: newIndex,
             algorithm: algorithm
         )
     }
@@ -304,8 +319,8 @@ struct QueueState: Equatable, Sendable {
     ///   - playedIds: Songs that had been played
     /// - Returns: Restored state, or nil if restoration fails
     ///
-    /// Note: The queue is reordered so the current song is first. This is required
-    /// because MusicKit's setQueue always starts from the first song in the array.
+    /// Note: Queue ordering is preserved exactly as persisted so replaying the app
+    /// keeps played/current/upcoming continuity across launches.
     func restored(
         queueOrder persistedOrder: [String],
         currentSongId: String?,
@@ -323,24 +338,16 @@ struct QueueState: Equatable, Sendable {
         // Filter played IDs to only valid songs
         let validPlayedIds = persistedPlayedIds.filter { songById[$0] != nil }
 
-        // Reorder queue so current song is first (MusicKit always starts from first song)
-        let reorderedQueue: [Song]
-        if let currentId = currentSongId,
-           let currentIndex = validQueueSongs.firstIndex(where: { $0.id == currentId }) {
-            // Rotate queue to start from current song
-            let fromCurrentSong = Array(validQueueSongs[currentIndex...])
-            let beforeCurrentSong = Array(validQueueSongs[..<currentIndex])
-            reorderedQueue = fromCurrentSong + beforeCurrentSong
-        } else {
-            // Current song not found - use queue as-is
-            reorderedQueue = validQueueSongs
-        }
+        // Keep persisted order intact and locate current within that queue.
+        let restoredIndex = currentSongId.flatMap { currentId in
+            validQueueSongs.firstIndex(where: { $0.id == currentId })
+        } ?? 0
 
         return QueueState(
             songPool: songPool,
-            queueOrder: reorderedQueue,
+            queueOrder: validQueueSongs,
             playedIds: validPlayedIds,
-            currentIndex: 0,  // Current song is now at index 0
+            currentIndex: restoredIndex,
             algorithm: algorithm
         )
     }

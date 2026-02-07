@@ -6,6 +6,134 @@ enum ShufflePlayerError: Error, Equatable {
     case playbackFailed(String)
 }
 
+@MainActor
+final class PlaybackCoordinator {
+    private let player: ShufflePlayer
+    private let appSettings: AppSettings
+
+    private var commandInFlight = false
+    private var waitingContinuations: [CheckedContinuation<Void, Never>] = []
+
+    init(player: ShufflePlayer, appSettings: AppSettings) {
+        self.player = player
+        self.appSettings = appSettings
+    }
+
+    private func acquireCommandLock() async {
+        guard commandInFlight else {
+            commandInFlight = true
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waitingContinuations.append(continuation)
+        }
+    }
+
+    private func releaseCommandLock() {
+        if let continuation = waitingContinuations.first {
+            waitingContinuations.removeFirst()
+            continuation.resume()
+            return
+        }
+        commandInFlight = false
+    }
+
+    private func withCommandLock<T>(_ operation: () async throws -> T) async rethrows -> T {
+        await acquireCommandLock()
+        defer { releaseCommandLock() }
+        return try await operation()
+    }
+
+    func seedSongs(_ songs: [Song]) async throws {
+        try await withCommandLock {
+            try player.addSongs(songs)
+        }
+    }
+
+    func prepareQueue() async throws {
+        try await withCommandLock {
+            try await player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
+        }
+    }
+
+    func play() async throws {
+        try await withCommandLock {
+            try await player.play(algorithm: appSettings.shuffleAlgorithm)
+        }
+    }
+
+    func pause() async {
+        await withCommandLock {
+            await player.pause()
+        }
+    }
+
+    func togglePlayback() async throws {
+        try await withCommandLock {
+            try await player.togglePlayback(algorithm: appSettings.shuffleAlgorithm)
+        }
+    }
+
+    func skipToNext() async throws {
+        try await withCommandLock {
+            try await player.skipToNext()
+        }
+    }
+
+    func restartOrSkipToPrevious() async throws {
+        try await withCommandLock {
+            try await player.restartOrSkipToPrevious()
+        }
+    }
+
+    func addSong(_ song: Song) async throws {
+        try await withCommandLock {
+            try player.addSong(song)
+        }
+    }
+
+    func addSongsWithQueueRebuild(_ songs: [Song]) async throws {
+        try await withCommandLock {
+            try await player.addSongsWithQueueRebuild(songs, algorithm: appSettings.shuffleAlgorithm)
+        }
+    }
+
+    func removeSong(id: String) async {
+        await withCommandLock {
+            await player.removeSong(id: id)
+        }
+    }
+
+    func removeAllSongs() async {
+        await withCommandLock {
+            await player.removeAllSongs()
+        }
+    }
+
+    func reshuffleAlgorithm(_ algorithm: ShuffleAlgorithm) async {
+        await withCommandLock {
+            await player.reshuffleWithNewAlgorithm(algorithm)
+        }
+    }
+
+    func restoreSession(
+        queueOrder: [String],
+        currentSongId: String?,
+        playedIds: Set<String>,
+        playbackPosition: TimeInterval
+    ) async -> Bool {
+        await withCommandLock {
+            await player.restoreSession(
+                queueOrder: queueOrder,
+                currentSongId: currentSongId,
+                playedIds: playedIds,
+                playbackPosition: playbackPosition
+            )
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class ShufflePlayer {
@@ -25,6 +153,9 @@ final class ShufflePlayer {
 
     /// Flag to suppress history updates during multi-step operations
     @ObservationIgnored private var suppressHistoryUpdates = false
+
+    /// Deferred restore seek that is applied on first explicit user play.
+    @ObservationIgnored private var pendingRestoreSeek: (songId: String, position: TimeInterval)?
 
     // MARK: - Computed Properties (for compatibility)
 
@@ -77,22 +208,38 @@ final class ShufflePlayer {
     }
 
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
+        // MusicKit can emit .stopped while a queue/current entry still exists after restore.
+        // Preserve the visible "current song loaded but not playing" state in that case.
+        let normalizedState: PlaybackState
+        if case .stopped = newState,
+           let current = queueState.currentSong,
+           suppressHistoryUpdates {
+            normalizedState = .paused(current)
+        } else {
+            normalizedState = newState
+        }
+
         // If the queue is empty, ignore any MusicKit states with songs (they're stale)
-        if queueState.isEmpty && newState.currentSong != nil {
+        if queueState.isEmpty && normalizedState.currentSong != nil {
             playbackState = .empty
             lastObservedSongId = nil
             return
         }
 
-        // MusicKit returns catalog IDs for queue entries, but our song pool uses library IDs.
-        // Look up the song in our pool by title+artist to get the correct library ID,
-        // but keep MusicKit's fresh artwork URL.
+        // Resolve IDs in a deterministic order:
+        // 1. Exact ID match
+        // 2. Metadata fallback (title + artist + album)
         let resolvedState: PlaybackState
         let resolvedSongId: String?
 
-        if let musicKitSong = newState.currentSong,
-           let poolSong = queueState.songPool.first(where: { $0.title == musicKitSong.title && $0.artist == musicKitSong.artist }) {
-            // Found matching song in pool - use pool's ID but keep MusicKit's artwork
+        if let musicKitSong = normalizedState.currentSong,
+           let poolSong = queueState.songPool.first(where: { $0.id == musicKitSong.id }) ??
+            queueState.songPool.first(where: {
+                $0.title == musicKitSong.title &&
+                $0.artist == musicKitSong.artist &&
+                $0.albumTitle == musicKitSong.albumTitle
+            }) {
+            // Found a stable mapping in the pool. Keep MusicKit artwork freshness.
             resolvedSongId = poolSong.id
             let mergedSong = Song(
                 id: poolSong.id,
@@ -103,7 +250,7 @@ final class ShufflePlayer {
                 playCount: musicKitSong.playCount,
                 lastPlayedDate: musicKitSong.lastPlayedDate
             )
-            switch newState {
+            switch normalizedState {
             case .playing:
                 resolvedState = .playing(mergedSong)
             case .paused:
@@ -111,12 +258,16 @@ final class ShufflePlayer {
             case .loading:
                 resolvedState = .loading(mergedSong)
             default:
-                resolvedState = newState
+                resolvedState = normalizedState
             }
         } else {
             // No match in pool - use MusicKit's data as-is
-            resolvedSongId = newState.currentSongId
-            resolvedState = newState
+            resolvedSongId = normalizedState.currentSongId
+            resolvedState = normalizedState
+        }
+
+        if let resolvedSongId {
+            queueState = queueState.settingCurrentSong(id: resolvedSongId)
         }
 
         // Song changed - add previous to history (unless suppressed during operations)
@@ -136,6 +287,14 @@ final class ShufflePlayer {
             break
         }
 
+        if case .playing = resolvedState,
+           let pendingSeek = pendingRestoreSeek,
+           let resolvedSongId,
+           pendingSeek.songId == resolvedSongId {
+            pendingRestoreSeek = nil
+            musicService.seek(to: pendingSeek.position)
+        }
+
         playbackState = resolvedState
     }
 
@@ -148,7 +307,7 @@ final class ShufflePlayer {
         // If not actively playing, invalidate the queue so next play() rebuilds with the new algorithm
         guard playbackState.isActive else {
             print("🎲 Algorithm changed to \(algorithm.displayName) while not active, invalidating queue")
-            queueState = queueState.invalidatingQueue()
+            queueState = queueState.invalidatingQueue(using: algorithm)
             return
         }
 
@@ -166,12 +325,15 @@ final class ShufflePlayer {
         print("🎲 New queue order: \(queueState.queueOrder.map { "\($0.title) by \($0.artist)" })")
 
         do {
-            // Get upcoming songs (exclude current which is at index 0 after reshuffle)
-            let upcomingSongs = Array(queueState.queueOrder.dropFirst())
-            try await musicService.replaceUpcomingQueue(with: upcomingSongs, currentSong: currentSong)
-            print("🎲 replaceUpcomingQueue succeeded")
+            let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
+            try await musicService.replaceQueue(
+                queue: queueState.queueOrder,
+                startAtSongId: currentSong.id,
+                policy: policy
+            )
+            print("🎲 replaceQueue succeeded")
         } catch {
-            print("🎲 replaceUpcomingQueue FAILED: \(error)")
+            print("🎲 replaceQueue FAILED: \(error)")
         }
     }
 
@@ -224,7 +386,7 @@ final class ShufflePlayer {
     }
 
     /// Add songs and reshuffle queue if playing (interleaves new songs throughout upcoming queue)
-    func addSongsWithQueueRebuild(_ newSongs: [Song]) async throws {
+    func addSongsWithQueueRebuild(_ newSongs: [Song], algorithm: ShuffleAlgorithm? = nil) async throws {
         print("🔍 addSongsWithQueueRebuild: Received \(newSongs.count) songs")
 
         guard let newState = queueState.addingSongs(newSongs) else {
@@ -246,18 +408,21 @@ final class ShufflePlayer {
                 return
             }
 
-            // Read shuffle algorithm from UserDefaults
-            let algorithm = currentAlgorithm()
+            let effectiveAlgorithm = algorithm ?? queueState.algorithm
 
             // Reshuffle upcoming songs (this excludes played songs and current song)
-            queueState = queueState.reshuffledUpcoming(with: algorithm)
+            queueState = queueState.reshuffledUpcoming(with: effectiveAlgorithm)
 
             print("🎵 Reshuffling with \(addedCount) new songs interleaved")
 
             do {
-                let upcomingSongs = Array(queueState.queueOrder.dropFirst())
-                try await musicService.replaceUpcomingQueue(with: upcomingSongs, currentSong: currentSong)
-                print("🎵 Successfully reshuffled queue with \(upcomingSongs.count) upcoming songs")
+                let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
+                try await musicService.replaceQueue(
+                    queue: queueState.queueOrder,
+                    startAtSongId: currentSong.id,
+                    policy: policy
+                )
+                print("🎵 Successfully reshuffled queue with \(queueState.queueOrder.count) total songs")
             } catch {
                 print("🎵 Failed to reshuffle queue: \(error)")
             }
@@ -282,10 +447,14 @@ final class ShufflePlayer {
             }
         } else if let currentSong = playbackState.currentSong,
                   queueState.containsSong(id: currentSong.id) {
-            // Removing upcoming song - rebuild queue without it
-            let upcomingSongs = queueState.queueOrder.filter { $0.id != currentSong.id }
+            // Removing upcoming song - rebuild queue without it while preserving current entry.
             do {
-                try await musicService.replaceUpcomingQueue(with: upcomingSongs, currentSong: currentSong)
+                let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
+                try await musicService.replaceQueue(
+                    queue: queueState.queueOrder,
+                    startAtSongId: currentSong.id,
+                    policy: policy
+                )
                 print("🎵 Removed song \(id) from MusicKit queue")
             } catch {
                 print("🎵 Failed to remove song from MusicKit queue: \(error)")
@@ -314,7 +483,7 @@ final class ShufflePlayer {
     func prepareQueue(algorithm: ShuffleAlgorithm? = nil) async throws {
         guard !queueState.isEmpty else { return }
 
-        let effectiveAlgorithm = algorithm ?? currentAlgorithm()
+        let effectiveAlgorithm = algorithm ?? queueState.algorithm
 
         print("🎲 prepareQueue: songPool has \(queueState.songCount) songs")
 
@@ -328,7 +497,7 @@ final class ShufflePlayer {
 
     // MARK: - Playback Control
 
-    func play() async throws {
+    func play(algorithm: ShuffleAlgorithm? = nil) async throws {
         print("▶️ play() called: isEmpty=\(queueState.isEmpty), hasQueue=\(queueState.hasQueue), isQueueStale=\(queueState.isQueueStale), songCount=\(queueState.songCount)")
         guard !queueState.isEmpty else {
             print("▶️ play() early return: queue is empty")
@@ -341,7 +510,7 @@ final class ShufflePlayer {
 
         if !queueState.hasQueue || queueState.isQueueStale {
             print("▶️ play() queue needs (re)build, preparing...")
-            try await prepareQueue()
+            try await prepareQueue(algorithm: algorithm)
             // Emit loading with the actual first song from shuffled queue
             if let firstSong = queueState.currentSong {
                 playbackState = .loading(firstSong)
@@ -371,17 +540,17 @@ final class ShufflePlayer {
         try await musicService.restartOrSkipToPrevious()
     }
 
-    func togglePlayback() async throws {
+    func togglePlayback(algorithm: ShuffleAlgorithm? = nil) async throws {
         switch playbackState {
         case .empty, .stopped:
-            try await play()
+            try await play(algorithm: algorithm)
         case .playing:
             await pause()
         case .paused:
             // If we have songs but no queue (e.g., after clear + re-add), build queue first
             if !queueState.isEmpty && !queueState.hasQueue {
                 print("▶️ togglePlayback: paused but no queue, calling play() to rebuild")
-                try await play()
+                try await play(algorithm: algorithm)
             } else {
                 try await musicService.play()
             }
@@ -390,29 +559,30 @@ final class ShufflePlayer {
             break
         case .error:
             // Try to play again
-            try await play()
+            try await play(algorithm: algorithm)
         }
     }
 
     // MARK: - Queue Restoration
 
-    /// Restores the queue from persisted state.
+    /// Restores session state from persistence without auto-starting playback.
     /// - Parameters:
     ///   - queueOrder: Array of song IDs representing the queue order
     ///   - currentSongId: The ID of the song that was playing
     ///   - playedIds: Set of song IDs that have been played
     ///   - playbackPosition: The position in seconds to seek to
     /// - Returns: True if restoration was successful, false if a fresh shuffle is needed
-    func restoreQueue(
+    func restoreSession(
         queueOrder: [String],
         currentSongId: String?,
         playedIds: Set<String>,
         playbackPosition: TimeInterval
     ) async -> Bool {
-        print("🔄 restoreQueue called: songs=\(queueState.songCount), queueOrder=\(queueOrder.count), currentSongId=\(currentSongId ?? "nil")")
+        print("🔄 restoreSession called: songs=\(queueState.songCount), queueOrder=\(queueOrder.count), currentSongId=\(currentSongId ?? "nil")")
+        pendingRestoreSeek = nil
 
         guard !queueState.isEmpty else {
-            print("🔄 restoreQueue: No songs in pool, returning false")
+            print("🔄 restoreSession: No songs in pool, returning false")
             return false
         }
 
@@ -422,57 +592,72 @@ final class ShufflePlayer {
             currentSongId: currentSongId,
             playedIds: playedIds
         ) else {
-            print("🔄 restoreQueue: Failed to restore state, returning false")
+            print("🔄 restoreSession: Failed to restore state, returning false")
             return false
         }
 
         // Apply restored state
         queueState = restoredState
         lastObservedSongId = queueState.currentSongId
-        print("🔄 restoreQueue: Restored state with \(queueState.queueOrder.count) songs, current=\(queueState.currentSong?.title ?? "none")")
+        print("🔄 restoreSession: Restored state with \(queueState.queueOrder.count) songs, current=\(queueState.currentSong?.title ?? "none")")
 
         // Suppress history updates during the restore sequence
         suppressHistoryUpdates = true
         defer { suppressHistoryUpdates = false }
 
-        // Set the queue in MusicKit
+        // Restore queue and position without auto-starting playback.
         do {
-            print("🔄 restoreQueue: Setting queue with \(queueState.queueOrder.count) songs")
-            try await musicService.setQueue(songs: queueState.queueOrder)
+            print("🔄 restoreSession: Restoring queue with \(queueState.queueOrder.count) songs")
+            try await musicService.replaceQueue(
+                queue: queueState.queueOrder,
+                startAtSongId: queueState.currentSongId,
+                policy: .forcePaused
+            )
 
-            // Brief play to load the song (required for seek to work and metadata to load)
-            print("🔄 restoreQueue: Playing briefly to load song...")
-            try await musicService.play()
-
-            // Seek to saved position
+            // Seek to saved position (best-effort, no autoplay probe).
             let clampedPosition = max(0, playbackPosition)
             if clampedPosition > 0 {
-                print("🔄 restoreQueue: Seeking to position \(clampedPosition)")
+                print("🔄 restoreSession: Seeking to position \(clampedPosition)")
                 musicService.seek(to: clampedPosition)
+                if let currentSongId = queueState.currentSongId {
+                    pendingRestoreSeek = (songId: currentSongId, position: clampedPosition)
+                }
             }
 
-            // Pause - user will see restored state
-            print("🔄 restoreQueue: Pausing...")
-            await musicService.pause()
+            print("🔄 restoreSession: Applying paused state without forcing extra transport pause")
+            if let current = queueState.currentSong {
+                // Preserve richer transport metadata (artwork/title updates) when already available.
+                let hydratedCurrent: Song
+                if let observedCurrent = playbackState.currentSong, observedCurrent.id == current.id {
+                    hydratedCurrent = observedCurrent
+                } else {
+                    hydratedCurrent = current
+                }
+                playbackState = .paused(hydratedCurrent)
+            } else {
+                playbackState = .stopped
+            }
 
-            print("🔄 restoreQueue: Success!")
+            print("🔄 restoreSession: Success!")
             return true
         } catch {
-            print("🔄 restoreQueue: Failed to set queue: \(error)")
+            print("🔄 restoreSession: Failed to set queue: \(error)")
             return false
         }
     }
 
-    /// Resumes playback after restoration (call after restoreQueue succeeds)
-    func resumeAfterRestore() async throws {
-        try await musicService.play()
-    }
-
-    // MARK: - Helpers
-
-    private func currentAlgorithm() -> ShuffleAlgorithm {
-        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
-            ?? ShuffleAlgorithm.noRepeat.rawValue
-        return ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
+    /// Backward-compat wrapper.
+    func restoreQueue(
+        queueOrder: [String],
+        currentSongId: String?,
+        playedIds: Set<String>,
+        playbackPosition: TimeInterval
+    ) async -> Bool {
+        await restoreSession(
+            queueOrder: queueOrder,
+            currentSongId: currentSongId,
+            playedIds: playedIds,
+            playbackPosition: playbackPosition
+        )
     }
 }
