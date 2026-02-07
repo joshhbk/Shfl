@@ -90,4 +90,16 @@ struct LastFMAuthenticatorTests {
         let retrieved = await authenticator.storedSession()
         #expect(retrieved == nil)
     }
+
+    @Test("Missing presentation anchor error is user-facing")
+    func missingPresentationAnchorErrorDescription() {
+        let error = LastFMAuthError.missingPresentationAnchor
+        #expect(error.errorDescription?.contains("No active window") == true)
+    }
+
+    @Test("Authentication failure preserves message")
+    func authenticationFailureMessage() {
+        let error = LastFMAuthError.authenticationFailed("Custom message")
+        #expect(error.errorDescription == "Custom message")
+    }
 }

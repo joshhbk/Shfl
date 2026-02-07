@@ -13,6 +13,24 @@ enum LastFMAuthError: Error {
     case authenticationFailed(String)
     case tokenExchangeFailed
     case cancelled
+    case missingPresentationAnchor
+}
+
+extension LastFMAuthError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .keychainError:
+            return "Unable to securely store Last.fm session."
+        case let .authenticationFailed(message):
+            return message
+        case .tokenExchangeFailed:
+            return "Unable to complete Last.fm sign-in."
+        case .cancelled:
+            return nil
+        case .missingPresentationAnchor:
+            return "No active window is available to present Last.fm sign-in. Try again once the app window is active."
+        }
+    }
 }
 
 actor LastFMAuthenticator {
@@ -120,7 +138,11 @@ actor LastFMAuthenticator {
 
     @MainActor
     private func performWebAuth(url: URL) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
+        guard WebAuthContextProvider.shared.currentPresentationAnchor() != nil else {
+            throw LastFMAuthError.missingPresentationAnchor
+        }
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             let session = ASWebAuthenticationSession(
                 url: url,
                 callbackURLScheme: "shfl"
@@ -148,7 +170,10 @@ actor LastFMAuthenticator {
 
             session.prefersEphemeralWebBrowserSession = false
             session.presentationContextProvider = WebAuthContextProvider.shared
-            session.start()
+            guard session.start() else {
+                continuation.resume(throwing: LastFMAuthError.authenticationFailed("Unable to start Last.fm sign-in. Please try again."))
+                return
+            }
         }
     }
 
@@ -201,11 +226,46 @@ final class WebAuthContextProvider: NSObject, ASWebAuthenticationPresentationCon
         super.init()
     }
 
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = scene.windows.first else {
-            fatalError("No window available for authentication")
+    func currentPresentationAnchor() -> ASPresentationAnchor? {
+        let windowScenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .sorted { lhs, rhs in
+                lhs.activationState.sortPriority < rhs.activationState.sortPriority
+            }
+
+        for scene in windowScenes {
+            if let keyWindow = scene.windows.first(where: { $0.isKeyWindow }) {
+                return keyWindow
+            }
+            if let visibleWindow = scene.windows.first(where: { !$0.isHidden }) {
+                return visibleWindow
+            }
+            if let anyWindow = scene.windows.first {
+                return anyWindow
+            }
         }
-        return window
+
+        return nil
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        currentPresentationAnchor() ?? ASPresentationAnchor()
+    }
+}
+
+private extension UIScene.ActivationState {
+    var sortPriority: Int {
+        switch self {
+        case .foregroundActive:
+            return 0
+        case .foregroundInactive:
+            return 1
+        case .background:
+            return 2
+        case .unattached:
+            return 3
+        @unknown default:
+            return 4
+        }
     }
 }
