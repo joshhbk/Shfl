@@ -6,37 +6,51 @@ import SwiftUI
 @Observable
 @MainActor
 final class AppSettings {
+    @ObservationIgnored private let defaults: UserDefaults
+
     var shuffleAlgorithm: ShuffleAlgorithm {
         didSet {
             guard shuffleAlgorithm != oldValue else { return }
-            UserDefaults.standard.set(shuffleAlgorithm.rawValue, forKey: "shuffleAlgorithm")
+            defaults.set(shuffleAlgorithm.rawValue, forKey: "shuffleAlgorithm")
         }
     }
 
     var librarySortOption: SortOption {
         didSet {
             guard librarySortOption != oldValue else { return }
-            UserDefaults.standard.set(librarySortOption.rawValue, forKey: "librarySortOption")
+            defaults.set(librarySortOption.rawValue, forKey: "librarySortOption")
         }
     }
 
     var currentThemeId: String {
         didSet {
             guard currentThemeId != oldValue else { return }
-            UserDefaults.standard.set(currentThemeId, forKey: "currentThemeId")
+            defaults.set(currentThemeId, forKey: "currentThemeId")
         }
     }
 
-    init() {
-        let algorithmRaw = UserDefaults.standard.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
+    var autofillAlgorithm: AutofillAlgorithm {
+        didSet {
+            guard autofillAlgorithm != oldValue else { return }
+            defaults.set(autofillAlgorithm.rawValue, forKey: "autofillAlgorithm")
+        }
+    }
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+
+        let algorithmRaw = defaults.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
         self.shuffleAlgorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
 
-        let sortRaw = UserDefaults.standard.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
+        let sortRaw = defaults.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
         self.librarySortOption = SortOption(rawValue: sortRaw) ?? .mostPlayed
 
-        self.currentThemeId = UserDefaults.standard.string(forKey: "currentThemeId")
+        self.currentThemeId = defaults.string(forKey: "currentThemeId")
             ?? ShuffleTheme.allThemes.randomElement()?.id
             ?? "pink"
+
+        let autofillRaw = defaults.string(forKey: "autofillAlgorithm") ?? AutofillAlgorithm.random.rawValue
+        self.autofillAlgorithm = AutofillAlgorithm(rawValue: autofillRaw) ?? .random
     }
 }
 

@@ -106,12 +106,9 @@ final class LibraryBrowserViewModel {
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var debounceTask: Task<Void, Never>?
 
-    init(musicService: MusicService) {
+    init(musicService: MusicService, initialSortOption: SortOption = .mostPlayed) {
         self.musicService = musicService
-
-        // Read sort option from UserDefaults
-        let savedRaw = UserDefaults.standard.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
-        self.sortOption = SortOption(rawValue: savedRaw) ?? .mostPlayed
+        self.sortOption = initialSortOption
     }
 
     /// Called when sort option changes. Views should call this via onChange(of: appSettings.librarySortOption).

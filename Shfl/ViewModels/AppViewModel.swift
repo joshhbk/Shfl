@@ -198,9 +198,10 @@ final class AppViewModel {
     func shuffleAll() async {
         isShuffling = true
         do {
-            let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
-            let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
-            let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
+            let source = LibraryAutofillSource(
+                musicService: musicService,
+                algorithm: appSettings.autofillAlgorithm
+            )
             let songs = try await source.fetchSongs(excluding: Set(), limit: ShufflePlayer.maxSongs)
             try await playbackCoordinator.seedSongs(songs)
             try await playbackCoordinator.play()

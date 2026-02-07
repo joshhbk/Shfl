@@ -17,6 +17,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.searchText, "")
         XCTAssertEqual(viewModel.currentMode, .browse)
         XCTAssertTrue(viewModel.isLoading)  // Starts true to show skeleton
+        XCTAssertEqual(viewModel.sortOption, .mostPlayed)
     }
 
     func test_currentMode_switchesToSearchWhenTextEntered() {
