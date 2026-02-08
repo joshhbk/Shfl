@@ -163,7 +163,7 @@ struct PlayerView: View {
 
 // MARK: - Previews
 
-private final class PreviewMockMusicService: MusicService, @unchecked Sendable {
+private final class PreviewMockMusicService: MusicService {
     let initialState: PlaybackState
 
     init(initialState: PlaybackState = .empty) {
