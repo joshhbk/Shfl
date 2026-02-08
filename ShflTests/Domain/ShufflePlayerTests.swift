@@ -634,7 +634,16 @@ final class ShufflePlayerTests: XCTestCase {
         await mockService.setShouldThrowOnInsert(NSError(domain: "test", code: 1))
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
-        try await player.addSong(song2)
+        do {
+            try await player.addSong(song2)
+            XCTFail("Expected addSong to throw when transport insertion fails")
+        } catch let error as ShufflePlayerError {
+            guard case .playbackFailed(let message) = error else {
+                XCTFail("Expected playbackFailed error, got \(error)")
+                return
+            }
+            XCTAssertFalse(message.isEmpty, "Error should include a user-facing message")
+        }
 
         // song2 should be in pool (still available for future plays)
         let containsSong = await player.containsSong(id: "2")
@@ -643,6 +652,9 @@ final class ShufflePlayerTests: XCTestCase {
         // But NOT in the queue order (rolled back)
         let queue = await player.lastShuffledQueue
         XCTAssertFalse(queue.contains { $0.id == "2" }, "Song should be rolled back from queue after insert failure")
+
+        let notice = await player.operationNotice
+        XCTAssertNotNil(notice, "Transport failure should surface a non-blocking notice")
     }
 
     func testAddSongDuringPlaybackAwaitsTransportInsertionBeforeReturn() async throws {
@@ -731,6 +743,57 @@ final class ShufflePlayerTests: XCTestCase {
 
         let setQueueCallCount = await mockService.setQueueCallCount
         XCTAssertEqual(setQueueCallCount, 0, "setQueue should NOT be called - uses replaceQueue instead")
+    }
+
+    func testAddSongsWithQueueRebuildThrowsAndRecoversWhenReplaceFails() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let queueBeforeFailure = await player.lastShuffledQueue.map(\.id)
+
+        await mockService.setShouldThrowOnReplace(
+            NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+        )
+
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        do {
+            try await player.addSongsWithQueueRebuild([song3])
+            XCTFail("Expected addSongsWithQueueRebuild to throw when replaceQueue fails")
+        } catch let error as ShufflePlayerError {
+            guard case .playbackFailed(let message) = error else {
+                XCTFail("Expected playbackFailed error, got \(error)")
+                return
+            }
+            XCTAssertFalse(message.isEmpty, "Error should include a user-facing message")
+        }
+
+        let queueAfterFailure = await player.lastShuffledQueue.map(\.id)
+        XCTAssertEqual(
+            queueAfterFailure,
+            queueBeforeFailure,
+            "Queue order should roll back to pre-rebuild state on replace failure"
+        )
+
+        let containsSong3 = await player.containsSong(id: "3")
+        XCTAssertTrue(containsSong3, "Added songs should remain in pool after replace failure")
+
+        let notice = await player.operationNotice
+        XCTAssertNotNil(notice, "Transport failure should surface a non-blocking notice")
+
+        await mockService.setShouldThrowOnReplace(nil)
+        await mockService.resetQueueTracking()
+
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let setQueueCallCount = await mockService.setQueueCallCount
+        XCTAssertEqual(setQueueCallCount, 1, "Stale queue should rebuild on next play")
+        let rebuiltQueue = await player.lastShuffledQueue.map(\.id)
+        XCTAssertTrue(rebuiltQueue.contains("3"), "Rebuilt queue should include deferred song")
     }
 
     func testAddSongsWithQueueRebuildIncludesAllSongs() async throws {
@@ -1231,6 +1294,40 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertFalse(containsSong, "Song should be removed from internal list")
     }
 
+    func testRemoveUpcomingSongRollsBackWhenReplaceFails() async throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song1)
+        try await player.addSong(song2)
+        try await player.addSong(song3)
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let currentSongId = await player.playbackState.currentSongId
+        let songToRemove = currentSongId == "1" ? "2" : "1"
+        let queueBeforeFailure = await player.lastShuffledQueue.map(\.id)
+
+        await mockService.setShouldThrowOnReplace(
+            NSError(domain: NSURLErrorDomain, code: NSURLErrorNetworkConnectionLost)
+        )
+        await player.removeSong(id: songToRemove)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let queueAfterFailure = await player.lastShuffledQueue.map(\.id)
+        XCTAssertEqual(
+            queueAfterFailure,
+            queueBeforeFailure,
+            "Queue should roll back to previous state when remove replaceQueue fails"
+        )
+
+        let containsSong = await player.containsSong(id: songToRemove)
+        XCTAssertTrue(containsSong, "Failed remove should not silently drop local song state")
+
+        let notice = await player.operationNotice
+        XCTAssertNotNil(notice, "Transport failure should surface a non-blocking notice")
+    }
+
     /// Verifies that removing the currently playing song skips to next.
     func testRemoveCurrentSongSkipsToNext() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1287,9 +1384,21 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
+        let queueBeforeFailure = await player.lastShuffledQueue.map(\.id)
+
         await mockService.setShouldThrowOnReplace(NSError(domain: "test", code: 99))
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
         try await Task.sleep(nanoseconds: 100_000_000)
+
+        let queueAfterFailure = await player.lastShuffledQueue.map(\.id)
+        XCTAssertEqual(
+            queueAfterFailure,
+            queueBeforeFailure,
+            "Reshuffle failure should roll back to the previous queue state"
+        )
+
+        let notice = await player.operationNotice
+        XCTAssertNotNil(notice, "Reshuffle failure should publish a non-blocking notice")
 
         // State should remain usable despite failed queue mutation.
         await mockService.setShouldThrowOnReplace(nil)

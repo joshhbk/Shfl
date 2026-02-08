@@ -9,6 +9,8 @@ actor LastFMTransport: ScrobbleTransport {
 
     private var isNetworkAvailable = true
     private var hasStartedNetworkMonitoring = false
+    private let maxFlushAttemptsPerCycle = 3
+    private let flushRetryDelayNanoseconds: UInt64 = 5_000_000_000
 
     init(
         apiKey: String,
@@ -149,7 +151,9 @@ actor LastFMTransport: ScrobbleTransport {
     private func flushQueue() async {
         guard await isAuthenticated, isNetworkAvailable else { return }
 
-        while true {
+        var attemptsRemaining = maxFlushAttemptsPerCycle
+
+        while attemptsRemaining > 0 {
             let batch = await queue.dequeueBatch(limit: 50)
             guard !batch.isEmpty else { break }
 
@@ -160,7 +164,9 @@ actor LastFMTransport: ScrobbleTransport {
                 await queue.confirmDequeued(batch)
             } catch {
                 await queue.returnToQueue(batch)
-                break
+                attemptsRemaining -= 1
+                guard attemptsRemaining > 0 else { break }
+                try? await Task.sleep(nanoseconds: flushRetryDelayNanoseconds)
             }
         }
     }
