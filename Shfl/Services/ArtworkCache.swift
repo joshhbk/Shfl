@@ -24,8 +24,22 @@ final class ArtworkCache {
 
     private init() {}
 
+#if DEBUG
+    static func makeForTesting() -> ArtworkCache {
+        ArtworkCache()
+    }
+#endif
+
     func artwork(for songId: String) -> Artwork? {
         cache[songId]
+    }
+
+    /// Inserts preloaded artwork and publishes an update to listeners for this id.
+    /// Useful for deterministic tests and future preload paths.
+    func setArtwork(_ artwork: Artwork, for id: String) {
+        cache[id] = artwork
+        pending.remove(id)
+        publishUpdate(for: id, artwork: artwork)
     }
 
     func requestArtwork(for songId: String) {
