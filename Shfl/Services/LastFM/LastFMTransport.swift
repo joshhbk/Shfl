@@ -254,16 +254,31 @@ actor LastFMTransport: ScrobbleTransport {
             let batch = await queue.dequeueBatch(limit: 50)
             guard !batch.isEmpty else { break }
 
-            do {
-                for event in batch {
+            var sent: [ScrobbleEvent] = []
+            var didFail = false
+
+            for (index, event) in batch.enumerated() {
+                do {
                     try await sendScrobble(event)
+                    sent.append(event)
+                } catch {
+                    let unsent = Array(batch[index...])
+
+                    if !sent.isEmpty {
+                        await queue.confirmDequeued(sent)
+                    }
+
+                    await queue.returnToQueue(unsent)
+                    didFail = true
+                    attemptsRemaining -= 1
+                    guard attemptsRemaining > 0 else { break }
+                    try? await Task.sleep(nanoseconds: flushRetryDelayNanoseconds)
+                    break
                 }
+            }
+
+            if !didFail {
                 await queue.confirmDequeued(batch)
-            } catch {
-                await queue.returnToQueue(batch)
-                attemptsRemaining -= 1
-                guard attemptsRemaining > 0 else { break }
-                try? await Task.sleep(nanoseconds: flushRetryDelayNanoseconds)
             }
         }
     }

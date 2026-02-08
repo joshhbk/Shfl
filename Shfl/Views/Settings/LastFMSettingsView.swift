@@ -8,7 +8,6 @@ struct LastFMSettingsView: View {
     @State private var isConnecting = false
     @State private var isRefreshing = false
     @State private var errorMessage: String?
-    @State private var pendingScrobbleCount = 0
     @State private var recentTracks: [LastFMRecentTrack] = []
     @State private var recentTracksState: RecentTracksState = .idle
 
@@ -57,18 +56,6 @@ struct LastFMSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-            }
-
-            if pendingScrobbleCount > 0 {
-                HStack {
-                    Label("Pending scrobbles", systemImage: "tray.full")
-                    Spacer()
-                    Text("\(pendingScrobbleCount)")
-                        .foregroundStyle(.secondary)
-                }
-                Text("Saved locally and will upload to Last.fm when connected and online.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
         }
@@ -173,7 +160,6 @@ struct LastFMSettingsView: View {
         } else {
             isConnected = false
             username = nil
-            pendingScrobbleCount = 0
             recentTracks = []
             recentTracksState = .idle
         }
@@ -195,8 +181,6 @@ struct LastFMSettingsView: View {
             return
         }
 
-        async let pendingTask: [ScrobbleEvent] = transport.pendingScrobbles()
-
         do {
             let tracks = try await transport.fetchRecentTracks(limit: 20)
             recentTracks = tracks
@@ -207,8 +191,6 @@ struct LastFMSettingsView: View {
             errorMessage = "Couldn’t refresh Last.fm activity. Try again in a moment."
         }
 
-        let pending = await pendingTask
-        pendingScrobbleCount = pending.count
         isRefreshing = false
     }
 
@@ -240,7 +222,6 @@ struct LastFMSettingsView: View {
             try await transport.disconnect()
             isConnected = false
             username = nil
-            pendingScrobbleCount = 0
             recentTracks = []
             recentTracksState = .idle
             errorMessage = nil
