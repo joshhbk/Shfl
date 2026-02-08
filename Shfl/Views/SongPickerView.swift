@@ -20,6 +20,7 @@ struct SongPickerView: View {
     @State private var selectedSongIds: Set<String> = []
     @State private var searchText = ""
     @State private var browseMode: BrowseMode = .songs
+    @State private var actionErrorMessage: String?
 
     @Environment(\.appSettings) private var appSettings
 
@@ -386,13 +387,25 @@ struct SongPickerView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
+            if let actionErrorMessage {
+                Text(actionErrorMessage)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.red.opacity(0.9), in: Capsule())
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             if showAutofillBanner {
                 Text(autofillMessage)
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundStyle(autofillMessageIsError ? .white : .primary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .background(autofillMessageIsError ? AnyShapeStyle(Color.red.opacity(0.9)) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .onAppear {
                         Task { @MainActor in
@@ -427,7 +440,7 @@ struct SongPickerView: View {
                 } catch ShufflePlayerError.capacityReached {
                     // Handled by SongRow's nope animation
                 } catch {
-                    // Other errors handled by alert
+                    showActionError(error.localizedDescription)
                 }
             }
         }
@@ -450,16 +463,43 @@ struct SongPickerView: View {
     }
 
     private var showAutofillBanner: Bool {
-        if case .completed = viewModel.autofillState {
+        switch viewModel.autofillState {
+        case .completed, .error:
             return true
+        case .idle, .loading:
+            return false
         }
-        return false
     }
 
     private var autofillMessage: String {
         if case .completed(let count) = viewModel.autofillState {
             return "Added \(count) songs"
         }
+        if case .error(let message) = viewModel.autofillState {
+            return message
+        }
         return ""
+    }
+
+    private var autofillMessageIsError: Bool {
+        if case .error = viewModel.autofillState {
+            return true
+        }
+        return false
+    }
+
+    private func showActionError(_ message: String) {
+        withAnimation {
+            actionErrorMessage = message
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation {
+                if actionErrorMessage == message {
+                    actionErrorMessage = nil
+                }
+            }
+        }
     }
 }
