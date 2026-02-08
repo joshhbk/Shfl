@@ -77,7 +77,7 @@ struct PlayerView: View {
             if progressState == nil {
                 progressState = PlayerProgressState(musicService: musicService)
             }
-            progressState?.startUpdating()
+            progressState?.startUpdating(playbackState: player.playbackState)
 
             // Initialize tint provider with current theme
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
@@ -126,7 +126,7 @@ struct PlayerView: View {
     }
 
     private func handleSeek(_ time: TimeInterval) {
-        progressState?.setCurrentTime(time)
+        progressState?.handleUserSeek(to: time)
         musicService.seek(to: time)
     }
 
@@ -150,8 +150,7 @@ struct PlayerView: View {
             }
         }
 
-        // Reset progress immediately so the bar doesn't show stale time
-        progressState?.resetToCurrentPosition()
+        progressState?.handlePlaybackStateChange(newState)
 
         if let song = newState.currentSong {
             colorExtractor.updateColor(for: song.id)
