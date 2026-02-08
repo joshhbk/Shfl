@@ -23,7 +23,7 @@ struct PlaybackProgressBar: View {
 
     private var progress: Double {
         guard duration > 0 else { return 0 }
-        return min(currentTime / duration, 1.0)
+        return min(max(currentTime / duration, 0), 1.0)
     }
 
     /// True when actively dragging or waiting for seek to complete
@@ -68,16 +68,24 @@ struct PlaybackProgressBar: View {
         VStack(spacing: 6) {
             // Progress track with scrubbing
             GeometryReader { geometry in
+                let trackHeight: CGFloat = isInteracting ? 6 : 4
+                let knobRadius: CGFloat = 6
+                let rawFilledWidth = max(0, min(geometry.size.width, geometry.size.width * displayProgress))
+                let minKnobX = min(knobRadius, geometry.size.width / 2)
+                let maxKnobX = max(minKnobX, geometry.size.width - minKnobX)
+                let knobX = min(max(rawFilledWidth, minKnobX), maxKnobX)
+                let filledWidth = isInteracting ? knobX : rawFilledWidth
+
                 ZStack(alignment: .leading) {
                     // Background track
                     Capsule()
                         .fill(trackBackground)
-                        .frame(height: isInteracting ? 6 : 4)
+                        .frame(height: trackHeight)
 
                     // Filled track
                     Capsule()
                         .fill(trackFill)
-                        .frame(width: max(0, geometry.size.width * displayProgress), height: isInteracting ? 6 : 4)
+                        .frame(width: filledWidth, height: trackHeight)
 
                     // Knob indicator (visible when interacting)
                     if isInteracting {
@@ -86,12 +94,12 @@ struct PlaybackProgressBar: View {
                             .frame(width: 12, height: 12)
                             .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
                             .position(
-                                x: max(6, min(geometry.size.width - 6, geometry.size.width * displayProgress)),
-                                y: 3
+                                x: knobX,
+                                y: trackHeight / 2
                             )
                     }
                 }
-                .frame(height: isInteracting ? 6 : 4)
+                .frame(height: trackHeight)
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(
@@ -101,10 +109,16 @@ struct PlaybackProgressBar: View {
                                 isDragging = true
                                 dragProgress = progress
                             }
+                            guard geometry.size.width > 0 else { return }
                             let newProgress = value.location.x / geometry.size.width
                             dragProgress = min(max(newProgress, 0), 1)
                         }
                         .onEnded { _ in
+                            guard duration > 0 else {
+                                isDragging = false
+                                seekTarget = nil
+                                return
+                            }
                             let seekTime = dragProgress * duration
                             seekTarget = seekTime
                             onSeek(seekTime)
@@ -118,6 +132,7 @@ struct PlaybackProgressBar: View {
                 // Clear seek target once playback catches up
                 if let target = seekTarget, abs(currentTime - target) < 0.5 {
                     seekTarget = nil
+                    dragProgress = progress
                 }
             }
 

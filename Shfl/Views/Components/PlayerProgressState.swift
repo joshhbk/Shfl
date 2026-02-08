@@ -8,25 +8,24 @@ final class PlayerProgressState {
 
     private let musicService: MusicService
     private var timer: Timer?
+    private let updateInterval: TimeInterval = 0.2
+    private let timeUpdateThreshold: TimeInterval = 0.02
+    private let durationUpdateThreshold: TimeInterval = 0.1
 
     init(musicService: MusicService) {
         self.musicService = musicService
     }
 
     func startUpdating() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        stopUpdating()
+        refreshNow()
+        timer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self else { return }
-                // Only update if values changed to avoid unnecessary view invalidations
-                let newTime = self.musicService.currentPlaybackTime
-                let newDuration = self.musicService.currentSongDuration
-                if abs(newTime - self.currentTime) > 0.1 {
-                    self.currentTime = newTime
-                }
-                if abs(newDuration - self.duration) > 0.1 {
-                    self.duration = newDuration
-                }
+                self?.refreshNow()
             }
+        }
+        if let timer {
+            RunLoop.main.add(timer, forMode: .common)
         }
     }
 
@@ -41,7 +40,23 @@ final class PlayerProgressState {
 
     /// Resets time to current playback position immediately (call on song change)
     func resetToCurrentPosition() {
-        currentTime = musicService.currentPlaybackTime
-        duration = musicService.currentSongDuration
+        refreshNow()
+    }
+
+    /// Updates displayed time immediately after user-initiated seeks.
+    func setCurrentTime(_ time: TimeInterval) {
+        let upperBound = duration > 0 ? duration : time
+        currentTime = min(max(0, time), upperBound)
+    }
+
+    private func refreshNow() {
+        let newTime = musicService.currentPlaybackTime
+        let newDuration = musicService.currentSongDuration
+        if abs(newTime - currentTime) > timeUpdateThreshold {
+            currentTime = newTime
+        }
+        if abs(newDuration - duration) > durationUpdateThreshold {
+            duration = newDuration
+        }
     }
 }

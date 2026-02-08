@@ -126,6 +126,7 @@ struct PlayerView: View {
     }
 
     private func handleSeek(_ time: TimeInterval) {
+        progressState?.setCurrentTime(time)
         musicService.seek(to: time)
     }
 
