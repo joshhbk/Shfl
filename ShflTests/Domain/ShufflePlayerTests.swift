@@ -636,11 +636,11 @@ final class ShufflePlayerTests: XCTestCase {
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
 
-        // song2 should be in pool (still available for future plays)
+        // song2 should be rolled back from pool and queue for a coherent state.
         let containsSong = await player.containsSong(id: "2")
-        XCTAssertTrue(containsSong, "Song should remain in pool after insert failure")
+        XCTAssertFalse(containsSong, "Song should be removed from pool after insert failure")
 
-        // But NOT in the queue order (rolled back)
+        // And NOT in queue order.
         let queue = await player.lastShuffledQueue
         XCTAssertFalse(queue.contains { $0.id == "2" }, "Song should be rolled back from queue after insert failure")
     }
@@ -1268,12 +1268,14 @@ final class ShufflePlayerTests: XCTestCase {
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
         try await Task.sleep(nanoseconds: 200_000_000)
 
-        let internalQueue = await player.lastShuffledQueue.map(\.id)
+        let internalQueue = await player.lastShuffledQueue
+        let playedCount = await player.playedSongIdsForTesting.count
+        let internalUpcomingQueue = Array(internalQueue.dropFirst(playedCount)).map(\.id)
         let transportQueue = await mockService.lastQueuedSongs.map(\.id)
         XCTAssertEqual(
-            Set(internalQueue),
+            Set(internalUpcomingQueue),
             Set(transportQueue),
-            "Interleaved operations should keep domain queue and transport queue in sync"
+            "Interleaved operations should keep upcoming domain queue and transport queue in sync"
         )
     }
 

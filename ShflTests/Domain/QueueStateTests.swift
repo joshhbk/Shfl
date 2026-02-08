@@ -151,7 +151,7 @@ final class QueueStateTests: XCTestCase {
         XCTAssertEqual(state.currentIndex, 0)
     }
 
-    func testReshuffledUpcomingExcludesPlayedSongs() {
+    func testReshuffledUpcomingPreservesInvariantAndKeepsPlayedBeforeCurrent() {
         let songs = (1...5).map { makeSong(id: "\($0)") }
         var state = QueueState.empty.addingSongs(songs)!.shuffled()
 
@@ -161,12 +161,19 @@ final class QueueStateTests: XCTestCase {
 
         // Now reshuffle upcoming
         let newState = state.reshuffledUpcoming()
-
-        // Played songs should not be in the new queue
         let playedSongIds = state.playedIds
+
+        XCTAssertEqual(newState.queueOrder.count, state.songPool.count, "Queue should still include full pool")
+        XCTAssertEqual(Set(newState.queueOrderIds), Set(state.songPool.map(\.id)), "Queue IDs should match pool IDs")
+        XCTAssertEqual(newState.currentSongId, state.currentSongId, "Current song should be preserved")
+
+        // Played songs should remain before current to preserve continuity.
         for playedId in playedSongIds {
-            XCTAssertFalse(newState.queueOrder.contains { $0.id == playedId },
-                           "Played song \(playedId) should not be in reshuffled queue")
+            guard let playedIndex = newState.queueOrder.firstIndex(where: { $0.id == playedId }) else {
+                XCTFail("Played song \(playedId) should still exist in queue")
+                continue
+            }
+            XCTAssertLessThan(playedIndex, newState.currentIndex, "Played song \(playedId) should be before current")
         }
     }
 
@@ -420,6 +427,38 @@ final class QueueStateTests: XCTestCase {
 
         // After removing from both, they should be in sync
         XCTAssertFalse(state.isQueueStale, "Should not be stale after removing from both pool and queue")
+    }
+
+    func testIsQueueStaleWhenQueueContainsDuplicates() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        let state = QueueState(
+            songPool: songs,
+            queueOrder: [songs[0], songs[0], songs[1]],
+            playedIds: [],
+            currentIndex: 0,
+            algorithm: .noRepeat
+        )
+
+        XCTAssertTrue(state.isQueueStale, "Queue should be stale when duplicate IDs are present")
+    }
+
+    func testReconcilingQueueRepairsMissingAndDuplicateEntries() {
+        let songs = (1...5).map { makeSong(id: "\($0)") }
+        let drifted = QueueState(
+            songPool: songs,
+            queueOrder: [songs[2], songs[2], songs[0]], // duplicate + missing entries
+            playedIds: ["1"],
+            currentIndex: 0,
+            algorithm: .noRepeat
+        )
+
+        let repaired = drifted.reconcilingQueue(preferredCurrentSongId: "3")
+
+        XCTAssertFalse(repaired.isQueueStale, "Repaired queue should be fully in sync with pool")
+        XCTAssertEqual(repaired.queueOrder.count, songs.count, "Repaired queue should include full pool")
+        XCTAssertEqual(Set(repaired.queueOrderIds), Set(songs.map(\.id)))
+        XCTAssertEqual(repaired.currentSongId, "3", "Preferred current song should be preserved")
+        XCTAssertEqual(repaired.queueOrder.first?.id, "1", "Played songs should be positioned before current")
     }
 
     // MARK: - Equatable

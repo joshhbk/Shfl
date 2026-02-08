@@ -285,6 +285,8 @@ final class ShufflePlayer {
             break
         }
 
+        reconcileQueueIfNeeded(reason: "playback-state-change", preferredCurrentSongId: resolvedSongId)
+
         if case .playing = resolvedState,
            let pendingSeek = pendingRestoreSeek,
            let resolvedSongId,
@@ -296,11 +298,31 @@ final class ShufflePlayer {
         playbackState = resolvedState
     }
 
+    private func reconcileQueueIfNeeded(reason: String, preferredCurrentSongId: String? = nil) {
+        guard queueState.isQueueStale else { return }
+        let beforePoolCount = queueState.songCount
+        let beforeQueueCount = queueState.queueOrder.count
+        let beforeCurrent = queueState.currentSongId ?? "nil"
+
+        queueState = queueState.reconcilingQueue(preferredCurrentSongId: preferredCurrentSongId)
+
+        let afterPoolCount = queueState.songCount
+        let afterQueueCount = queueState.queueOrder.count
+        let afterCurrent = queueState.currentSongId ?? "nil"
+        let repaired = !queueState.isQueueStale
+
+        print(
+            "🛠️ Queue reconciliation [\(reason)] pool \(beforePoolCount)->\(afterPoolCount), " +
+            "queue \(beforeQueueCount)->\(afterQueueCount), current \(beforeCurrent)->\(afterCurrent), repaired=\(repaired)"
+        )
+    }
+
     // MARK: - Algorithm Change
 
     /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
     func reshuffleWithNewAlgorithm(_ algorithm: ShuffleAlgorithm) async {
         guard !queueState.isEmpty else { return }
+        reconcileQueueIfNeeded(reason: "reshuffle-start", preferredCurrentSongId: playbackState.currentSongId)
 
         // If not actively playing, invalidate the queue so next play() rebuilds with the new algorithm
         guard playbackState.isActive else {
@@ -325,7 +347,7 @@ final class ShufflePlayer {
         do {
             let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
             try await musicService.replaceQueue(
-                queue: queueState.queueOrder,
+                queue: queueState.upcomingSongs,
                 startAtSongId: currentSong.id,
                 policy: policy
             )
@@ -364,12 +386,15 @@ final class ShufflePlayer {
                 try await musicService.insertIntoQueue(songs: [song])
                 print("🎵 Successfully inserted \(song.title) into MusicKit queue")
             } catch {
-                // Rollback: remove from queue order since MusicKit doesn't have it
-                queueState = queueState.removingFromQueueOnly(id: song.id)
-                print("⚠️ Rolled back \(song.title) from queue after insert failure: \(error)")
+                // Rollback completely so pool/queue invariants remain intact.
+                queueState = queueState.removingSong(id: song.id)
+                print("⚠️ Rolled back \(song.title) from pool+queue after insert failure: \(error)")
             }
         } else {
             print("➕ addSong: playback not active or no queue yet, song only added to pool")
+        }
+        if playbackState.isActive {
+            reconcileQueueIfNeeded(reason: "add-song", preferredCurrentSongId: playbackState.currentSongId)
         }
     }
 
@@ -414,7 +439,7 @@ final class ShufflePlayer {
             do {
                 let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
                 try await musicService.replaceQueue(
-                    queue: queueState.queueOrder,
+                    queue: queueState.upcomingSongs,
                     startAtSongId: currentSong.id,
                     policy: policy
                 )
@@ -422,6 +447,9 @@ final class ShufflePlayer {
             } catch {
                 print("🎵 Failed to reshuffle queue: \(error)")
             }
+        }
+        if playbackState.isActive {
+            reconcileQueueIfNeeded(reason: "add-songs-with-rebuild", preferredCurrentSongId: playbackState.currentSongId)
         }
         print("🔍 addSongsWithQueueRebuild: Complete")
     }
@@ -447,7 +475,7 @@ final class ShufflePlayer {
             do {
                 let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
                 try await musicService.replaceQueue(
-                    queue: queueState.queueOrder,
+                    queue: queueState.upcomingSongs,
                     startAtSongId: currentSong.id,
                     policy: policy
                 )
@@ -456,6 +484,8 @@ final class ShufflePlayer {
                 print("🎵 Failed to remove song from MusicKit queue: \(error)")
             }
         }
+
+        reconcileQueueIfNeeded(reason: "remove-song", preferredCurrentSongId: playbackState.currentSongId)
     }
 
     func removeAllSongs() async {
