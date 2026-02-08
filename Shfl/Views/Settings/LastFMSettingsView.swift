@@ -2,83 +2,271 @@ import SwiftUI
 
 struct LastFMSettingsView: View {
     @Environment(\.lastFMTransport) private var transport
+
     @State private var isConnected = false
     @State private var username: String?
     @State private var isConnecting = false
+    @State private var isRefreshing = false
     @State private var errorMessage: String?
+    @State private var nowPlayingState: LastFMNowPlayingState = .idle
+    @State private var pendingScrobbleCount = 0
+    @State private var recentTracks: [LastFMRecentTrack] = []
+    @State private var recentTracksState: RecentTracksState = .idle
+    @State private var lastRefreshAt: Date?
 
     var body: some View {
         List {
-            Section {
-                if isConnected, let username = username {
-                    HStack {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Connected")
-                                    .font(.body)
-                                Text(username)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                        Spacer()
+            statusSection
+            actionsSection
+            recentTracksSection
+            helpSection
+        }
+        .navigationTitle("Last.fm")
+        .refreshable {
+            await refreshActivity(showLoading: recentTracks.isEmpty)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await refreshActivity(showLoading: recentTracks.isEmpty) }
+                } label: {
+                    if isRefreshing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.clockwise")
                     }
-                } else {
-                    Label("Not connected", systemImage: "xmark.circle")
+                }
+                .disabled(!isConnected || isConnecting || isRefreshing)
+                .accessibilityLabel("Refresh Last.fm activity")
+            }
+        }
+        .task {
+            await syncConnectionStatusOnly()
+            await refreshActivity(showLoading: true)
+        }
+        .task(id: isConnected) {
+            guard isConnected else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { break }
+                await refreshActivity(showLoading: false)
+            }
+        }
+    }
+
+    private var statusSection: some View {
+        Section("Status") {
+            HStack(spacing: 12) {
+                Image(systemName: isConnected ? "checkmark.circle.fill" : "xmark.circle")
+                    .foregroundStyle(isConnected ? .green : .secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isConnected ? "Connected" : "Not connected")
+                        .font(.body.weight(.semibold))
+                    Text(username ?? "Connect Last.fm to enable scrobbling")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: nowPlayingSymbol)
+                    .foregroundStyle(nowPlayingColor)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(nowPlayingTitle)
+                        .font(.body.weight(.semibold))
+                    Text(nowPlayingSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            if pendingScrobbleCount > 0 {
+                HStack {
+                    Label("Queued scrobbles", systemImage: "tray.full")
+                    Spacer()
+                    Text("\(pendingScrobbleCount)")
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Section {
-                if isConnected {
-                    Button(role: .destructive) {
-                        Task {
-                            await disconnect()
-                        }
-                    } label: {
-                        Label("Disconnect", systemImage: "link.badge.minus")
-                    }
-                } else {
-                    Button {
-                        Task {
-                            await connect()
-                        }
-                    } label: {
-                        HStack {
-                            Label("Connect to Last.fm", systemImage: "link.badge.plus")
-                            Spacer()
-                            if isConnecting {
-                                ProgressView()
-                            }
-                        }
-                    }
-                    .disabled(isConnecting)
+            if let lastRefreshAt {
+                HStack {
+                    Text("Last updated")
+                    Spacer()
+                    Text(lastRefreshAt, style: .relative)
+                        .foregroundStyle(.secondary)
                 }
+                .font(.caption)
             }
-
-            if let errorMessage {
-                Section {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.red)
-                }
-            }
-
-            Section {
-                Text("When connected, Shfl will scrobble your plays to Last.fm. Songs must be played for at least half their duration (up to 4 minutes) to be scrobbled.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle("Last.fm")
-        .task {
-            await checkConnectionStatus()
         }
     }
 
-    private func checkConnectionStatus() async {
+    private var actionsSection: some View {
+        Section("Actions") {
+            if isConnected {
+                Button(role: .destructive) {
+                    Task { await disconnect() }
+                } label: {
+                    Label("Disconnect", systemImage: "link.badge.minus")
+                }
+                .disabled(isConnecting || isRefreshing)
+            } else {
+                Button {
+                    Task { await connect() }
+                } label: {
+                    HStack {
+                        Label("Connect to Last.fm", systemImage: "link.badge.plus")
+                        Spacer()
+                        if isConnecting {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isConnecting)
+            }
+
+            Button {
+                Task { await refreshActivity(showLoading: recentTracks.isEmpty) }
+            } label: {
+                HStack {
+                    Label("Refresh Activity", systemImage: "arrow.clockwise")
+                    Spacer()
+                    if isRefreshing {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(!isConnected || isConnecting || isRefreshing)
+
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var recentTracksSection: some View {
+        Section("Recent Tracks") {
+            if !isConnected {
+                emptyHintRow(
+                    title: "Connect Last.fm to see recent tracks",
+                    subtitle: "You can verify real-time scrobbling activity here after connecting."
+                )
+            } else {
+                switch recentTracksState {
+                case .idle, .loading:
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        Text("Loading recent tracks...")
+                            .foregroundStyle(.secondary)
+                    }
+                case .empty:
+                    emptyHintRow(
+                        title: "No recent scrobbles yet",
+                        subtitle: "Play music for at least half the track duration to scrobble."
+                    )
+                    Button("Retry") {
+                        Task { await refreshActivity(showLoading: true) }
+                    }
+                case .error:
+                    emptyHintRow(
+                        title: "Couldn’t load recent tracks",
+                        subtitle: "Check your connection and try again."
+                    )
+                    Button("Retry") {
+                        Task { await refreshActivity(showLoading: true) }
+                    }
+                case .loaded:
+                    ForEach(Array(recentTracks.prefix(20))) { track in
+                        RecentTrackRow(track: track)
+                    }
+                }
+            }
+        }
+    }
+
+    private var helpSection: some View {
+        Section {
+            Text("Shfl sends a now-playing update immediately, then scrobbles after at least half the track duration (up to 4 minutes).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var nowPlayingTitle: String {
+        switch nowPlayingState {
+        case .idle:
+            return "Waiting for active playback"
+        case .scrobblingNow:
+            return "Scrobbling now"
+        case .queued:
+            return "Now playing queued"
+        case .failed:
+            return "Now playing update failed"
+        }
+    }
+
+    private var nowPlayingSubtitle: String {
+        switch nowPlayingState {
+        case .idle:
+            return "Start playback to send a now-playing update."
+        case .scrobblingNow(let event, _):
+            return "\(event.track) • \(event.artist)"
+        case .queued(let event, let reason, _):
+            let reasonText: String
+            switch reason {
+            case .disconnected:
+                reasonText = "connect Last.fm"
+            case .offline:
+                reasonText = "you’re offline"
+            }
+            return "\(event.track) • \(event.artist) (waiting while \(reasonText))"
+        case .failed(let event, _):
+            return "\(event.track) • \(event.artist)"
+        }
+    }
+
+    private var nowPlayingSymbol: String {
+        switch nowPlayingState {
+        case .idle:
+            return "waveform"
+        case .scrobblingNow:
+            return "dot.radiowaves.left.and.right"
+        case .queued:
+            return "clock.arrow.trianglehead.counterclockwise.rotate.90"
+        case .failed:
+            return "exclamationmark.circle"
+        }
+    }
+
+    private var nowPlayingColor: Color {
+        switch nowPlayingState {
+        case .idle:
+            return .secondary
+        case .scrobblingNow:
+            return .green
+        case .queued:
+            return .orange
+        case .failed:
+            return .red
+        }
+    }
+
+    private func emptyHintRow(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.body.weight(.semibold))
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func syncConnectionStatusOnly() async {
         guard let transport else { return }
         if let session = await transport.storedSession() {
             isConnected = true
@@ -86,7 +274,47 @@ struct LastFMSettingsView: View {
         } else {
             isConnected = false
             username = nil
+            nowPlayingState = .idle
+            pendingScrobbleCount = 0
+            recentTracks = []
+            recentTracksState = .idle
         }
+    }
+
+    private func refreshActivity(showLoading: Bool) async {
+        guard let transport else { return }
+        guard !isRefreshing else { return }
+
+        isRefreshing = true
+        if showLoading {
+            recentTracksState = .loading
+        }
+
+        await syncConnectionStatusOnly()
+
+        guard isConnected else {
+            isRefreshing = false
+            return
+        }
+
+        async let nowPlayingTask: LastFMNowPlayingState = transport.currentNowPlayingState()
+        async let pendingTask: [ScrobbleEvent] = transport.pendingScrobbles()
+
+        do {
+            let tracks = try await transport.fetchRecentTracks(limit: 20)
+            recentTracks = tracks
+            recentTracksState = tracks.isEmpty ? .empty : .loaded
+            errorMessage = nil
+        } catch {
+            recentTracksState = .error
+            errorMessage = "Couldn’t refresh Last.fm activity. Try again in a moment."
+        }
+
+        nowPlayingState = await nowPlayingTask
+        let pending = await pendingTask
+        pendingScrobbleCount = pending.count
+        lastRefreshAt = Date()
+        isRefreshing = false
     }
 
     @MainActor
@@ -99,8 +327,9 @@ struct LastFMSettingsView: View {
             let session = try await transport.authenticate()
             isConnected = true
             username = session.username
+            await refreshActivity(showLoading: true)
         } catch LastFMAuthError.cancelled {
-            // User cancelled, no error to show
+            // User cancelled intentionally.
         } catch let error as LastFMAuthError {
             errorMessage = error.localizedDescription
         } catch {
@@ -116,9 +345,116 @@ struct LastFMSettingsView: View {
             try await transport.disconnect()
             isConnected = false
             username = nil
+            nowPlayingState = .idle
+            pendingScrobbleCount = 0
+            recentTracks = []
+            recentTracksState = .idle
+            errorMessage = nil
         } catch {
             errorMessage = "Failed to disconnect."
         }
+    }
+}
+
+private enum RecentTracksState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case empty
+    case error
+}
+
+private struct RecentTrackRow: View {
+    let track: LastFMRecentTrack
+
+    var body: some View {
+        HStack(spacing: 12) {
+            artwork
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(track.title)
+                        .font(.body.weight(.semibold))
+                        .lineLimit(1)
+                    if track.isNowPlaying {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+
+                Text(track.artist)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            if track.isNowPlaying {
+                Text("Scrobbling now")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                    .multilineTextAlignment(.trailing)
+            } else if let playedAt = track.playedAt {
+                Text(playedAt, style: .relative)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+            } else {
+                Text("Just now")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(trackAccessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var artwork: some View {
+        if let artworkURL = track.artworkURL {
+            AsyncImage(url: artworkURL) { phase in
+                switch phase {
+                case .empty:
+                    artworkPlaceholder
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    artworkPlaceholder
+                @unknown default:
+                    artworkPlaceholder
+                }
+            }
+            .frame(width: 46, height: 46)
+            .clipShape(.rect(cornerRadius: 8))
+        } else {
+            artworkPlaceholder
+                .frame(width: 46, height: 46)
+        }
+    }
+
+    private var artworkPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(.quaternary)
+            .overlay {
+                Image(systemName: "music.note")
+                    .foregroundStyle(.secondary)
+            }
+    }
+
+    private var trackAccessibilityLabel: String {
+        if track.isNowPlaying {
+            return "\(track.title), \(track.artist), scrobbling now"
+        }
+        if let playedAt = track.playedAt {
+            let formatter = RelativeDateTimeFormatter()
+            let relative = formatter.localizedString(for: playedAt, relativeTo: Date())
+            return "\(track.title), \(track.artist), played \(relative)"
+        }
+        return "\(track.title), \(track.artist)"
     }
 }
 
