@@ -636,11 +636,11 @@ final class ShufflePlayerTests: XCTestCase {
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
 
-        // song2 should be in pool (still available for future plays)
+        // song2 should be rolled back from pool and queue for a coherent state.
         let containsSong = await player.containsSong(id: "2")
-        XCTAssertTrue(containsSong, "Song should remain in pool after insert failure")
+        XCTAssertFalse(containsSong, "Song should be removed from pool after insert failure")
 
-        // But NOT in the queue order (rolled back)
+        // And NOT in queue order.
         let queue = await player.lastShuffledQueue
         XCTAssertFalse(queue.contains { $0.id == "2" }, "Song should be rolled back from queue after insert failure")
     }
@@ -817,6 +817,53 @@ final class ShufflePlayerTests: XCTestCase {
         // setQueue should have been called to rebuild
         let setQueueCallCount = await mockService.setQueueCallCount
         XCTAssertEqual(setQueueCallCount, 1, "setQueue should be called to rebuild stale queue")
+    }
+
+    func testQueueDriftTelemetryRecordsReasonsOnPlaybackStateReconcile() async throws {
+        // Build an initial queue of 3 songs.
+        for i in 1...3 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Capture a valid song for playback-state simulation.
+        guard let currentSong = await player.lastShuffledQueue.first else {
+            XCTFail("Expected a current song in queue")
+            return
+        }
+
+        // Stop, then add songs while stopped to force pool/queue drift.
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        for i in 4...5 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+
+        let staleBefore = await player.queueState.isQueueStale
+        XCTAssertTrue(staleBefore, "Queue should be stale before reconciliation")
+
+        // Playback state change should trigger reconciliation and telemetry capture.
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let telemetry = await player.queueDriftTelemetry
+        XCTAssertEqual(telemetry.detections, 1, "Should detect one drift event")
+        XCTAssertEqual(telemetry.reconciliations, 1, "Should reconcile one drift event")
+        XCTAssertEqual(telemetry.unrepairedDetections, 0, "Drift should be repaired")
+        XCTAssertEqual(
+            telemetry.detectionsByTrigger["playback-state-change"],
+            1,
+            "Telemetry should attribute drift to playback-state reconciliation"
+        )
+        XCTAssertEqual(telemetry.detectionsByReason[.countMismatch], 1)
+        XCTAssertEqual(telemetry.detectionsByReason[.membershipMismatch], 1)
+
+        let staleAfter = await player.queueState.isQueueStale
+        XCTAssertFalse(staleAfter, "Queue should be repaired after reconciliation")
     }
 
     func testPlayRebuildsQueueWhenSongsRemovedWhileStopped() async throws {
@@ -1268,12 +1315,14 @@ final class ShufflePlayerTests: XCTestCase {
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
         try await Task.sleep(nanoseconds: 200_000_000)
 
-        let internalQueue = await player.lastShuffledQueue.map(\.id)
+        let internalQueue = await player.lastShuffledQueue
+        let playedCount = await player.playedSongIdsForTesting.count
+        let internalUpcomingQueue = Array(internalQueue.dropFirst(playedCount)).map(\.id)
         let transportQueue = await mockService.lastQueuedSongs.map(\.id)
         XCTAssertEqual(
-            Set(internalQueue),
+            Set(internalUpcomingQueue),
             Set(transportQueue),
-            "Interleaved operations should keep domain queue and transport queue in sync"
+            "Interleaved operations should keep upcoming domain queue and transport queue in sync"
         )
     }
 

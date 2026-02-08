@@ -1,5 +1,29 @@
 import Foundation
 
+enum QueueDriftReason: String, CaseIterable, Hashable, Sendable {
+    case countMismatch
+    case duplicateQueueIDs
+    case membershipMismatch
+
+    var displayName: String {
+        switch self {
+        case .countMismatch: return "Count mismatch"
+        case .duplicateQueueIDs: return "Duplicate queue IDs"
+        case .membershipMismatch: return "Pool/queue membership mismatch"
+        }
+    }
+}
+
+struct QueueDriftDiagnostics: Equatable, Sendable {
+    let isStale: Bool
+    let reasons: Set<QueueDriftReason>
+    let poolCount: Int
+    let queueCount: Int
+    let duplicateQueueIDs: [String]
+    let missingFromQueue: [String]
+    let missingFromPool: [String]
+}
+
 /// Immutable queue state - single source of truth for queue management.
 /// All mutations return a new state instance, making state transitions explicit and testable.
 struct QueueState: Equatable, Sendable {
@@ -78,10 +102,59 @@ struct QueueState: Equatable, Sendable {
     /// Whether the queue is out of sync with the song pool.
     /// True when songs have been added to or removed from the pool since the queue was built.
     var isQueueStale: Bool {
-        guard hasQueue else { return false }
-        let queueIds = Set(queueOrder.map(\.id))
-        let poolIds = Set(songPool.map(\.id))
-        return queueIds != poolIds
+        queueDriftDiagnostics.isStale
+    }
+
+    /// Detailed invariant diagnostics for queue/pool drift.
+    var queueDriftDiagnostics: QueueDriftDiagnostics {
+        guard hasQueue else {
+            return QueueDriftDiagnostics(
+                isStale: false,
+                reasons: [],
+                poolCount: songPool.count,
+                queueCount: 0,
+                duplicateQueueIDs: [],
+                missingFromQueue: [],
+                missingFromPool: []
+            )
+        }
+
+        let queueIds = queueOrder.map(\.id)
+        let poolIds = songPool.map(\.id)
+        let queueIdSet = Set(queueIds)
+        let poolIdSet = Set(poolIds)
+
+        var reasons = Set<QueueDriftReason>()
+        if queueIds.count != poolIds.count {
+            reasons.insert(.countMismatch)
+        }
+
+        var seen = Set<String>()
+        var duplicateQueueIDs: [String] = []
+        for id in queueIds where !seen.insert(id).inserted {
+            if !duplicateQueueIDs.contains(id) {
+                duplicateQueueIDs.append(id)
+            }
+        }
+        if !duplicateQueueIDs.isEmpty {
+            reasons.insert(.duplicateQueueIDs)
+        }
+
+        let missingFromQueue = poolIds.filter { !queueIdSet.contains($0) }
+        let missingFromPool = queueIds.filter { !poolIdSet.contains($0) }
+        if !missingFromQueue.isEmpty || !missingFromPool.isEmpty {
+            reasons.insert(.membershipMismatch)
+        }
+
+        return QueueDriftDiagnostics(
+            isStale: !reasons.isEmpty,
+            reasons: reasons,
+            poolCount: poolIds.count,
+            queueCount: queueIds.count,
+            duplicateQueueIDs: duplicateQueueIDs,
+            missingFromQueue: missingFromQueue,
+            missingFromPool: missingFromPool
+        )
     }
 
     /// Invalidate the queue while preserving the song pool.
@@ -222,27 +295,28 @@ struct QueueState: Equatable, Sendable {
     /// Reshuffle upcoming songs while preserving current song and played history.
     func reshuffledUpcoming(with algorithm: ShuffleAlgorithm? = nil) -> QueueState {
         let effectiveAlgorithm = algorithm ?? self.algorithm
+        let reconciled = reconcilingQueue(preferredCurrentSongId: currentSongId)
+        guard let current = reconciled.currentSong else {
+            // If current context is invalid, fall back to a full fresh shuffle.
+            return reconciled.shuffled(with: effectiveAlgorithm)
+        }
 
-        // Get songs that haven't been played and aren't current
-        let upcomingPool = songPool.filter { song in
-            !playedIds.contains(song.id) && song.id != currentSongId
+        // Preserve already-played songs ahead of current and reshuffle only upcoming.
+        let playedPrefix = Array(reconciled.queueOrder.prefix(reconciled.currentIndex))
+        let playedPrefixIds = Set(playedPrefix.map(\.id))
+        let upcomingPool = reconciled.songPool.filter { song in
+            !playedPrefixIds.contains(song.id) && song.id != current.id
         }
 
         let shuffler = QueueShuffler(algorithm: effectiveAlgorithm)
         let shuffledUpcoming = shuffler.shuffle(upcomingPool)
-
-        // Build new queue: current song + shuffled upcoming
-        var newQueue: [Song] = []
-        if let current = currentSong {
-            newQueue.append(current)
-        }
-        newQueue.append(contentsOf: shuffledUpcoming)
+        let newQueue = playedPrefix + [current] + shuffledUpcoming
 
         return QueueState(
-            songPool: songPool,
+            songPool: reconciled.songPool,
             queueOrder: newQueue,
-            playedIds: playedIds,
-            currentIndex: 0,  // Current song is now at index 0
+            playedIds: reconciled.playedIds,
+            currentIndex: playedPrefix.count,
             algorithm: effectiveAlgorithm
         )
     }
@@ -341,11 +415,87 @@ struct QueueState: Equatable, Sendable {
             validQueueSongs.firstIndex(where: { $0.id == currentId })
         } ?? 0
 
-        return QueueState(
+        let restored = QueueState(
             songPool: songPool,
             queueOrder: validQueueSongs,
             playedIds: validPlayedIds,
             currentIndex: restoredIndex,
+            algorithm: algorithm
+        )
+
+        // Repair only stale historical persisted states that omitted part of the pool.
+        if restored.isQueueStale {
+            return restored.reconcilingQueue(preferredCurrentSongId: currentSongId)
+        }
+        return restored
+    }
+
+    // MARK: - Invariant Repair
+
+    /// Deterministically repair queue drift while preserving current-song and played-song context.
+    /// This keeps played songs before current and appends any missing songs from pool order.
+    func reconcilingQueue(preferredCurrentSongId: String? = nil) -> QueueState {
+        guard hasQueue else { return self }
+
+        let poolSongsById = Dictionary(uniqueKeysWithValues: songPool.map { ($0.id, $0) })
+        let poolOrderIds = songPool.map(\.id)
+
+        // Keep only queue IDs that still exist in pool, preserving first occurrence order.
+        var seen = Set<String>()
+        let normalizedQueueIds = queueOrder.map(\.id).filter { id in
+            guard poolSongsById[id] != nil else { return false }
+            guard !seen.contains(id) else { return false }
+            seen.insert(id)
+            return true
+        }
+
+        let preferredCurrentId = preferredCurrentSongId.flatMap { poolSongsById[$0] != nil ? $0 : nil }
+        let fallbackCurrentId = currentSongId.flatMap { poolSongsById[$0] != nil ? $0 : nil }
+        let currentId = preferredCurrentId ?? fallbackCurrentId ?? normalizedQueueIds.first ?? poolOrderIds.first
+
+        // Keep played songs in deterministic order before current.
+        var playedPrefixIds = normalizedQueueIds.filter { id in
+            playedIds.contains(id) && id != currentId
+        }
+        let playedPrefixSet = Set(playedPrefixIds)
+        let missingPlayedIds = poolOrderIds.filter { id in
+            playedIds.contains(id) && id != currentId && !playedPrefixSet.contains(id)
+        }
+        playedPrefixIds.append(contentsOf: missingPlayedIds)
+
+        // Keep existing unplayed ordering for upcoming songs, then append missing ones in pool order.
+        var upcomingIds = normalizedQueueIds.filter { id in
+            id != currentId && !playedIds.contains(id)
+        }
+        var includedIds = Set(playedPrefixIds)
+        if let currentId { includedIds.insert(currentId) }
+        includedIds.formUnion(upcomingIds)
+
+        let missingUpcomingIds = poolOrderIds.filter { id in
+            id != currentId && !includedIds.contains(id)
+        }
+        upcomingIds.append(contentsOf: missingUpcomingIds)
+
+        var repairedIds = playedPrefixIds
+        if let currentId { repairedIds.append(currentId) }
+        repairedIds.append(contentsOf: upcomingIds)
+
+        let repairedQueue = repairedIds.compactMap { poolSongsById[$0] }
+        guard !repairedQueue.isEmpty else { return self }
+
+        let repairedCurrentIndex = currentId.flatMap { id in
+            repairedQueue.firstIndex(where: { $0.id == id })
+        } ?? 0
+
+        let repairedPlayedIds = Set(playedIds.filter { id in
+            poolSongsById[id] != nil && id != currentId
+        })
+
+        return QueueState(
+            songPool: songPool,
+            queueOrder: repairedQueue,
+            playedIds: repairedPlayedIds,
+            currentIndex: repairedCurrentIndex,
             algorithm: algorithm
         )
     }
