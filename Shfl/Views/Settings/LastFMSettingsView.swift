@@ -8,11 +8,9 @@ struct LastFMSettingsView: View {
     @State private var isConnecting = false
     @State private var isRefreshing = false
     @State private var errorMessage: String?
-    @State private var nowPlayingState: LastFMNowPlayingState = .idle
     @State private var pendingScrobbleCount = 0
     @State private var recentTracks: [LastFMRecentTrack] = []
     @State private var recentTracksState: RecentTracksState = .idle
-    @State private var lastRefreshAt: Date?
 
     var body: some View {
         List {
@@ -44,14 +42,6 @@ struct LastFMSettingsView: View {
             await syncConnectionStatusOnly()
             await refreshActivity(showLoading: true)
         }
-        .task(id: isConnected) {
-            guard isConnected else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled else { break }
-                await refreshActivity(showLoading: false)
-            }
-        }
     }
 
     private var statusSection: some View {
@@ -69,37 +59,18 @@ struct LastFMSettingsView: View {
                 Spacer()
             }
 
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: nowPlayingSymbol)
-                    .foregroundStyle(nowPlayingColor)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(nowPlayingTitle)
-                        .font(.body.weight(.semibold))
-                    Text(nowPlayingSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-
             if pendingScrobbleCount > 0 {
                 HStack {
-                    Label("Queued scrobbles", systemImage: "tray.full")
+                    Label("Pending scrobbles", systemImage: "tray.full")
                     Spacer()
                     Text("\(pendingScrobbleCount)")
                         .foregroundStyle(.secondary)
                 }
+                Text("Saved locally and will upload to Last.fm when connected and online.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
-            if let lastRefreshAt {
-                HStack {
-                    Text("Last updated")
-                    Spacer()
-                    Text(lastRefreshAt, style: .relative)
-                        .foregroundStyle(.secondary)
-                }
-                .font(.caption)
-            }
         }
     }
 
@@ -126,19 +97,6 @@ struct LastFMSettingsView: View {
                 }
                 .disabled(isConnecting)
             }
-
-            Button {
-                Task { await refreshActivity(showLoading: recentTracks.isEmpty) }
-            } label: {
-                HStack {
-                    Label("Refresh Activity", systemImage: "arrow.clockwise")
-                    Spacer()
-                    if isRefreshing {
-                        ProgressView()
-                    }
-                }
-            }
-            .disabled(!isConnected || isConnecting || isRefreshing)
 
             if let errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -196,65 +154,6 @@ struct LastFMSettingsView: View {
         }
     }
 
-    private var nowPlayingTitle: String {
-        switch nowPlayingState {
-        case .idle:
-            return "Waiting for active playback"
-        case .scrobblingNow:
-            return "Scrobbling now"
-        case .queued:
-            return "Now playing queued"
-        case .failed:
-            return "Now playing update failed"
-        }
-    }
-
-    private var nowPlayingSubtitle: String {
-        switch nowPlayingState {
-        case .idle:
-            return "Start playback to send a now-playing update."
-        case .scrobblingNow(let event, _):
-            return "\(event.track) • \(event.artist)"
-        case .queued(let event, let reason, _):
-            let reasonText: String
-            switch reason {
-            case .disconnected:
-                reasonText = "connect Last.fm"
-            case .offline:
-                reasonText = "you’re offline"
-            }
-            return "\(event.track) • \(event.artist) (waiting while \(reasonText))"
-        case .failed(let event, _):
-            return "\(event.track) • \(event.artist)"
-        }
-    }
-
-    private var nowPlayingSymbol: String {
-        switch nowPlayingState {
-        case .idle:
-            return "waveform"
-        case .scrobblingNow:
-            return "dot.radiowaves.left.and.right"
-        case .queued:
-            return "clock.arrow.trianglehead.counterclockwise.rotate.90"
-        case .failed:
-            return "exclamationmark.circle"
-        }
-    }
-
-    private var nowPlayingColor: Color {
-        switch nowPlayingState {
-        case .idle:
-            return .secondary
-        case .scrobblingNow:
-            return .green
-        case .queued:
-            return .orange
-        case .failed:
-            return .red
-        }
-    }
-
     private func emptyHintRow(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -274,7 +173,6 @@ struct LastFMSettingsView: View {
         } else {
             isConnected = false
             username = nil
-            nowPlayingState = .idle
             pendingScrobbleCount = 0
             recentTracks = []
             recentTracksState = .idle
@@ -297,7 +195,6 @@ struct LastFMSettingsView: View {
             return
         }
 
-        async let nowPlayingTask: LastFMNowPlayingState = transport.currentNowPlayingState()
         async let pendingTask: [ScrobbleEvent] = transport.pendingScrobbles()
 
         do {
@@ -310,10 +207,8 @@ struct LastFMSettingsView: View {
             errorMessage = "Couldn’t refresh Last.fm activity. Try again in a moment."
         }
 
-        nowPlayingState = await nowPlayingTask
         let pending = await pendingTask
         pendingScrobbleCount = pending.count
-        lastRefreshAt = Date()
         isRefreshing = false
     }
 
@@ -345,7 +240,6 @@ struct LastFMSettingsView: View {
             try await transport.disconnect()
             isConnected = false
             username = nil
-            nowPlayingState = .idle
             pendingScrobbleCount = 0
             recentTracks = []
             recentTracksState = .idle
@@ -366,6 +260,12 @@ private enum RecentTracksState: Equatable {
 
 private struct RecentTrackRow: View {
     let track: LastFMRecentTrack
+    private static let playedAtFormat = Date.FormatStyle.dateTime
+        .year()
+        .month(.abbreviated)
+        .day()
+        .hour()
+        .minute()
 
     var body: some View {
         HStack(spacing: 12) {
@@ -397,9 +297,10 @@ private struct RecentTrackRow: View {
                     .foregroundStyle(.green)
                     .multilineTextAlignment(.trailing)
             } else if let playedAt = track.playedAt {
-                Text(playedAt, style: .relative)
+                Text(playedAt, format: Self.playedAtFormat)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
                     .multilineTextAlignment(.trailing)
             } else {
                 Text("Just now")
@@ -450,9 +351,8 @@ private struct RecentTrackRow: View {
             return "\(track.title), \(track.artist), scrobbling now"
         }
         if let playedAt = track.playedAt {
-            let formatter = RelativeDateTimeFormatter()
-            let relative = formatter.localizedString(for: playedAt, relativeTo: Date())
-            return "\(track.title), \(track.artist), played \(relative)"
+            let timestamp = playedAt.formatted(Self.playedAtFormat)
+            return "\(track.title), \(track.artist), played at \(timestamp)"
         }
         return "\(track.title), \(track.artist)"
     }
