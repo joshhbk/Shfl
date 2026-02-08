@@ -69,6 +69,7 @@ struct MainView: View {
                 SongPickerView(
                     player: viewModel.player,
                     musicService: viewModel.musicService,
+                    initialSortOption: appSettings.librarySortOption,
                     onAddSong: { song in try await viewModel.addSong(song) },
                     onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
                     onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
@@ -85,6 +86,7 @@ struct MainView: View {
             SongPickerView(
                 player: viewModel.player,
                 musicService: viewModel.musicService,
+                initialSortOption: appSettings.librarySortOption,
                 onAddSong: { song in try await viewModel.addSong(song) },
                 onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
                 onRemoveSong: { songId in await viewModel.removeSong(id: songId) },

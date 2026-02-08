@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct AutofillSettingsView: View {
-    @AppStorage("autofillAlgorithm") private var algorithmRaw: String = AutofillAlgorithm.random.rawValue
+    @Environment(\.appSettings) private var appSettings
 
     private var algorithm: AutofillAlgorithm {
-        AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
+        appSettings?.autofillAlgorithm ?? .random
     }
 
     var body: some View {
@@ -12,7 +12,7 @@ struct AutofillSettingsView: View {
             Section {
                 ForEach(Array(AutofillAlgorithm.allCases), id: \.self) { algo in
                     Button {
-                        algorithmRaw = algo.rawValue
+                        appSettings?.autofillAlgorithm = algo
                     } label: {
                         HStack {
                             Text(algo.displayName)
@@ -46,4 +46,5 @@ struct AutofillSettingsView: View {
     NavigationStack {
         AutofillSettingsView()
     }
+    .environment(\.appSettings, AppSettings())
 }

@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import Testing
 @testable import Shfl
@@ -5,16 +6,16 @@ import Testing
 @Suite("AutofillSettingsView Tests")
 struct AutofillSettingsViewTests {
     @Test("Default algorithm is random")
+    @MainActor
     func defaultAlgorithmIsRandom() {
-        // Clear any existing value
-        UserDefaults.standard.removeObject(forKey: "autofillAlgorithm")
+        let suite = "AutofillSettingsViewTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            Issue.record("Failed to create isolated UserDefaults suite")
+            return
+        }
 
-        let storedValue = UserDefaults.standard.string(forKey: "autofillAlgorithm")
-        #expect(storedValue == nil, "No value should be stored by default")
-
-        // The view should default to random when nil
-        let algorithm = AutofillAlgorithm(rawValue: storedValue ?? "random")
-        #expect(algorithm == .random)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.autofillAlgorithm == .random)
     }
 
     @Test("Algorithm enum has correct display names")

@@ -26,6 +26,7 @@ struct SongPickerView: View {
     init(
         player: ShufflePlayer,
         musicService: MusicService,
+        initialSortOption: SortOption,
         onAddSong: @escaping @MainActor (Song) async throws -> Void,
         onAddSongsWithQueueRebuild: @escaping @MainActor ([Song]) async throws -> Void,
         onRemoveSong: @escaping @MainActor (String) async -> Void,
@@ -39,7 +40,12 @@ struct SongPickerView: View {
         self.onRemoveSong = onRemoveSong
         self.onRemoveAllSongs = onRemoveAllSongs
         self.onDismiss = onDismiss
-        self._viewModel = State(wrappedValue: LibraryBrowserViewModel(musicService: musicService))
+        self._viewModel = State(
+            wrappedValue: LibraryBrowserViewModel(
+                musicService: musicService,
+                initialSortOption: initialSortOption
+            )
+        )
         self._selectedSongIds = State(wrappedValue: Set(player.allSongs.map(\.id)))
     }
 
@@ -115,8 +121,7 @@ struct SongPickerView: View {
 
             Button {
                 Task { @MainActor in
-                    let algorithmRaw = UserDefaults.standard.string(forKey: "autofillAlgorithm") ?? "random"
-                    let algorithm = AutofillAlgorithm(rawValue: algorithmRaw) ?? .random
+                    let algorithm = appSettings?.autofillAlgorithm ?? .random
                     let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
                     await viewModel.autofill(
                         into: player,
