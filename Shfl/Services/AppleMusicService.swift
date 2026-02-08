@@ -448,7 +448,7 @@ final class AppleMusicService: MusicService {
         defer { observationTaskLock.unlock() }
         guard stateObservationTask == nil else { return }
 
-        stateObservationTask = Task { [weak self] in
+        stateObservationTask = Task { @MainActor [weak self] in
             guard let self else { return }
 
             // Initial state
@@ -457,13 +457,13 @@ final class AppleMusicService: MusicService {
             // Observe both state AND queue changes
             // State changes: play/pause/stop status
             // Queue changes: current song advances
-            async let stateChanges: Void = {
+            async let stateChanges: Void = { @MainActor in
                 for await _ in self.player.state.objectWillChange.values {
                     self.emitCurrentState()
                 }
             }()
 
-            async let queueChanges: Void = {
+            async let queueChanges: Void = { @MainActor in
                 for await _ in self.player.queue.objectWillChange.values {
                     self.emitCurrentState()
                 }

@@ -213,7 +213,7 @@ final class AppPlaybackSessionCoordinator {
         }
     }
 
-    private func restorePlaybackState(_ state: PersistedPlaybackState) async -> Bool {
+    private func restorePlaybackState(_ state: PersistedPlaybackSnapshot) async -> Bool {
         if playbackStateRepository.isStateStale(state) {
             print("🔄 Playback state is stale (>7 days), using fresh shuffle")
             try? playbackStateRepository.clearPlaybackState()
