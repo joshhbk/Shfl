@@ -819,6 +819,53 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(setQueueCallCount, 1, "setQueue should be called to rebuild stale queue")
     }
 
+    func testQueueDriftTelemetryRecordsReasonsOnPlaybackStateReconcile() async throws {
+        // Build an initial queue of 3 songs.
+        for i in 1...3 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Capture a valid song for playback-state simulation.
+        guard let currentSong = await player.lastShuffledQueue.first else {
+            XCTFail("Expected a current song in queue")
+            return
+        }
+
+        // Stop, then add songs while stopped to force pool/queue drift.
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        for i in 4...5 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+
+        let staleBefore = await player.queueState.isQueueStale
+        XCTAssertTrue(staleBefore, "Queue should be stale before reconciliation")
+
+        // Playback state change should trigger reconciliation and telemetry capture.
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let telemetry = await player.queueDriftTelemetry
+        XCTAssertEqual(telemetry.detections, 1, "Should detect one drift event")
+        XCTAssertEqual(telemetry.reconciliations, 1, "Should reconcile one drift event")
+        XCTAssertEqual(telemetry.unrepairedDetections, 0, "Drift should be repaired")
+        XCTAssertEqual(
+            telemetry.detectionsByTrigger["playback-state-change"],
+            1,
+            "Telemetry should attribute drift to playback-state reconciliation"
+        )
+        XCTAssertEqual(telemetry.detectionsByReason[.countMismatch], 1)
+        XCTAssertEqual(telemetry.detectionsByReason[.membershipMismatch], 1)
+
+        let staleAfter = await player.queueState.isQueueStale
+        XCTAssertFalse(staleAfter, "Queue should be repaired after reconciliation")
+    }
+
     func testPlayRebuildsQueueWhenSongsRemovedWhileStopped() async throws {
         // Add 5 songs and play
         for i in 1...5 {

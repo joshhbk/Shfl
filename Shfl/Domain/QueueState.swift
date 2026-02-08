@@ -1,5 +1,29 @@
 import Foundation
 
+enum QueueDriftReason: String, CaseIterable, Hashable, Sendable {
+    case countMismatch
+    case duplicateQueueIDs
+    case membershipMismatch
+
+    var displayName: String {
+        switch self {
+        case .countMismatch: return "Count mismatch"
+        case .duplicateQueueIDs: return "Duplicate queue IDs"
+        case .membershipMismatch: return "Pool/queue membership mismatch"
+        }
+    }
+}
+
+struct QueueDriftDiagnostics: Equatable, Sendable {
+    let isStale: Bool
+    let reasons: Set<QueueDriftReason>
+    let poolCount: Int
+    let queueCount: Int
+    let duplicateQueueIDs: [String]
+    let missingFromQueue: [String]
+    let missingFromPool: [String]
+}
+
 /// Immutable queue state - single source of truth for queue management.
 /// All mutations return a new state instance, making state transitions explicit and testable.
 struct QueueState: Equatable, Sendable {
@@ -78,12 +102,59 @@ struct QueueState: Equatable, Sendable {
     /// Whether the queue is out of sync with the song pool.
     /// True when songs have been added to or removed from the pool since the queue was built.
     var isQueueStale: Bool {
-        guard hasQueue else { return false }
+        queueDriftDiagnostics.isStale
+    }
+
+    /// Detailed invariant diagnostics for queue/pool drift.
+    var queueDriftDiagnostics: QueueDriftDiagnostics {
+        guard hasQueue else {
+            return QueueDriftDiagnostics(
+                isStale: false,
+                reasons: [],
+                poolCount: songPool.count,
+                queueCount: 0,
+                duplicateQueueIDs: [],
+                missingFromQueue: [],
+                missingFromPool: []
+            )
+        }
+
         let queueIds = queueOrder.map(\.id)
         let poolIds = songPool.map(\.id)
-        guard queueIds.count == poolIds.count else { return true }
-        guard Set(queueIds).count == queueIds.count else { return true } // Duplicate IDs in queue.
-        return Set(queueIds) != Set(poolIds)
+        let queueIdSet = Set(queueIds)
+        let poolIdSet = Set(poolIds)
+
+        var reasons = Set<QueueDriftReason>()
+        if queueIds.count != poolIds.count {
+            reasons.insert(.countMismatch)
+        }
+
+        var seen = Set<String>()
+        var duplicateQueueIDs: [String] = []
+        for id in queueIds where !seen.insert(id).inserted {
+            if !duplicateQueueIDs.contains(id) {
+                duplicateQueueIDs.append(id)
+            }
+        }
+        if !duplicateQueueIDs.isEmpty {
+            reasons.insert(.duplicateQueueIDs)
+        }
+
+        let missingFromQueue = poolIds.filter { !queueIdSet.contains($0) }
+        let missingFromPool = queueIds.filter { !poolIdSet.contains($0) }
+        if !missingFromQueue.isEmpty || !missingFromPool.isEmpty {
+            reasons.insert(.membershipMismatch)
+        }
+
+        return QueueDriftDiagnostics(
+            isStale: !reasons.isEmpty,
+            reasons: reasons,
+            poolCount: poolIds.count,
+            queueCount: queueIds.count,
+            duplicateQueueIDs: duplicateQueueIDs,
+            missingFromQueue: missingFromQueue,
+            missingFromPool: missingFromPool
+        )
     }
 
     /// Invalidate the queue while preserving the song pool.

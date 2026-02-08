@@ -6,6 +6,30 @@ enum ShufflePlayerError: Error, Equatable {
     case playbackFailed(String)
 }
 
+struct QueueDriftEvent: Equatable, Sendable, Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let trigger: String
+    let reasons: [QueueDriftReason]
+    let poolCount: Int
+    let queueCount: Int
+    let duplicateCount: Int
+    let missingFromQueueCount: Int
+    let missingFromPoolCount: Int
+    let currentSongId: String?
+    let preferredCurrentSongId: String?
+    let repaired: Bool
+}
+
+struct QueueDriftTelemetry: Equatable, Sendable {
+    var detections: Int = 0
+    var reconciliations: Int = 0
+    var unrepairedDetections: Int = 0
+    var detectionsByTrigger: [String: Int] = [:]
+    var detectionsByReason: [QueueDriftReason: Int] = [:]
+    var recentEvents: [QueueDriftEvent] = []
+}
+
 @MainActor
 final class PlaybackCoordinator {
     private let player: ShufflePlayer
@@ -145,6 +169,9 @@ final class ShufflePlayer {
 
     /// Current playback state from MusicKit
     private(set) var playbackState: PlaybackState = .empty
+
+    /// Diagnostics for queue drift detection and reconciliation.
+    private(set) var queueDriftTelemetry = QueueDriftTelemetry()
 
     /// Track last observed song for history updates
     @ObservationIgnored private var lastObservedSongId: String?
@@ -299,10 +326,17 @@ final class ShufflePlayer {
     }
 
     private func reconcileQueueIfNeeded(reason: String, preferredCurrentSongId: String? = nil) {
-        guard queueState.isQueueStale else { return }
+        let diagnostics = queueState.queueDriftDiagnostics
+        guard diagnostics.isStale else { return }
         let beforePoolCount = queueState.songCount
         let beforeQueueCount = queueState.queueOrder.count
         let beforeCurrent = queueState.currentSongId ?? "nil"
+
+        queueDriftTelemetry.detections += 1
+        queueDriftTelemetry.detectionsByTrigger[reason, default: 0] += 1
+        for driftReason in diagnostics.reasons {
+            queueDriftTelemetry.detectionsByReason[driftReason, default: 0] += 1
+        }
 
         queueState = queueState.reconcilingQueue(preferredCurrentSongId: preferredCurrentSongId)
 
@@ -310,10 +344,35 @@ final class ShufflePlayer {
         let afterQueueCount = queueState.queueOrder.count
         let afterCurrent = queueState.currentSongId ?? "nil"
         let repaired = !queueState.isQueueStale
+        queueDriftTelemetry.reconciliations += 1
+        if !repaired {
+            queueDriftTelemetry.unrepairedDetections += 1
+        }
+
+        let event = QueueDriftEvent(
+            timestamp: Date(),
+            trigger: reason,
+            reasons: diagnostics.reasons.sorted { $0.rawValue < $1.rawValue },
+            poolCount: diagnostics.poolCount,
+            queueCount: diagnostics.queueCount,
+            duplicateCount: diagnostics.duplicateQueueIDs.count,
+            missingFromQueueCount: diagnostics.missingFromQueue.count,
+            missingFromPoolCount: diagnostics.missingFromPool.count,
+            currentSongId: queueState.currentSongId,
+            preferredCurrentSongId: preferredCurrentSongId,
+            repaired: repaired
+        )
+        queueDriftTelemetry.recentEvents.insert(event, at: 0)
+        if queueDriftTelemetry.recentEvents.count > 20 {
+            queueDriftTelemetry.recentEvents.removeLast(queueDriftTelemetry.recentEvents.count - 20)
+        }
 
         print(
             "🛠️ Queue reconciliation [\(reason)] pool \(beforePoolCount)->\(afterPoolCount), " +
-            "queue \(beforeQueueCount)->\(afterQueueCount), current \(beforeCurrent)->\(afterCurrent), repaired=\(repaired)"
+            "queue \(beforeQueueCount)->\(afterQueueCount), current \(beforeCurrent)->\(afterCurrent), " +
+            "reasons=\(event.reasons.map(\.rawValue)), duplicateIDs=\(diagnostics.duplicateQueueIDs.count), " +
+            "missingFromQueue=\(diagnostics.missingFromQueue.count), missingFromPool=\(diagnostics.missingFromPool.count), " +
+            "repaired=\(repaired)"
         )
     }
 

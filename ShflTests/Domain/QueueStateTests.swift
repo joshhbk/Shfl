@@ -442,6 +442,44 @@ final class QueueStateTests: XCTestCase {
         XCTAssertTrue(state.isQueueStale, "Queue should be stale when duplicate IDs are present")
     }
 
+    func testQueueDriftDiagnosticsReportsCountAndMembershipMismatch() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        let state = QueueState(
+            songPool: songs,
+            queueOrder: [songs[0], songs[1]],
+            playedIds: [],
+            currentIndex: 0,
+            algorithm: .noRepeat
+        )
+
+        let diagnostics = state.queueDriftDiagnostics
+
+        XCTAssertTrue(diagnostics.isStale)
+        XCTAssertTrue(diagnostics.reasons.contains(.countMismatch))
+        XCTAssertTrue(diagnostics.reasons.contains(.membershipMismatch))
+        XCTAssertEqual(diagnostics.poolCount, 3)
+        XCTAssertEqual(diagnostics.queueCount, 2)
+        XCTAssertEqual(diagnostics.missingFromQueue, ["3"])
+        XCTAssertEqual(diagnostics.missingFromPool, [])
+    }
+
+    func testQueueDriftDiagnosticsReportsDuplicateQueueIDs() {
+        let songs = (1...3).map { makeSong(id: "\($0)") }
+        let state = QueueState(
+            songPool: songs,
+            queueOrder: [songs[0], songs[0], songs[1]],
+            playedIds: [],
+            currentIndex: 0,
+            algorithm: .noRepeat
+        )
+
+        let diagnostics = state.queueDriftDiagnostics
+
+        XCTAssertTrue(diagnostics.isStale)
+        XCTAssertTrue(diagnostics.reasons.contains(.duplicateQueueIDs))
+        XCTAssertEqual(diagnostics.duplicateQueueIDs, ["1"])
+    }
+
     func testReconcilingQueueRepairsMissingAndDuplicateEntries() {
         let songs = (1...5).map { makeSong(id: "\($0)") }
         let drifted = QueueState(
