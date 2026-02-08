@@ -198,4 +198,33 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.autofillState, .completed(count: 1))
     }
+
+    func test_autofill_whilePlaying_rebuildsActiveQueue() async throws {
+        let allSongs = (1...5).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        await mockService.setLibrarySongs(allSongs)
+
+        let player = ShufflePlayer(musicService: mockService)
+        try await player.addSong(allSongs[0])
+        try await player.addSong(allSongs[1])
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        let source = LibraryAutofillSource(musicService: mockService)
+        await viewModel.autofill(into: player, using: source) { songs in
+            try await player.addSongsWithQueueRebuild(songs)
+        }
+
+        XCTAssertEqual(viewModel.autofillState, .completed(count: 3))
+        XCTAssertEqual(player.songCount, 5)
+
+        let replaceCallCount = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallCount, 1, "Autofill while active should rebuild the transport queue")
+
+        let queuedIds = Set(await mockService.lastQueuedSongs.map(\.id))
+        XCTAssertEqual(queuedIds, Set(allSongs.map(\.id)))
+    }
 }
