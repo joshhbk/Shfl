@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import MusicKit
 
-final class AppleMusicService: MusicService, @unchecked Sendable {
+final class AppleMusicService: MusicService {
     private let player = ApplicationMusicPlayer.shared
     private var stateObservationTask: Task<Void, Never>?
     private var continuation: AsyncStream<PlaybackState>.Continuation?

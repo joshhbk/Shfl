@@ -1,6 +1,6 @@
 import Foundation
 
-final class MockMusicService: MusicService, @unchecked Sendable {
+final class MockMusicService: MusicService {
     var isAuthorized: Bool { true }
 
     var playbackStateStream: AsyncStream<PlaybackState> {
