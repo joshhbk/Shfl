@@ -65,6 +65,7 @@ struct PlayerView: View {
                         withAnimation {
                             showError = false
                         }
+                        player.clearOperationNotice()
                     }
                 )
             }
@@ -90,6 +91,13 @@ struct PlayerView: View {
         }
         .onChange(of: player.playbackState) { _, newState in
             handlePlaybackStateChange(newState)
+        }
+        .onChange(of: player.operationNotice) { _, notice in
+            guard let notice else { return }
+            errorMessage = notice
+            withAnimation {
+                showError = true
+            }
         }
         .onChange(of: colorExtractor.extractedColor) { _, newColor in
             tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)

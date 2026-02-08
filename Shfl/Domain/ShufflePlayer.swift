@@ -6,6 +6,19 @@ enum ShufflePlayerError: Error, Equatable {
     case playbackFailed(String)
 }
 
+extension ShufflePlayerError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .capacityReached:
+            return "Song limit reached."
+        case .notAuthorized:
+            return "Apple Music authorization is required."
+        case .playbackFailed(let message):
+            return message
+        }
+    }
+}
+
 struct QueueDriftEvent: Equatable, Sendable, Identifiable {
     let id = UUID()
     let timestamp: Date
@@ -172,6 +185,9 @@ final class ShufflePlayer {
 
     /// Diagnostics for queue drift detection and reconciliation.
     private(set) var queueDriftTelemetry = QueueDriftTelemetry()
+
+    /// Non-blocking operation notice for queue/transport sync failures.
+    private(set) var operationNotice: String?
 
     /// Track last observed song for history updates
     @ObservationIgnored private var lastObservedSongId: String?
@@ -376,6 +392,35 @@ final class ShufflePlayer {
         )
     }
 
+    func clearOperationNotice() {
+        operationNotice = nil
+    }
+
+    private func reportTransportFailure(action: String, error: Error) -> String {
+        let message = Self.isLikelyOfflineError(error)
+            ? "\(action) while offline. Reconnect and try again."
+            : "\(action). Please try again."
+        operationNotice = message
+        print("⚠️ \(action): \(error)")
+        return message
+    }
+
+    private static func isLikelyOfflineError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+
+        return [
+            NSURLErrorNotConnectedToInternet,
+            NSURLErrorNetworkConnectionLost,
+            NSURLErrorTimedOut,
+            NSURLErrorCannotFindHost,
+            NSURLErrorCannotConnectToHost,
+            NSURLErrorInternationalRoamingOff,
+            NSURLErrorDataNotAllowed,
+            NSURLErrorCallIsActive
+        ].contains(nsError.code)
+    }
+
     // MARK: - Algorithm Change
 
     /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
@@ -398,6 +443,8 @@ final class ShufflePlayer {
             return
         }
 
+        let stateBeforeReshuffle = queueState
+
         // Update queue state with reshuffled upcoming songs
         queueState = queueState.reshuffledUpcoming(with: algorithm)
 
@@ -412,6 +459,8 @@ final class ShufflePlayer {
             )
             print("🎲 replaceQueue succeeded")
         } catch {
+            queueState = stateBeforeReshuffle
+            _ = reportTransportFailure(action: "Couldn't reshuffle the active queue", error: error)
             print("🎲 replaceQueue FAILED: \(error)")
         }
     }
@@ -448,6 +497,8 @@ final class ShufflePlayer {
                 // Rollback completely so pool/queue invariants remain intact.
                 queueState = queueState.removingSong(id: song.id)
                 print("⚠️ Rolled back \(song.title) from pool+queue after insert failure: \(error)")
+                let message = reportTransportFailure(action: "Couldn't add the song to the active queue", error: error)
+                throw ShufflePlayerError.playbackFailed(message)
             }
         } else {
             print("➕ addSong: playback not active or no queue yet, song only added to pool")
@@ -478,6 +529,7 @@ final class ShufflePlayer {
         print("🔍 addSongsWithQueueRebuild: \(addedCount) unique after filtering")
 
         queueState = newState
+        let stateBeforeQueueRebuild = queueState
         print("🔍 addSongsWithQueueRebuild: Added to internal list, playbackState.isActive = \(playbackState.isActive)")
 
         // If playing, reshuffle to interleave new songs throughout upcoming queue
@@ -504,7 +556,10 @@ final class ShufflePlayer {
                 )
                 print("🎵 Successfully reshuffled queue with \(queueState.queueOrder.count) total songs")
             } catch {
+                queueState = stateBeforeQueueRebuild
+                let message = reportTransportFailure(action: "Couldn't sync newly added songs to the active queue", error: error)
                 print("🎵 Failed to reshuffle queue: \(error)")
+                throw ShufflePlayerError.playbackFailed(message)
             }
         }
         if playbackState.isActive {
@@ -514,6 +569,7 @@ final class ShufflePlayer {
     }
 
     func removeSong(id: String) async {
+        let previousState = queueState
         let isRemovingCurrentSong = playbackState.currentSongId == id
         queueState = queueState.removingSong(id: id)
 
@@ -526,6 +582,8 @@ final class ShufflePlayer {
                 try await musicService.skipToNext()
                 print("🎵 Skipped to next after removing current song")
             } catch {
+                queueState = previousState
+                _ = reportTransportFailure(action: "Couldn't remove the currently playing song", error: error)
                 print("🎵 Failed to skip after removing current song: \(error)")
             }
         } else if let currentSong = playbackState.currentSong,
@@ -540,6 +598,8 @@ final class ShufflePlayer {
                 )
                 print("🎵 Removed song \(id) from MusicKit queue")
             } catch {
+                queueState = previousState
+                _ = reportTransportFailure(action: "Couldn't remove the song from the active queue", error: error)
                 print("🎵 Failed to remove song from MusicKit queue: \(error)")
             }
         }
