@@ -23,13 +23,18 @@ nonisolated struct PersistedPlaybackSnapshot: Equatable, Sendable {
 final class PlaybackStateRepository {
     private let modelContext: ModelContext
     private let container: ModelContainer
+    private let saveHandler: () throws -> Void
 
     /// Number of days after which saved state is considered stale
     private static let staleThresholdDays: Int = 7
 
-    init(modelContext: ModelContext) {
+    init(
+        modelContext: ModelContext,
+        saveHandler: (() throws -> Void)? = nil
+    ) {
         self.modelContext = modelContext
         self.container = modelContext.container
+        self.saveHandler = saveHandler ?? { try modelContext.save() }
     }
 
     /// Loads playback state on a background thread to avoid blocking the main thread during startup.
@@ -48,17 +53,34 @@ final class PlaybackStateRepository {
 
     /// Saves the playback state atomically (deletes old, inserts new).
     func savePlaybackState(_ state: PersistedPlaybackState) throws {
-        // Clear existing state first
-        try clearPlaybackState()
+        do {
+            let descriptor = FetchDescriptor<PersistedPlaybackState>()
+            let existingStates = try modelContext.fetch(descriptor)
+            for existingState in existingStates {
+                modelContext.delete(existingState)
+            }
 
-        // Insert new state
-        modelContext.insert(state)
-        try modelContext.save()
+            modelContext.insert(state)
+            try saveHandler()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
     }
 
     /// Clears all persisted playback state.
     func clearPlaybackState() throws {
-        try modelContext.delete(model: PersistedPlaybackState.self)
+        do {
+            let descriptor = FetchDescriptor<PersistedPlaybackState>()
+            let existingStates = try modelContext.fetch(descriptor)
+            for existingState in existingStates {
+                modelContext.delete(existingState)
+            }
+            try saveHandler()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
     }
 
     /// Checks if the given state is older than the stale threshold.

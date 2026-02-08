@@ -5,10 +5,15 @@ import SwiftData
 final class SongRepository {
     private let modelContext: ModelContext
     private let container: ModelContainer
+    private let saveHandler: () throws -> Void
 
-    init(modelContext: ModelContext) {
+    init(
+        modelContext: ModelContext,
+        saveHandler: (() throws -> Void)? = nil
+    ) {
         self.modelContext = modelContext
         self.container = modelContext.container
+        self.saveHandler = saveHandler ?? { try modelContext.save() }
     }
 
     /// Loads songs on a background thread to avoid blocking the main thread during startup.
@@ -25,16 +30,24 @@ final class SongRepository {
     }
 
     func saveSongs(_ songs: [Song]) throws {
-        // Clear existing
-        try clearSongs()
+        do {
+            // Replace snapshot in-memory first, then commit once.
+            let descriptor = FetchDescriptor<PersistedSong>()
+            let existing = try modelContext.fetch(descriptor)
+            for song in existing {
+                modelContext.delete(song)
+            }
 
-        // Insert new
-        for (index, song) in songs.enumerated() {
-            let persisted = PersistedSong.from(song, orderIndex: index)
-            modelContext.insert(persisted)
+            for (index, song) in songs.enumerated() {
+                let persisted = PersistedSong.from(song, orderIndex: index)
+                modelContext.insert(persisted)
+            }
+
+            try saveHandler()
+        } catch {
+            modelContext.rollback()
+            throw error
         }
-
-        try modelContext.save()
     }
 
     func loadSongs() throws -> [Song] {
@@ -46,6 +59,16 @@ final class SongRepository {
     }
 
     func clearSongs() throws {
-        try modelContext.delete(model: PersistedSong.self)
+        do {
+            let descriptor = FetchDescriptor<PersistedSong>()
+            let existing = try modelContext.fetch(descriptor)
+            for song in existing {
+                modelContext.delete(song)
+            }
+            try saveHandler()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
     }
 }
