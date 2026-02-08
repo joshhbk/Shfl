@@ -5,19 +5,23 @@ import MusicKit
 final class AppleMusicService: MusicService {
     private let player = ApplicationMusicPlayer.shared
     private var stateObservationTask: Task<Void, Never>?
-    private var continuation: AsyncStream<PlaybackState>.Continuation?
-    private var cachedStream: AsyncStream<PlaybackState>?
+    private let observationTaskLock = NSLock()
+    private let playbackStateBroadcaster = PlaybackStateBroadcaster()
 
     var playbackStateStream: AsyncStream<PlaybackState> {
-        if let cachedStream {
-            return cachedStream
-        }
-        let stream = AsyncStream { [weak self] continuation in
-            self?.continuation = continuation
-            self?.startObservingPlaybackState()
-        }
-        cachedStream = stream
+        let currentState = mapPlaybackState()
+        let stream = playbackStateBroadcaster.stream(replaying: currentState)
+        startObservingPlaybackStateIfNeeded()
         return stream
+    }
+
+    deinit {
+        observationTaskLock.lock()
+        let task = stateObservationTask
+        stateObservationTask = nil
+        observationTaskLock.unlock()
+        task?.cancel()
+        playbackStateBroadcaster.finishAll()
     }
 
     var currentPlaybackTime: TimeInterval {
@@ -439,8 +443,11 @@ final class AppleMusicService: MusicService {
         player.playbackTime = max(0, time)
     }
 
-    private func startObservingPlaybackState() {
-        stateObservationTask?.cancel()
+    private func startObservingPlaybackStateIfNeeded() {
+        observationTaskLock.lock()
+        defer { observationTaskLock.unlock() }
+        guard stateObservationTask == nil else { return }
+
         stateObservationTask = Task { [weak self] in
             guard let self else { return }
 
@@ -472,7 +479,7 @@ final class AppleMusicService: MusicService {
         #if DEBUG
         print("📻 Emitting state: \(state)")
         #endif
-        continuation?.yield(state)
+        playbackStateBroadcaster.publish(state)
     }
 
     private func mapPlaybackState() -> PlaybackState {
@@ -513,5 +520,74 @@ final class AppleMusicService: MusicService {
         @unknown default:
             return .stopped
         }
+    }
+}
+
+final class PlaybackStateBroadcaster {
+    private var continuations: [UUID: AsyncStream<PlaybackState>.Continuation] = [:]
+    private var latestState: PlaybackState = .empty
+    private let lock = NSLock()
+
+    var subscriberCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return continuations.count
+    }
+
+    func stream(replaying state: PlaybackState) -> AsyncStream<PlaybackState> {
+        AsyncStream { [weak self] continuation in
+            guard let self else {
+                continuation.finish()
+                return
+            }
+
+            let id = UUID()
+            let replayState: PlaybackState
+
+            lock.lock()
+            latestState = state
+            continuations[id] = continuation
+            replayState = latestState
+            lock.unlock()
+
+            continuation.yield(replayState)
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.removeSubscriber(id: id)
+                }
+            }
+        }
+    }
+
+    func publish(_ state: PlaybackState) {
+        let subscribers: [AsyncStream<PlaybackState>.Continuation]
+
+        lock.lock()
+        latestState = state
+        subscribers = Array(continuations.values)
+        lock.unlock()
+
+        for continuation in subscribers {
+            continuation.yield(state)
+        }
+    }
+
+    func finishAll() {
+        let subscribers: [AsyncStream<PlaybackState>.Continuation]
+
+        lock.lock()
+        subscribers = Array(continuations.values)
+        continuations.removeAll()
+        lock.unlock()
+
+        for continuation in subscribers {
+            continuation.finish()
+        }
+    }
+
+    private func removeSubscriber(id: UUID) {
+        lock.lock()
+        continuations.removeValue(forKey: id)
+        lock.unlock()
     }
 }
