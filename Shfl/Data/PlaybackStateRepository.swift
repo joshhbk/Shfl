@@ -1,6 +1,24 @@
 import Foundation
 import SwiftData
 
+nonisolated struct PersistedPlaybackSnapshot: Equatable, Sendable {
+    let currentSongId: String?
+    let playbackPosition: Double
+    let wasPlaying: Bool
+    let savedAt: Date
+    let queueOrder: [String]
+    let playedSongIds: Set<String>
+
+    init(model: PersistedPlaybackState) {
+        self.currentSongId = model.currentSongId
+        self.playbackPosition = model.playbackPosition
+        self.wasPlaying = model.wasPlaying
+        self.savedAt = model.savedAt
+        self.queueOrder = model.queueOrder
+        self.playedSongIds = model.playedSongIds
+    }
+}
+
 @MainActor
 final class PlaybackStateRepository {
     private let modelContext: ModelContext
@@ -15,7 +33,7 @@ final class PlaybackStateRepository {
     }
 
     /// Loads playback state on a background thread to avoid blocking the main thread during startup.
-    nonisolated func loadPlaybackStateAsync() async throws -> PersistedPlaybackState? {
+    nonisolated func loadPlaybackStateAsync() async throws -> PersistedPlaybackSnapshot? {
         let container = self.container
         return try await Task.detached {
             let context = ModelContext(container)
@@ -23,7 +41,8 @@ final class PlaybackStateRepository {
                 sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
             )
             let states = try context.fetch(descriptor)
-            return states.first
+            guard let latest = states.first else { return nil }
+            return PersistedPlaybackSnapshot(model: latest)
         }.value
     }
 
@@ -43,7 +62,7 @@ final class PlaybackStateRepository {
     }
 
     /// Checks if the given state is older than the stale threshold.
-    func isStateStale(_ state: PersistedPlaybackState) -> Bool {
+    func isStateStale(_ state: PersistedPlaybackSnapshot) -> Bool {
         let calendar = Calendar.current
         guard let staleDate = calendar.date(
             byAdding: .day,

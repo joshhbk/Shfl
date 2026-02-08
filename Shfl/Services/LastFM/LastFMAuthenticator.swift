@@ -3,7 +3,7 @@ import Security
 import AuthenticationServices
 import UIKit
 
-struct LastFMSession: Codable, Equatable {
+nonisolated struct LastFMSession: Codable, Equatable, Sendable {
     let sessionKey: String
     let username: String
 }
