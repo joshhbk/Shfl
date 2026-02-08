@@ -95,6 +95,15 @@ enum ColorBlending {
         return Color(hue: hsb.hue, saturation: hsb.saturation, brightness: darkerBrightness)
     }
 
+    /// WCAG contrast ratio between two colors (returns value >= 1.0)
+    static func contrastRatio(between foreground: Color, and background: Color) -> CGFloat {
+        let fgLum = relativeLuminance(of: foreground)
+        let bgLum = relativeLuminance(of: background)
+        let lighter = max(fgLum, bgLum)
+        let darker = min(fgLum, bgLum)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
     /// Determine appropriate wheel and text styles based on color luminance
     static func determineStyles(for color: Color) -> (wheel: ShuffleTheme.WheelStyle, text: ShuffleTheme.TextStyle, iconColor: Color) {
         let luminance = relativeLuminance(of: color)

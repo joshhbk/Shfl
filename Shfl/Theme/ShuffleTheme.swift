@@ -41,6 +41,11 @@ struct ShuffleTheme: Identifiable, Equatable {
         case .dark: return Color(white: 0.15).opacity(0.7)
         }
     }
+
+    /// The accent color derived from this theme, for use as app-wide tint
+    var accentColor: Color {
+        bodyGradientTop
+    }
 }
 
 // MARK: - Theme Definitions

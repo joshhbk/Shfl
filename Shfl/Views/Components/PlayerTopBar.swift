@@ -3,10 +3,20 @@ import SwiftUI
 /// Top bar with Add and Settings buttons for the player view
 struct PlayerTopBar: View {
     @Environment(\.shuffleTheme) private var theme
+    @Environment(\.appSettings) private var appSettings
 
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
     let topPadding: CGFloat
+
+    /// Device theme accent color — always visible against the dark button background.
+    private var iconColor: Color {
+        guard let themeId = appSettings?.currentThemeId,
+              let deviceTheme = ShuffleTheme.theme(byId: themeId) else {
+            return .white
+        }
+        return deviceTheme.accentColor
+    }
 
     var body: some View {
         HStack {
@@ -24,20 +34,20 @@ struct PlayerTopBar: View {
         Button(action: onAddTapped) {
             Image(systemName: "music.note.list")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(theme.textColor)
+                .foregroundStyle(iconColor)
                 .frame(width: 44, height: 44)
         }
-        .modifier(CircularButtonStyle(textStyle: theme.textStyle))
+        .modifier(CircularButtonStyle())
     }
 
     private var settingsButton: some View {
         Button(action: onSettingsTapped) {
             Image(systemName: "gearshape")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(theme.textColor)
+                .foregroundStyle(iconColor)
                 .frame(width: 44, height: 44)
         }
-        .modifier(CircularButtonStyle(textStyle: theme.textStyle))
+        .modifier(CircularButtonStyle())
     }
 }
 
@@ -59,35 +69,19 @@ private struct GlassContainerModifier: ViewModifier {
 
 // MARK: - Circular Button Style
 
-/// Applies liquid glass effect on iOS 26+, material background on older versions
+/// Applies a consistent dark circular background so the device accent icon is always readable
 private struct CircularButtonStyle: ViewModifier {
-    let textStyle: ShuffleTheme.TextStyle
-
-    private var tintColor: Color {
-        switch textStyle {
-        case .light: return .black.opacity(0.15)
-        case .dark: return .white.opacity(0.15)
-        }
-    }
-
-    private var borderColor: Color {
-        switch textStyle {
-        case .light: return .white.opacity(0.2)
-        case .dark: return .black.opacity(0.15)
-        }
-    }
-
     func body(content: Content) -> some View {
         if #available(iOS 26, macOS 26, *) {
             content
-                .background(tintColor, in: Circle())
+                .background(.black.opacity(0.8), in: Circle())
                 .glassEffect(.regular.interactive(), in: .circle)
         } else {
             content
-                .background(.ultraThinMaterial, in: Circle())
+                .background(.black.opacity(0.8), in: Circle())
                 .overlay(
                     Circle()
-                        .strokeBorder(borderColor, lineWidth: 0.5)
+                        .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
                 )
         }
     }

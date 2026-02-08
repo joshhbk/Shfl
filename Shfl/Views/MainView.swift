@@ -37,6 +37,7 @@ struct MainView: View {
                 authorizationView
             }
         }
+        .tint(deviceAccentColor)
         .environment(\.appSettings, appSettings)
         .onAppear {
             VolumeController.initialize()
@@ -61,6 +62,7 @@ struct MainView: View {
                 },
                 onDismiss: { viewModel.closeManage() }
             )
+            .tint(deviceAccentColor)
             .environment(\.appSettings, appSettings)
             .sheet(isPresented: Binding(
                 get: { viewModel.showingPicker },
@@ -76,6 +78,7 @@ struct MainView: View {
                     onRemoveAllSongs: { await viewModel.removeAllSongs() },
                     onDismiss: { viewModel.closePicker() }
                 )
+                .tint(deviceAccentColor)
                 .environment(\.appSettings, appSettings)
             }
         }
@@ -93,6 +96,7 @@ struct MainView: View {
                 onRemoveAllSongs: { await viewModel.removeAllSongs() },
                 onDismiss: { viewModel.closePickerDirect() }
             )
+            .tint(deviceAccentColor)
             .environment(\.appSettings, appSettings)
         }
         .sheet(isPresented: Binding(
@@ -100,6 +104,7 @@ struct MainView: View {
             set: { viewModel.showingSettings = $0 }
         )) {
             SettingsView()
+                .tint(deviceAccentColor)
                 .environment(\.appSettings, appSettings)
                 .environment(\.shufflePlayer, viewModel.player)
                 .environment(\.lastFMTransport, viewModel.lastFMTransport)
@@ -119,6 +124,10 @@ struct MainView: View {
                 Text(error)
             }
         }
+    }
+
+    private var deviceAccentColor: Color {
+        (ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink).accentColor
     }
 
     private var loadingView: some View {
