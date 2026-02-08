@@ -1,4 +1,3 @@
-import Combine
 import MusicKit
 import SwiftUI
 
@@ -21,17 +20,16 @@ struct EntityArtwork: View {
                         .foregroundStyle(.gray)
                 }
             }
-            .onAppear {
+            .task(id: entityId) {
                 artwork = ArtworkCache.shared.artwork(for: entityId)
-                if artwork == nil {
-                    ArtworkCache.shared.requestArtwork(for: entityId, type: type)
+                guard artwork == nil else { return }
+
+                ArtworkCache.shared.requestArtwork(for: entityId, type: type)
+
+                for await loadedArtwork in ArtworkCache.shared.artworkUpdates(for: entityId) {
+                    artwork = loadedArtwork
+                    break
                 }
-            }
-            .onReceive(
-                NotificationCenter.default.publisher(for: ArtworkCache.artworkDidLoad)
-                    .filter { ($0.userInfo?["songId"] as? String) == entityId }
-            ) { _ in
-                artwork = ArtworkCache.shared.artwork(for: entityId)
             }
     }
 

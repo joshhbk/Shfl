@@ -1,16 +1,14 @@
 import Foundation
 import MusicKit
 
-/// Non-observable artwork storage to prevent observation fan-out.
-/// Views query this directly; changes are signaled via NotificationCenter
-/// so only the specific view for that song updates.
+/// Boundary note:
+/// - App/domain state propagation uses Observation.
+/// - Artwork loading uses targeted AsyncStream updates per entity id.
+/// This avoids global observation fan-out for artwork-heavy lists while
+/// keeping eventing local and typed (no NotificationCenter payload parsing).
 @MainActor
 final class ArtworkCache {
     static let shared = ArtworkCache()
-
-    /// Notification posted when a specific song's artwork is loaded.
-    /// userInfo contains "songId": String
-    static let artworkDidLoad = Notification.Name("ArtworkCacheDidLoad")
 
     enum ArtworkType {
         case song
@@ -22,6 +20,7 @@ final class ArtworkCache {
     private var pending: Set<String> = []
     private var loadQueue: [(id: String, type: ArtworkType)] = []
     private var isProcessing = false
+    private var updateContinuations: [String: [UUID: AsyncStream<Artwork>.Continuation]] = [:]
 
     private init() {}
 
@@ -39,6 +38,33 @@ final class ArtworkCache {
         pending.insert(id)
         loadQueue.append((id: id, type: type))
         processQueue()
+    }
+
+    func artworkUpdates(for id: String) -> AsyncStream<Artwork> {
+        if let cached = cache[id] {
+            return AsyncStream { continuation in
+                continuation.yield(cached)
+                continuation.finish()
+            }
+        }
+
+        let token = UUID()
+        return AsyncStream { [weak self] continuation in
+            guard let self else {
+                continuation.finish()
+                return
+            }
+
+            var waiters = self.updateContinuations[id, default: [:]]
+            waiters[token] = continuation
+            self.updateContinuations[id] = waiters
+
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.removeContinuation(for: id, token: token)
+                }
+            }
+        }
     }
 
     private func processQueue() {
@@ -81,20 +107,24 @@ final class ArtworkCache {
 
         do {
             let response = try await request.response()
+            var loadedIds: Set<String> = []
             for song in response.items {
                 let songId = song.id.rawValue
                 if let artwork = song.artwork {
                     cache[songId] = artwork
-                    NotificationCenter.default.post(
-                        name: Self.artworkDidLoad,
-                        object: nil,
-                        userInfo: ["songId": songId]
-                    )
+                    publishUpdate(for: songId, artwork: artwork)
                 }
+                loadedIds.insert(songId)
                 pending.remove(songId)
+            }
+
+            for id in songIds where !loadedIds.contains(id) {
+                finishWaiters(for: id)
+                pending.remove(id)
             }
         } catch {
             for id in songIds {
+                finishWaiters(for: id)
                 pending.remove(id)
             }
         }
@@ -108,20 +138,24 @@ final class ArtworkCache {
 
         do {
             let response = try await request.response()
+            var loadedIds: Set<String> = []
             for artist in response.items {
                 let artistId = artist.id.rawValue
                 if let artwork = artist.artwork {
                     cache[artistId] = artwork
-                    NotificationCenter.default.post(
-                        name: Self.artworkDidLoad,
-                        object: nil,
-                        userInfo: ["songId": artistId]
-                    )
+                    publishUpdate(for: artistId, artwork: artwork)
                 }
+                loadedIds.insert(artistId)
                 pending.remove(artistId)
+            }
+
+            for id in artistIds where !loadedIds.contains(id) {
+                finishWaiters(for: id)
+                pending.remove(id)
             }
         } catch {
             for id in artistIds {
+                finishWaiters(for: id)
                 pending.remove(id)
             }
         }
@@ -135,22 +169,51 @@ final class ArtworkCache {
 
         do {
             let response = try await request.response()
+            var loadedIds: Set<String> = []
             for playlist in response.items {
                 let playlistId = playlist.id.rawValue
                 if let artwork = playlist.artwork {
                     cache[playlistId] = artwork
-                    NotificationCenter.default.post(
-                        name: Self.artworkDidLoad,
-                        object: nil,
-                        userInfo: ["songId": playlistId]
-                    )
+                    publishUpdate(for: playlistId, artwork: artwork)
                 }
+                loadedIds.insert(playlistId)
                 pending.remove(playlistId)
+            }
+
+            for id in playlistIds where !loadedIds.contains(id) {
+                finishWaiters(for: id)
+                pending.remove(id)
             }
         } catch {
             for id in playlistIds {
+                finishWaiters(for: id)
                 pending.remove(id)
             }
+        }
+    }
+
+    private func publishUpdate(for id: String, artwork: Artwork) {
+        guard let waiters = updateContinuations.removeValue(forKey: id) else { return }
+        for continuation in waiters.values {
+            continuation.yield(artwork)
+            continuation.finish()
+        }
+    }
+
+    private func finishWaiters(for id: String) {
+        guard let waiters = updateContinuations.removeValue(forKey: id) else { return }
+        for continuation in waiters.values {
+            continuation.finish()
+        }
+    }
+
+    private func removeContinuation(for id: String, token: UUID) {
+        guard var waiters = updateContinuations[id] else { return }
+        waiters.removeValue(forKey: token)
+        if waiters.isEmpty {
+            updateContinuations.removeValue(forKey: id)
+        } else {
+            updateContinuations[id] = waiters
         }
     }
 }

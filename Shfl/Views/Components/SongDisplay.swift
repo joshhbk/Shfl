@@ -1,4 +1,3 @@
-import Combine
 import MusicKit
 import SwiftUI
 
@@ -42,18 +41,16 @@ struct SongArtwork: View {
                         .foregroundStyle(.gray)
                 }
             }
-            .onAppear {
-                // Check cache first, request if not present
+            .task(id: songId) {
                 artwork = ArtworkCache.shared.artwork(for: songId)
-                if artwork == nil {
-                    ArtworkCache.shared.requestArtwork(for: songId)
+                guard artwork == nil else { return }
+
+                ArtworkCache.shared.requestArtwork(for: songId)
+
+                for await loadedArtwork in ArtworkCache.shared.artworkUpdates(for: songId) {
+                    artwork = loadedArtwork
+                    break
                 }
-            }
-            .onReceive(
-                NotificationCenter.default.publisher(for: ArtworkCache.artworkDidLoad)
-                    .filter { ($0.userInfo?["songId"] as? String) == songId }
-            ) { _ in
-                artwork = ArtworkCache.shared.artwork(for: songId)
             }
     }
 }
