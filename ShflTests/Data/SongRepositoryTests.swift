@@ -5,6 +5,7 @@ import SwiftData
 final class SongRepositoryTests: XCTestCase {
     var container: ModelContainer!
     var repository: SongRepository!
+    private enum InjectedFailure: Error { case save }
 
     @MainActor
     override func setUp() async throws {
@@ -54,5 +55,27 @@ final class SongRepositoryTests: XCTestCase {
 
         let loaded = try repository.loadSongs()
         XCTAssertTrue(loaded.isEmpty)
+    }
+
+    @MainActor
+    func testSaveSongsFailureKeepsPreviousSnapshotRecoverable() async throws {
+        let originalSongs = [
+            Song(id: "1", title: "Original", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        ]
+        try repository.saveSongs(originalSongs)
+
+        let failingRepository = SongRepository(
+            modelContext: container.mainContext,
+            saveHandler: { throw InjectedFailure.save }
+        )
+        let replacementSongs = [
+            Song(id: "2", title: "Replacement", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        ]
+
+        XCTAssertThrowsError(try failingRepository.saveSongs(replacementSongs))
+
+        let recoveredRepository = SongRepository(modelContext: ModelContext(container))
+        let loaded = try recoveredRepository.loadSongs()
+        XCTAssertEqual(loaded.map(\.id), ["1"])
     }
 }
