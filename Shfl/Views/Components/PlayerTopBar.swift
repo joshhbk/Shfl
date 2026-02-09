@@ -20,9 +20,8 @@ struct PlayerTopBar: View {
 
     var body: some View {
         HStack {
-            addButton
             Spacer()
-            settingsButton
+            buttonGroup
         }
         .modifier(GlassContainerModifier())
         .padding(.horizontal, 20)
@@ -30,24 +29,23 @@ struct PlayerTopBar: View {
         .padding(.bottom, 16)
     }
 
-    private var addButton: some View {
-        Button(action: onAddTapped) {
-            Image(systemName: "music.note.list")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(iconColor)
-                .frame(width: 44, height: 44)
+    private var buttonGroup: some View {
+        HStack(spacing: 4) {
+            Button(action: onAddTapped) {
+                Image(systemName: "music.note.list")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 48, height: 48)
+            }
+            Button(action: onSettingsTapped) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 48, height: 48)
+            }
         }
-        .modifier(CircularButtonStyle())
-    }
-
-    private var settingsButton: some View {
-        Button(action: onSettingsTapped) {
-            Image(systemName: "gearshape")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(iconColor)
-                .frame(width: 44, height: 44)
-        }
-        .modifier(CircularButtonStyle())
+        .padding(.horizontal, 4)
+        .modifier(CapsuleButtonGroupStyle())
     }
 }
 
@@ -67,21 +65,25 @@ private struct GlassContainerModifier: ViewModifier {
     }
 }
 
-// MARK: - Circular Button Style
+// MARK: - Capsule Button Group Style
 
-/// Applies a consistent dark circular background so the device accent icon is always readable
-private struct CircularButtonStyle: ViewModifier {
+/// Wraps grouped buttons in a single capsule container
+private struct CapsuleButtonGroupStyle: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, macOS 26, *) {
             content
-                .background(.black.opacity(0.8), in: Circle())
-                .glassEffect(.regular.interactive(), in: .circle)
+                .background(.black.opacity(0.85), in: Capsule())
+                .overlay(
+                    Capsule()
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                )
+                .glassEffect(.regular.interactive(), in: .capsule)
         } else {
             content
-                .background(.black.opacity(0.8), in: Circle())
+                .background(.black.opacity(0.85), in: Capsule())
                 .overlay(
-                    Circle()
-                        .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
+                    Capsule()
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
                 )
         }
     }
