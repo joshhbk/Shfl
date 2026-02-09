@@ -69,11 +69,11 @@ struct SongInfoDisplay: View {
                 .scaleEffect(0.8)
                 .tint(theme.textColor)
             Text(song.title)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundStyle(theme.textColor)
                 .lineLimit(1)
             Text(song.artist)
-                .font(.system(size: 14))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(theme.secondaryTextColor)
                 .lineLimit(1)
         }
@@ -81,13 +81,13 @@ struct SongInfoDisplay: View {
 
     @ViewBuilder
     private func activeContent(song: Song) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             Text(song.title)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundStyle(theme.textColor)
                 .lineLimit(1)
             Text(song.artist)
-                .font(.system(size: 13))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(theme.secondaryTextColor)
                 .lineLimit(1)
 
@@ -124,7 +124,7 @@ struct SongInfoDisplay: View {
     private var emptyContent: some View {
         VStack(spacing: 12) {
             Text("No songs yet")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundStyle(theme.textColor)
 
             HStack(spacing: 12) {
