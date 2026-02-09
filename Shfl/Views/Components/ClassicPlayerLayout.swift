@@ -23,6 +23,15 @@ struct ClassicPlayerLayout: View {
         }
     }
 
+    /// Coarse state category for animating layout transitions between empty/loading/active
+    private var stateCategory: Int {
+        switch playbackState {
+        case .playing, .paused: return 2
+        case .loading: return 1
+        default: return 0
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if showError {
@@ -39,9 +48,14 @@ struct ClassicPlayerLayout: View {
             Spacer()
 
             // Album art card - show real art when playing/paused, placeholder otherwise
-            AlbumArtCard(artworkURL: playingOrPausedSong?.artworkURL, size: 280)
-                .padding(.bottom, 16)
-                .opacity(hasSongs || playbackState.isActive ? 1 : 0)
+            ZStack {
+                AlbumArtCard(artworkURL: playingOrPausedSong?.artworkURL, size: 280)
+                    .id(playingOrPausedSong?.id)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+            .animation(.easeInOut(duration: 0.4), value: playingOrPausedSong?.id)
+            .padding(.bottom, 16)
+            .opacity(hasSongs || playbackState.isActive ? 1 : 0)
 
             // Song info - floating directly on background
             SongInfoDisplay(
@@ -52,8 +66,7 @@ struct ClassicPlayerLayout: View {
                 onSeek: actions.onSeek,
                 onAddSongs: actions.onAdd,
                 onShuffle: actions.onShuffle,
-                isShuffling: actions.isShuffling,
-                onPlayPause: actions.onPlayPause
+                isShuffling: actions.isShuffling
             )
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 32)
@@ -73,6 +86,7 @@ struct ClassicPlayerLayout: View {
             .opacity(isControlsDisabled ? 0.6 : 1.0)
             .padding(.bottom, safeAreaInsets.bottom + 20)
         }
+        .animation(.easeInOut(duration: 0.3), value: stateCategory)
         .animation(.easeInOut(duration: 0.2), value: showError)
     }
 }

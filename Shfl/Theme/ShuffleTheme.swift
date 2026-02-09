@@ -8,7 +8,6 @@ struct ShuffleTheme: Identifiable, Equatable {
     let wheelStyle: WheelStyle
     let textStyle: TextStyle
     let centerButtonIconColor: Color
-    let brushedMetalIntensity: CGFloat
 
     enum WheelStyle: Equatable {
         case light
@@ -59,8 +58,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.48, green: 0.48, blue: 0.50), // #7A7A80 - darker aluminum
         wheelStyle: .dark,
         textStyle: .dark,
-        centerButtonIconColor: .black,
-        brushedMetalIntensity: 1.0
+        centerButtonIconColor: .black
     )
 
     // iPod Shuffle 4th gen: #0094E1 "Blue Cola"
@@ -71,8 +69,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.00, green: 0.48, blue: 0.78), // #007AC7 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0
+        centerButtonIconColor: .white
     )
 
     // iPod Shuffle 4th gen: #A0CB3B "Android Green"
@@ -83,8 +80,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.53, green: 0.70, blue: 0.16), // #87B329 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0
+        centerButtonIconColor: .white
     )
 
     // iPod Shuffle 4th gen: #FAB71F "Orange-Yellow"
@@ -95,8 +91,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.90, green: 0.62, blue: 0.05), // #E69E0D - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0
+        centerButtonIconColor: .white
     )
 
     // iPod Shuffle 4th gen: #EC5298 "Raspberry Pink"
@@ -107,8 +102,7 @@ extension ShuffleTheme {
         bodyGradientBottom: Color(red: 0.83, green: 0.24, blue: 0.50), // #D43D80 - slightly deeper
         wheelStyle: .light,
         textStyle: .light,
-        centerButtonIconColor: .white,
-        brushedMetalIntensity: 1.0
+        centerButtonIconColor: .white
     )
 
     static let allThemes: [ShuffleTheme] = [.silver, .blue, .green, .orange, .pink]

@@ -1,21 +1,13 @@
 import SwiftUI
 
-/// Full-screen brushed metal background using the tinted theme color
+/// Full-screen background with tinted theme gradient and subtle grain texture
 struct BrushedMetalBackground: View {
     @Environment(\.shuffleTheme) private var theme
 
     var body: some View {
-        GeometryReader { geometry in
-            Rectangle()
-                .fill(theme.bodyGradientTop)
-                .colorEffect(
-                    ShaderLibrary.shfl_brushedMetal(
-                        .float2(geometry.size.width / 2, geometry.size.height / 2),
-                        .float(theme.brushedMetalIntensity)
-                    )
-                )
-                .ignoresSafeArea()
-        }
+        Rectangle()
+            .fill(theme.bodyGradientTop)
+            .ignoresSafeArea()
     }
 }
 

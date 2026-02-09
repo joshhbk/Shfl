@@ -68,8 +68,8 @@ struct PlaybackProgressBar: View {
         VStack(spacing: 6) {
             // Progress track with scrubbing
             GeometryReader { geometry in
-                let trackHeight: CGFloat = isInteracting ? 6 : 4
-                let knobRadius: CGFloat = 6
+                let trackHeight: CGFloat = isInteracting ? 8 : 6
+                let knobRadius: CGFloat = 7
                 let rawFilledWidth = max(0, min(geometry.size.width, geometry.size.width * displayProgress))
                 let minKnobX = min(knobRadius, geometry.size.width / 2)
                 let maxKnobX = max(minKnobX, geometry.size.width - minKnobX)
@@ -91,7 +91,7 @@ struct PlaybackProgressBar: View {
                     if isInteracting {
                         Circle()
                             .fill(knobColor)
-                            .frame(width: 12, height: 12)
+                            .frame(width: 14, height: 14)
                             .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
                             .position(
                                 x: knobX,
@@ -139,13 +139,13 @@ struct PlaybackProgressBar: View {
             // Time labels
             HStack {
                 Text(formatTime(displayTime))
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
                     .foregroundStyle(theme.secondaryTextColor)
 
                 Spacer()
 
                 Text("-" + formatTime(remainingTime))
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
                     .foregroundStyle(theme.secondaryTextColor)
             }
         }
