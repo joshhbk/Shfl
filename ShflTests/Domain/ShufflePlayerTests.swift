@@ -959,6 +959,36 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(queueIds, Set(["1", "3", "5"]), "Only remaining songs should be in queue")
     }
 
+    func testPlayReshufflesQueueOnReplayAfterFullPlaythrough() async throws {
+        // Add 5 songs and play
+        for i in 1...5 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist \(i)", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Simulate full playthrough ending
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        // Play again — should reshuffle even though pool hasn't changed
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // setQueue should have been called to rebuild with a fresh shuffle
+        let setQueueCallCount = await mockService.setQueueCallCount
+        XCTAssertEqual(setQueueCallCount, 1, "setQueue should be called to reshuffle on replay")
+
+        // Queue should still contain all 5 songs
+        let queue = await player.lastShuffledQueue
+        XCTAssertEqual(queue.count, 5, "Queue should contain all songs after reshuffle")
+        let queueIds = Set(queue.map { $0.id })
+        XCTAssertEqual(queueIds, Set(["1", "2", "3", "4", "5"]), "All songs should be in reshuffled queue")
+    }
+
     // MARK: - Algorithm Change
 
     func testAlgorithmChangeWhenNotActiveInvalidatesQueue() async throws {

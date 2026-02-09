@@ -5,7 +5,12 @@ struct ShuffleBodyView<Content: View>: View {
     @Environment(\.shuffleTheme) private var theme
 
     var height: CGFloat = 200
-    @ViewBuilder let content: () -> Content
+    let content: Content
+
+    init(height: CGFloat = 200, @ViewBuilder content: () -> Content) {
+        self.height = height
+        self.content = content()
+    }
 
     private let cornerRadius: CGFloat = 20
 
@@ -29,7 +34,7 @@ struct ShuffleBodyView<Content: View>: View {
                     )
 
                 // Content (click wheel)
-                content()
+                content
             }
         }
         .frame(height: height)
