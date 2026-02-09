@@ -13,7 +13,6 @@ struct SongInfoDisplay: View {
     let onAddSongs: () -> Void
     let onShuffle: () -> Void
     let isShuffling: Bool
-    let onPlayPause: () -> Void
 
     init(
         playbackState: PlaybackState,
@@ -24,8 +23,7 @@ struct SongInfoDisplay: View {
         onSeek: @escaping (TimeInterval) -> Void = { _ in },
         onAddSongs: @escaping () -> Void = {},
         onShuffle: @escaping () -> Void = {},
-        isShuffling: Bool = false,
-        onPlayPause: @escaping () -> Void = {}
+        isShuffling: Bool = false
     ) {
         self.playbackState = playbackState
         self.hasSongs = hasSongs
@@ -36,46 +34,52 @@ struct SongInfoDisplay: View {
         self.onAddSongs = onAddSongs
         self.onShuffle = onShuffle
         self.isShuffling = isShuffling
-        self.onPlayPause = onPlayPause
     }
 
     var body: some View {
-        PlaybackStateContent(
-            playbackState: playbackState,
-            loading: { _ in
-                if isShuffling {
-                    emptyContent
-                } else {
-                    idleContent
+        ZStack {
+            // Hidden reference matching active content layout — reserves consistent height
+            activeHeightReference
+                .hidden()
+
+            PlaybackStateContent(
+                playbackState: playbackState,
+                loading: { _ in
+                    if isShuffling {
+                        emptyContent
+                    }
+                },
+                active: { song in
+                    activeContent(song: song)
+                },
+                empty: {
+                    if !hasSongs || isShuffling {
+                        emptyContent
+                    }
                 }
-            },
-            active: { song in
-                activeContent(song: song)
-            },
-            empty: {
-                if hasSongs && !isShuffling {
-                    idleContent
-                } else {
-                    emptyContent
-                }
-            }
-        )
+            )
+        }
     }
 
-    @ViewBuilder
-    private func loadingContent(song: Song) -> some View {
-        VStack(spacing: 8) {
-            ProgressView()
-                .scaleEffect(0.8)
-                .tint(theme.textColor)
-            Text(song.title)
+    /// Invisible spacer that matches the active content's intrinsic height.
+    /// Keeps album art and wheel positions stable across all playback states.
+    private var activeHeightReference: some View {
+        VStack(spacing: 4) {
+            Text(" ")
                 .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(theme.textColor)
                 .lineLimit(1)
-            Text(song.artist)
+            Text(" ")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(theme.secondaryTextColor)
                 .lineLimit(1)
+            if showProgressBar {
+                // Matches PlaybackProgressBar layout: track + spacing + time labels
+                VStack(spacing: 6) {
+                    Color.clear.frame(height: 12)
+                    Text(" ")
+                        .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
+                }
+                .padding(.top, 14)
+            }
         }
     }
 
@@ -86,10 +90,14 @@ struct SongInfoDisplay: View {
                 .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundStyle(theme.textColor)
                 .lineLimit(1)
+                .contentTransition(.opacity)
+                .animation(.easeOut(duration: 0.3), value: song.title)
             Text(song.artist)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(theme.secondaryTextColor)
                 .lineLimit(1)
+                .contentTransition(.opacity)
+                .animation(.easeOut(duration: 0.3), value: song.artist)
 
             if showProgressBar {
                 PlaybackProgressBar(
@@ -100,24 +108,6 @@ struct SongInfoDisplay: View {
                 .padding(.top, 14)
             }
         }
-    }
-
-    private var idleContentHeight: CGFloat {
-        showProgressBar ? 80 : 33
-    }
-
-    @ViewBuilder
-    private var idleContent: some View {
-        Button(action: onPlayPause) {
-            Label("Play", systemImage: "play.fill")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(ctaTextColor)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 10)
-                .background(ctaBackgroundColor, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .frame(height: idleContentHeight)
     }
 
     @ViewBuilder

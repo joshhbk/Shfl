@@ -32,6 +32,8 @@ struct PlayPauseButton: View {
                 )
 
             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .contentTransition(.symbolEffect(.replace))
+                .animation(.spring(duration: 0.1), value: isPlaying)
                 .font(.system(size: iconSize, weight: .medium))
                 .foregroundStyle(iconColor)
                 .offset(x: isPlaying ? 0 : 3)
