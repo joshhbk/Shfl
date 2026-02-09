@@ -39,8 +39,8 @@ struct ClassicPlayerLayout: View {
             Spacer()
 
             // Album art card - show real art when playing/paused, placeholder otherwise
-            AlbumArtCard(artworkURL: playingOrPausedSong?.artworkURL, size: 320)
-                .padding(.bottom, 24)
+            AlbumArtCard(artworkURL: playingOrPausedSong?.artworkURL, size: 280)
+                .padding(.bottom, 16)
                 .opacity(hasSongs || playbackState.isActive ? 1 : 0)
 
             // Song info - floating directly on background
@@ -67,7 +67,7 @@ struct ClassicPlayerLayout: View {
                 onSkipBack: actions.onSkipBack,
                 onVolumeUp: { VolumeController.increaseVolume() },
                 onVolumeDown: { VolumeController.decreaseVolume() },
-                scale: 0.6
+                scale: 0.75
             )
             .disabled(isControlsDisabled)
             .opacity(isControlsDisabled ? 0.6 : 1.0)

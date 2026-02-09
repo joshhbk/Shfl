@@ -1,6 +1,5 @@
 import MusicKit
 import SwiftUI
-import UIKit
 
 /// Extracts colors from album artwork using MusicKit's library data
 @Observable
@@ -46,20 +45,22 @@ final class AlbumArtColorExtractor {
 
                 print("[ColorExtractor] Artwork object: \(String(describing: song.artwork))")
 
-                guard let artwork = song.artwork,
-                      let bgColor = artwork.backgroundColor else {
-                    print("[ColorExtractor] No backgroundColor available from library for songId: \(songId)")
+                guard let artwork = song.artwork else {
+                    print("[ColorExtractor] No artwork available for songId: \(songId)")
                     return
                 }
 
-                // let color = boostColorIfNeeded(Color(cgColor: bgColor))
-                let color = Color(cgColor: bgColor) // raw, no boost
+                let color = Self.pickMostVibrant(from: artwork)
+
+                guard let color else {
+                    print("[ColorExtractor] No usable colors from artwork for songId: \(songId)")
+                    return
+                }
+
                 colorCache[songId] = color
 
-                let uiColor = UIColor(color)
-                var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0
-                uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
-                print("[ColorExtractor] Got library backgroundColor - hue: \(h), sat: \(s), bright: \(b)")
+                let hsb = ColorBlending.extractHSB(from: color)
+                print("[ColorExtractor] Selected color - hue: \(hsb.hue), sat: \(hsb.saturation), bright: \(hsb.brightness)")
 
                 // No animation here - TintedThemeProvider handles the visual transition
                 extractedColor = color
@@ -77,23 +78,42 @@ final class AlbumArtColorExtractor {
         extractedColor = nil
     }
 
-    // MARK: - Color adjustment
+    // MARK: - Color selection
 
-    private func boostColorIfNeeded(_ color: Color) -> Color {
-        let uiColor = UIColor(color)
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
+    /// Evaluates all available artwork colors and picks the most vibrant one.
+    /// MusicKit provides backgroundColor, primaryTextColor, secondaryTextColor,
+    /// tertiaryTextColor, and quaternaryTextColor — we score each by vibrancy.
+    private static func pickMostVibrant(from artwork: MusicKit.Artwork) -> Color? {
+        var candidates: [(color: Color, label: String)] = []
 
-        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        if let c = artwork.backgroundColor {
+            candidates.append((Color(cgColor: c), "background"))
+        }
+        if let c = artwork.primaryTextColor {
+            candidates.append((Color(cgColor: c), "primaryText"))
+        }
+        if let c = artwork.secondaryTextColor {
+            candidates.append((Color(cgColor: c), "secondaryText"))
+        }
+        if let c = artwork.tertiaryTextColor {
+            candidates.append((Color(cgColor: c), "tertiaryText"))
+        }
+        if let c = artwork.quaternaryTextColor {
+            candidates.append((Color(cgColor: c), "quaternaryText"))
+        }
 
-        // Boost saturation for visibility
-        let boostedSaturation = max(saturation, 0.5)
+        guard !candidates.isEmpty else { return nil }
 
-        // Ensure good brightness range
-        let boostedBrightness = min(max(brightness, 0.6), 0.95)
+        let scored = candidates.map { candidate in
+            let hsb = ColorBlending.extractHSB(from: candidate.color)
+            // Score = saturation * brightness. This naturally penalizes
+            // dark colors (which can have high HSB saturation but look black)
+            // and desaturated colors (grays/whites) equally.
+            let score = hsb.saturation * hsb.brightness
+            print("[ColorExtractor]   \(candidate.label): hue=\(String(format: "%.2f", hsb.hue)) sat=\(String(format: "%.2f", hsb.saturation)) bright=\(String(format: "%.2f", hsb.brightness)) score=\(String(format: "%.3f", score))")
+            return (candidate.color, score)
+        }
 
-        return Color(hue: hue, saturation: boostedSaturation, brightness: boostedBrightness)
+        return scored.max(by: { $0.1 < $1.1 })?.0
     }
 }

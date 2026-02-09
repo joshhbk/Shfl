@@ -46,18 +46,12 @@ final class TintedThemeProvider {
             return
         }
 
-        // Blend album color with theme
-        let blendedTop = ColorBlending.blend(
-            albumColor: albumColor,
-            themeColor: theme.bodyGradientTop,
-            hueFactor: hueFactor(for: theme),
-            maxSaturation: maxSaturation(for: theme)
-        )
+        // Use album color directly — vibrancy scoring already selects a good candidate
+        let derivedTop = albumColor
+        let derivedBottom = ColorBlending.darken(albumColor, by: 0.12)
 
-        let blendedBottom = ColorBlending.darken(blendedTop, by: 0.12)
-
-        // Determine wheel/text styles based on blended color luminance
-        let (wheelStyle, textStyle, iconColor) = ColorBlending.determineStyles(for: blendedTop)
+        // Determine wheel/text styles based on derived color luminance
+        let (wheelStyle, textStyle, iconColor) = ColorBlending.determineStyles(for: derivedTop)
 
         // First tint (e.g. from empty/idle → playing) uses a longer, gentler animation
         // so the color wash feels intentional rather than a sudden shift
@@ -68,8 +62,8 @@ final class TintedThemeProvider {
             computedTheme = ShuffleTheme(
                 id: theme.id,
                 name: theme.name,
-                bodyGradientTop: blendedTop,
-                bodyGradientBottom: blendedBottom,
+                bodyGradientTop: derivedTop,
+                bodyGradientBottom: derivedBottom,
                 wheelStyle: wheelStyle,
                 textStyle: textStyle,
                 centerButtonIconColor: iconColor,
@@ -78,15 +72,4 @@ final class TintedThemeProvider {
         }
     }
 
-    // MARK: - Theme-specific adjustments
-
-    /// Silver theme blends less aggressively to preserve its metallic character
-    private func hueFactor(for theme: ShuffleTheme) -> CGFloat {
-        theme.id == "silver" ? 0.25 : 0.35
-    }
-
-    /// Silver theme caps saturation lower to keep the aluminum feel
-    private func maxSaturation(for theme: ShuffleTheme) -> CGFloat {
-        theme.id == "silver" ? 0.5 : 0.85
-    }
 }

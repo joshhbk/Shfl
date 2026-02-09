@@ -58,4 +58,11 @@ struct ShuffleThemeTests {
             #expect(theme.brushedMetalIntensity >= 0 && theme.brushedMetalIntensity <= 1)
         }
     }
+
+    @Test("Each theme has an accent color matching bodyGradientTop")
+    func accentColorMatchesBodyGradientTop() {
+        for theme in ShuffleTheme.allThemes {
+            #expect(theme.accentColor == theme.bodyGradientTop)
+        }
+    }
 }
