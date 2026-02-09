@@ -22,8 +22,7 @@ final class TintedThemeProvider {
             bodyGradientBottom: Color(red: 0.48, green: 0.48, blue: 0.50),
             wheelStyle: .dark,
             textStyle: .dark,
-            centerButtonIconColor: .black,
-            brushedMetalIntensity: 1.0
+            centerButtonIconColor: .black
         )
         self.baseTheme = defaultTheme
         self.computedTheme = defaultTheme
@@ -66,8 +65,7 @@ final class TintedThemeProvider {
                 bodyGradientBottom: derivedBottom,
                 wheelStyle: wheelStyle,
                 textStyle: textStyle,
-                centerButtonIconColor: iconColor,
-                brushedMetalIntensity: theme.brushedMetalIntensity
+                centerButtonIconColor: iconColor
             )
         }
     }

@@ -11,18 +11,10 @@ struct ShuffleBodyView<Content: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let bodyWidth = geometry.size.width
-
             ZStack {
-                // Metallic body
+                // Body
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(theme.bodyGradientTop)
-                    .colorEffect(
-                        ShaderLibrary.shfl_brushedMetal(
-                            .float2(bodyWidth / 2, height / 2),
-                            .float(theme.brushedMetalIntensity)
-                        )
-                    )
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
 
                 // Subtle edge highlight

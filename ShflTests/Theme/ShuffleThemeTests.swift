@@ -52,13 +52,6 @@ struct ShuffleThemeTests {
         }
     }
 
-    @Test("All themes have brushed metal configuration")
-    func allThemesHaveBrushedMetalConfig() {
-        for theme in ShuffleTheme.allThemes {
-            #expect(theme.brushedMetalIntensity >= 0 && theme.brushedMetalIntensity <= 1)
-        }
-    }
-
     @Test("Each theme has an accent color matching bodyGradientTop")
     func accentColorMatchesBodyGradientTop() {
         for theme in ShuffleTheme.allThemes {
