@@ -24,7 +24,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-
 		DC1306952EFDBDA300200F38 /* Shfl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shfl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };

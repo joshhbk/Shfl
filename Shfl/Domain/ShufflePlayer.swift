@@ -653,17 +653,13 @@ final class ShufflePlayer {
         queueState = queueState.clearingPlayedHistory()
         lastObservedSongId = nil
 
-        if !queueState.hasQueue || queueState.isQueueStale {
-            print("▶️ play() queue needs (re)build, preparing...")
-            try await prepareQueue(algorithm: algorithm)
-            // Emit loading with the actual first song from shuffled queue
-            if let firstSong = queueState.currentSong {
-                playbackState = .loading(firstSong)
-            }
-            print("▶️ play() queue prepared, order has \(queueState.queueOrder.count) songs")
-        } else {
-            print("▶️ play() queue already exists with \(queueState.queueOrder.count) songs")
+        print("▶️ play() preparing queue...")
+        try await prepareQueue(algorithm: algorithm)
+        // Emit loading with the actual first song from shuffled queue
+        if let firstSong = queueState.currentSong {
+            playbackState = .loading(firstSong)
         }
+        print("▶️ play() queue prepared, order has \(queueState.queueOrder.count) songs")
 
         try await musicService.play()
         print("▶️ play() complete")
