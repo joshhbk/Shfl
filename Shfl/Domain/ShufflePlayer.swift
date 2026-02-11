@@ -1,181 +1,12 @@
 import Foundation
 
-enum ShufflePlayerError: Error, Equatable {
-    case capacityReached
-    case notAuthorized
-    case playbackFailed(String)
-}
-
-extension ShufflePlayerError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .capacityReached:
-            return "Song limit reached."
-        case .notAuthorized:
-            return "Apple Music authorization is required."
-        case .playbackFailed(let message):
-            return message
-        }
-    }
-}
-
-struct QueueDriftEvent: Equatable, Sendable, Identifiable {
-    let id = UUID()
-    let timestamp: Date
-    let trigger: String
-    let reasons: [QueueDriftReason]
-    let poolCount: Int
-    let queueCount: Int
-    let duplicateCount: Int
-    let missingFromQueueCount: Int
-    let missingFromPoolCount: Int
-    let currentSongId: String?
-    let preferredCurrentSongId: String?
-    let repaired: Bool
-}
-
-struct QueueDriftTelemetry: Equatable, Sendable {
-    var detections: Int = 0
-    var reconciliations: Int = 0
-    var unrepairedDetections: Int = 0
-    var detectionsByTrigger: [String: Int] = [:]
-    var detectionsByReason: [QueueDriftReason: Int] = [:]
-    var recentEvents: [QueueDriftEvent] = []
-}
-
-@MainActor
-final class PlaybackCoordinator {
-    private let player: ShufflePlayer
-    private let appSettings: AppSettings
-
-    /// Serializes command execution without manual continuation management.
-    private var commandQueue: Task<Void, Never> = Task { }
-
-    init(player: ShufflePlayer, appSettings: AppSettings) {
-        self.player = player
-        self.appSettings = appSettings
-    }
-
-    private func enqueue<T>(_ operation: @escaping @MainActor () async throws -> T) async throws -> T {
-        let previous = self.commandQueue
-        let task = Task<T, Error> { @MainActor in
-            await previous.value
-            return try await operation()
-        }
-        self.commandQueue = Task {
-            _ = await task.result
-        }
-        return try await task.value
-    }
-
-    private func enqueue<T>(_ operation: @escaping @MainActor () async -> T) async -> T {
-        let previous = self.commandQueue
-        let task = Task<T, Never> { @MainActor in
-            await previous.value
-            return await operation()
-        }
-        self.commandQueue = Task {
-            _ = await task.value
-        }
-        return await task.value
-    }
-
-    func seedSongs(_ songs: [Song]) async throws {
-        try await enqueue { [self] in
-            try self.player.addSongs(songs)
-        }
-    }
-
-    func prepareQueue() async throws {
-        try await enqueue { [self] in
-            try await self.player.prepareQueue(algorithm: self.appSettings.shuffleAlgorithm)
-        }
-    }
-
-    func play() async throws {
-        try await enqueue { [self] in
-            try await self.player.play(algorithm: self.appSettings.shuffleAlgorithm)
-        }
-    }
-
-    func pause() async {
-        await enqueue { [self] in
-            await self.player.pause()
-        }
-    }
-
-    func togglePlayback() async throws {
-        try await enqueue { [self] in
-            try await self.player.togglePlayback(algorithm: self.appSettings.shuffleAlgorithm)
-        }
-    }
-
-    func skipToNext() async throws {
-        try await enqueue { [self] in
-            try await self.player.skipToNext()
-        }
-    }
-
-    func restartOrSkipToPrevious() async throws {
-        try await enqueue { [self] in
-            try await self.player.restartOrSkipToPrevious()
-        }
-    }
-
-    func addSong(_ song: Song) async throws {
-        try await enqueue { [self] in
-            try await self.player.addSong(song)
-        }
-    }
-
-    func addSongsWithQueueRebuild(_ songs: [Song]) async throws {
-        try await enqueue { [self] in
-            try await self.player.addSongsWithQueueRebuild(songs, algorithm: self.appSettings.shuffleAlgorithm)
-        }
-    }
-
-    func removeSong(id: String) async {
-        await enqueue { [self] in
-            await self.player.removeSong(id: id)
-        }
-    }
-
-    func removeAllSongs() async {
-        await enqueue { [self] in
-            await self.player.removeAllSongs()
-        }
-    }
-
-    func reshuffleAlgorithm(_ algorithm: ShuffleAlgorithm) async {
-        await enqueue { [self] in
-            await self.player.reshuffleWithNewAlgorithm(algorithm)
-        }
-    }
-
-    func restoreSession(
-        queueOrder: [String],
-        currentSongId: String?,
-        playedIds: Set<String>,
-        playbackPosition: TimeInterval
-    ) async -> Bool {
-        await enqueue { [self] in
-            await self.player.restoreSession(
-                queueOrder: queueOrder,
-                currentSongId: currentSongId,
-                playedIds: playedIds,
-                playbackPosition: playbackPosition
-            )
-        }
-    }
-}
-
 @Observable
 @MainActor
 final class ShufflePlayer {
     static let maxSongs = 120
 
     @ObservationIgnored private let musicService: MusicService
-    @ObservationIgnored private var stateTask: Task<Void, Never>?
+    @ObservationIgnored private let playbackObserver: PlaybackStateObserver
 
     /// Single source of truth for queue state
     private(set) var queueState: QueueState = .empty
@@ -188,15 +19,6 @@ final class ShufflePlayer {
 
     /// Non-blocking operation notice for queue/transport sync failures.
     private(set) var operationNotice: String?
-
-    /// Track last observed song for history updates
-    @ObservationIgnored private var lastObservedSongId: String?
-
-    /// Flag to suppress history updates during multi-step operations
-    @ObservationIgnored private var suppressHistoryUpdates = false
-
-    /// Deferred restore seek that is applied on first explicit user play.
-    @ObservationIgnored private var pendingRestoreSeek: (songId: String, position: TimeInterval)?
 
     // MARK: - Computed Properties (for compatibility)
 
@@ -230,115 +52,42 @@ final class ShufflePlayer {
 
     init(musicService: MusicService) {
         self.musicService = musicService
-        observePlaybackState()
+        self.playbackObserver = PlaybackStateObserver(musicService: musicService)
+        startObserving()
     }
 
     deinit {
-        stateTask?.cancel()
+        // PlaybackStateObserver cancels its own task in its deinit.
     }
 
     // MARK: - Playback State Observation
 
-    private func observePlaybackState() {
-        stateTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            for await state in self.musicService.playbackStateStream {
-                self.handlePlaybackStateChange(state)
+    private func startObserving() {
+        playbackObserver.startObserving(
+            queueState: { [weak self] in self?.queueState ?? .empty },
+            onResolution: { [weak self] resolution in
+                self?.applyResolution(resolution)
             }
-        }
+        )
     }
 
-    private func handlePlaybackStateChange(_ newState: PlaybackState) {
-        // MusicKit can emit .stopped while a queue/current entry still exists after restore.
-        // Preserve the visible "current song loaded but not playing" state in that case.
-        let normalizedState: PlaybackState
-        if case .stopped = newState,
-           let current = queueState.currentSong,
-           suppressHistoryUpdates {
-            normalizedState = .paused(current)
-        } else {
-            normalizedState = newState
+    private func applyResolution(_ resolution: PlaybackStateResolution) {
+        if resolution.shouldUpdateCurrentSong, let songId = resolution.resolvedSongId {
+            queueState = queueState.settingCurrentSong(id: songId)
         }
-
-        // If the queue is empty, ignore any MusicKit states with songs (they're stale)
-        if queueState.isEmpty && normalizedState.currentSong != nil {
-            playbackState = .empty
-            lastObservedSongId = nil
-            return
+        if let playedId = resolution.songIdToMarkPlayed {
+            queueState = queueState.markingAsPlayed(id: playedId)
         }
-
-        // Resolve IDs in a deterministic order:
-        // 1. Exact ID match
-        // 2. Metadata fallback (title + artist + album)
-        let resolvedState: PlaybackState
-        let resolvedSongId: String?
-
-        if let musicKitSong = normalizedState.currentSong,
-           let poolSong = queueState.songPool.first(where: { $0.id == musicKitSong.id }) ??
-            queueState.songPool.first(where: {
-                $0.title == musicKitSong.title &&
-                $0.artist == musicKitSong.artist &&
-                $0.albumTitle == musicKitSong.albumTitle
-            }) {
-            // Found a stable mapping in the pool. Keep MusicKit artwork freshness.
-            resolvedSongId = poolSong.id
-            let mergedSong = Song(
-                id: poolSong.id,
-                title: musicKitSong.title,
-                artist: musicKitSong.artist,
-                albumTitle: musicKitSong.albumTitle,
-                artworkURL: musicKitSong.artworkURL,
-                playCount: musicKitSong.playCount,
-                lastPlayedDate: musicKitSong.lastPlayedDate
-            )
-            switch normalizedState {
-            case .playing:
-                resolvedState = .playing(mergedSong)
-            case .paused:
-                resolvedState = .paused(mergedSong)
-            case .loading:
-                resolvedState = .loading(mergedSong)
-            default:
-                resolvedState = normalizedState
-            }
-        } else {
-            // No match in pool - use MusicKit's data as-is
-            resolvedSongId = normalizedState.currentSongId
-            resolvedState = normalizedState
-        }
-
-        if let resolvedSongId {
-            queueState = queueState.settingCurrentSong(id: resolvedSongId)
-        }
-
-        // Song changed - add previous to history (unless suppressed during operations)
-        if !suppressHistoryUpdates,
-           let lastId = lastObservedSongId,
-           lastId != resolvedSongId {
-            queueState = queueState.markingAsPlayed(id: lastId)
-        }
-        lastObservedSongId = resolvedSongId
-
-        // Clear history on stop/empty/error
-        switch resolvedState {
-        case .stopped, .empty, .error:
+        if resolution.shouldClearHistory {
             queueState = queueState.clearingPlayedHistory()
-            lastObservedSongId = nil
-        default:
-            break
         }
-
-        reconcileQueueIfNeeded(reason: "playback-state-change", preferredCurrentSongId: resolvedSongId)
-
-        if case .playing = resolvedState,
-           let pendingSeek = pendingRestoreSeek,
-           let resolvedSongId,
-           pendingSeek.songId == resolvedSongId {
-            pendingRestoreSeek = nil
-            musicService.seek(to: pendingSeek.position)
+        if resolution.shouldReconcile {
+            reconcileQueueIfNeeded(reason: "playback-state-change", preferredCurrentSongId: resolution.resolvedSongId)
         }
-
-        playbackState = resolvedState
+        if let seek = resolution.pendingSeekConsumed {
+            musicService.seek(to: seek.position)
+        }
+        playbackState = resolution.resolvedState
     }
 
     private func reconcileQueueIfNeeded(reason: String, preferredCurrentSongId: String? = nil) {
@@ -610,7 +359,7 @@ final class ShufflePlayer {
     func removeAllSongs() async {
         print("🗑️ removeAllSongs() called: had \(queueState.songCount) songs, queueOrder had \(queueState.queueOrder.count)")
         queueState = queueState.cleared()
-        lastObservedSongId = nil
+        playbackObserver.clearLastObservedSongId()
 
         // Stop MusicKit playback so it doesn't continue with stale queue
         await musicService.pause()
@@ -651,7 +400,7 @@ final class ShufflePlayer {
 
         // Clear played history for fresh playback
         queueState = queueState.clearingPlayedHistory()
-        lastObservedSongId = nil
+        playbackObserver.clearLastObservedSongId()
 
         print("▶️ play() preparing queue...")
         try await prepareQueue(algorithm: algorithm)
@@ -719,72 +468,30 @@ final class ShufflePlayer {
         playedIds: Set<String>,
         playbackPosition: TimeInterval
     ) async -> Bool {
-        print("🔄 restoreSession called: songs=\(queueState.songCount), queueOrder=\(queueOrder.count), currentSongId=\(currentSongId ?? "nil")")
-        pendingRestoreSeek = nil
+        playbackObserver.clearPendingRestoreSeek()
 
-        guard !queueState.isEmpty else {
-            print("🔄 restoreSession: No songs in pool, returning false")
-            return false
-        }
+        playbackObserver.beginSuppressingHistory()
+        defer { playbackObserver.endSuppressingHistory() }
 
-        // Attempt to restore from persisted state
-        guard let restoredState = queueState.restored(
+        let restorer = SessionRestorer(musicService: musicService)
+        guard let result = await restorer.restore(
+            queueState: queueState,
+            currentPlaybackState: playbackState,
             queueOrder: queueOrder,
             currentSongId: currentSongId,
-            playedIds: playedIds
+            playedIds: playedIds,
+            playbackPosition: playbackPosition
         ) else {
-            print("🔄 restoreSession: Failed to restore state, returning false")
             return false
         }
 
-        // Apply restored state
-        queueState = restoredState
-        lastObservedSongId = queueState.currentSongId
-        print("🔄 restoreSession: Restored state with \(queueState.queueOrder.count) songs, current=\(queueState.currentSong?.title ?? "none")")
-
-        // Suppress history updates during the restore sequence
-        suppressHistoryUpdates = true
-        defer { suppressHistoryUpdates = false }
-
-        // Restore queue and position without auto-starting playback.
-        do {
-            print("🔄 restoreSession: Restoring queue with \(queueState.queueOrder.count) songs")
-            try await musicService.replaceQueue(
-                queue: queueState.queueOrder,
-                startAtSongId: queueState.currentSongId,
-                policy: .forcePaused
-            )
-
-            // Seek to saved position (best-effort, no autoplay probe).
-            let clampedPosition = max(0, playbackPosition)
-            if clampedPosition > 0 {
-                print("🔄 restoreSession: Seeking to position \(clampedPosition)")
-                musicService.seek(to: clampedPosition)
-                if let currentSongId = queueState.currentSongId {
-                    pendingRestoreSeek = (songId: currentSongId, position: clampedPosition)
-                }
-            }
-
-            print("🔄 restoreSession: Applying paused state without forcing extra transport pause")
-            if let current = queueState.currentSong {
-                // Preserve richer transport metadata (artwork/title updates) when already available.
-                let hydratedCurrent: Song
-                if let observedCurrent = playbackState.currentSong, observedCurrent.id == current.id {
-                    hydratedCurrent = observedCurrent
-                } else {
-                    hydratedCurrent = current
-                }
-                playbackState = .paused(hydratedCurrent)
-            } else {
-                playbackState = .stopped
-            }
-
-            print("🔄 restoreSession: Success!")
-            return true
-        } catch {
-            print("🔄 restoreSession: Failed to set queue: \(error)")
-            return false
+        queueState = result.restoredQueueState
+        playbackState = result.restoredPlaybackState
+        playbackObserver.setLastObservedSongId(result.lastObservedSongId)
+        if let seek = result.pendingRestoreSeek {
+            playbackObserver.setPendingRestoreSeek(songId: seek.songId, position: seek.position)
         }
+        return true
     }
 
     /// Backward-compat wrapper.
