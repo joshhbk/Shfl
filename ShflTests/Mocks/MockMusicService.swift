@@ -44,6 +44,9 @@ actor MockMusicService: MusicService {
     nonisolated var currentSongId: String? { mockCurrentSongId }
     nonisolated(unsafe) var mockCurrentSongId: String?
 
+    nonisolated var transportQueueEntryCount: Int { mockTransportQueueEntryCount }
+    nonisolated(unsafe) var mockTransportQueueEntryCount: Int = 0
+
     private func setContinuation(_ cont: AsyncStream<PlaybackState>.Continuation) {
         self.continuation = cont
         cont.yield(currentState)
@@ -159,6 +162,7 @@ actor MockMusicService: MusicService {
         lastQueuedSongs = songs
         queuedSongs = songs  // Don't shuffle - let QueueShuffler handle it
         currentIndex = 0
+        mockTransportQueueEntryCount = queuedSongs.count
 
         switch currentState {
         case .playing, .paused:
@@ -184,6 +188,7 @@ actor MockMusicService: MusicService {
         // Append to existing queue without disrupting playback
         queuedSongs.append(contentsOf: songs)
         lastQueuedSongs = queuedSongs
+        mockTransportQueueEntryCount = queuedSongs.count
     }
 
     func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {
@@ -193,6 +198,7 @@ actor MockMusicService: MusicService {
         replaceQueueCallCount += 1
         queuedSongs = queue
         lastQueuedSongs = queuedSongs
+        mockTransportQueueEntryCount = queuedSongs.count
         if let startAtSongId,
            let queueIndex = queuedSongs.firstIndex(where: { $0.id == startAtSongId }) {
             currentIndex = queueIndex

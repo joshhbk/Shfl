@@ -12,6 +12,7 @@ final class MockMusicService: MusicService {
     var currentPlaybackTime: TimeInterval { 0 }
     var currentSongDuration: TimeInterval { 180 }
     var currentSongId: String? { nil }
+    var transportQueueEntryCount: Int { 0 }
 
     func requestAuthorization() async -> Bool { true }
 

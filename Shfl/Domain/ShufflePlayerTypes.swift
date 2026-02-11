@@ -32,6 +32,9 @@ struct QueueDriftEvent: Equatable, Sendable, Identifiable {
     let currentSongId: String?
     let preferredCurrentSongId: String?
     let repaired: Bool
+    let transportEntryCount: Int?
+    let transportCurrentSongId: String?
+    let transportParityMismatch: Bool
 }
 
 struct QueueDriftTelemetry: Equatable, Sendable {

@@ -174,6 +174,7 @@ private final class PreviewMockMusicService: MusicService {
     var currentPlaybackTime: TimeInterval { 78 }
     var currentSongDuration: TimeInterval { 242 }
     var currentSongId: String? { "preview-1" }
+    var transportQueueEntryCount: Int { 0 }
     var playbackStateStream: AsyncStream<PlaybackState> {
         let state = initialState
         return AsyncStream { continuation in

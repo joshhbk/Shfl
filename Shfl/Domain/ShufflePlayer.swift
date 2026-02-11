@@ -34,6 +34,12 @@ final class ShufflePlayer {
     /// Debug: The algorithm used for the last shuffle
     var lastUsedAlgorithm: ShuffleAlgorithm { queueState.algorithm }
 
+    /// Debug: Number of entries in the MusicKit transport queue
+    var transportQueueEntryCount: Int { musicService.transportQueueEntryCount }
+
+    /// Debug: ID of the song currently selected in the MusicKit transport
+    var transportCurrentSongId: String? { musicService.currentSongId }
+
     /// Exposed for testing only
     var playedSongIdsForTesting: Set<String> { queueState.playedIds }
 
@@ -114,6 +120,11 @@ final class ShufflePlayer {
             queueDriftTelemetry.unrepairedDetections += 1
         }
 
+        let transportCount = musicService.transportQueueEntryCount
+        let transportCurrentId = musicService.currentSongId
+        let transportParityMismatch = transportCount != queueState.queueOrder.count
+            || transportCurrentId != queueState.currentSongId
+
         let event = QueueDriftEvent(
             timestamp: Date(),
             trigger: reason,
@@ -125,7 +136,10 @@ final class ShufflePlayer {
             missingFromPoolCount: diagnostics.missingFromPool.count,
             currentSongId: queueState.currentSongId,
             preferredCurrentSongId: preferredCurrentSongId,
-            repaired: repaired
+            repaired: repaired,
+            transportEntryCount: transportCount,
+            transportCurrentSongId: transportCurrentId,
+            transportParityMismatch: transportParityMismatch
         )
         queueDriftTelemetry.recentEvents.insert(event, at: 0)
         if queueDriftTelemetry.recentEvents.count > 20 {
