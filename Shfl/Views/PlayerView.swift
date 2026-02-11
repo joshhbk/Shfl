@@ -55,8 +55,7 @@ struct PlayerView: View {
                     playbackState: player.playbackState,
                     hasSongs: player.songCount > 0,
                     isControlsDisabled: player.songCount == 0,
-                    currentTime: progressState?.currentTime ?? 0,
-                    duration: progressState?.duration ?? 0,
+                    progressState: progressState,
                     actions: actions,
                     showError: showError,
                     errorMessage: errorMessage,
@@ -174,6 +173,7 @@ private final class PreviewMockMusicService: MusicService {
     var currentPlaybackTime: TimeInterval { 78 }
     var currentSongDuration: TimeInterval { 242 }
     var currentSongId: String? { "preview-1" }
+    var transportQueueEntryCount: Int { 0 }
     var playbackStateStream: AsyncStream<PlaybackState> {
         let state = initialState
         return AsyncStream { continuation in

@@ -116,4 +116,7 @@ protocol MusicService: Sendable {
     /// ID of the currently playing song (nil if nothing playing)
     /// This reads directly from MusicKit, not from cached state
     var currentSongId: String? { get }
+
+    /// Number of entries in the MusicKit transport queue (best-effort snapshot).
+    var transportQueueEntryCount: Int { get }
 }

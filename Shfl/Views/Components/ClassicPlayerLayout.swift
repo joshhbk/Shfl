@@ -5,8 +5,7 @@ struct ClassicPlayerLayout: View {
     let playbackState: PlaybackState
     let hasSongs: Bool
     let isControlsDisabled: Bool
-    let currentTime: TimeInterval
-    let duration: TimeInterval
+    let progressState: PlayerProgressState?
     let actions: PlayerActions
     let showError: Bool
     let errorMessage: String
@@ -61,8 +60,7 @@ struct ClassicPlayerLayout: View {
             SongInfoDisplay(
                 playbackState: playbackState,
                 hasSongs: hasSongs,
-                currentTime: currentTime,
-                duration: duration,
+                progressState: progressState,
                 onSeek: actions.onSeek,
                 onAddSongs: actions.onAdd,
                 onShuffle: actions.onShuffle,

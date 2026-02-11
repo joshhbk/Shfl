@@ -45,6 +45,8 @@ final class AppleMusicService: MusicService {
         return song.id.rawValue
     }
 
+    var transportQueueEntryCount: Int { player.queue.entries.count }
+
     var isAuthorized: Bool {
         get async {
             MusicAuthorization.currentStatus == .authorized

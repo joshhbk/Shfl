@@ -43,6 +43,7 @@ private struct DebugQueueContent: View {
         List {
             queueOverviewSection
             driftTelemetrySection
+            transportParitySection
             driftEventsSection
             shuffledQueueSection
         }
@@ -131,10 +132,37 @@ private struct DebugQueueContent: View {
     }
 
     @ViewBuilder
+    private var transportParitySection: some View {
+        Section {
+            statusRow(
+                title: "Transport Entries",
+                value: "\(player.transportQueueEntryCount)",
+                color: .secondary
+            )
+            statusRow(
+                title: "Domain Queue",
+                value: "\(queue.count)",
+                color: .secondary
+            )
+
+            let transportParity = player.transportQueueEntryCount == queue.count
+            statusRow(
+                title: "Parity",
+                value: transportParity ? "In Sync" : "Mismatch",
+                color: transportParity ? .secondary : .red
+            )
+        } header: {
+            Text("Transport Parity")
+        } footer: {
+            Text("Compares MusicKit transport queue entry count against domain queue size.")
+        }
+    }
+
+    @ViewBuilder
     private var driftEventsSection: some View {
         if !driftTelemetry.recentEvents.isEmpty {
             Section("Recent Drift Events") {
-                ForEach(Array(driftTelemetry.recentEvents.prefix(5))) { event in
+                ForEach(driftTelemetry.recentEvents) { event in
                     DriftEventRow(event: event)
                 }
             }
@@ -185,6 +213,11 @@ private struct DriftEventRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                if event.transportParityMismatch {
+                    Text("Transport Mismatch")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
                 Text(event.repaired ? "Repaired" : "Unrepaired")
                     .font(.caption)
                     .foregroundStyle(event.repaired ? Color.secondary : Color.red)
@@ -197,6 +230,12 @@ private struct DriftEventRow: View {
             Text(reasonSummary)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+
+            if let transportCount = event.transportEntryCount {
+                Text("Transport: \(transportCount) entries, current: \(event.transportCurrentSongId ?? "nil")")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 2)
     }

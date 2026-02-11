@@ -6,8 +6,7 @@ struct SongInfoDisplay: View {
 
     let playbackState: PlaybackState
     let hasSongs: Bool
-    let currentTime: TimeInterval
-    let duration: TimeInterval
+    let progressState: PlayerProgressState?
     let showProgressBar: Bool
     let onSeek: (TimeInterval) -> Void
     let onAddSongs: () -> Void
@@ -17,8 +16,7 @@ struct SongInfoDisplay: View {
     init(
         playbackState: PlaybackState,
         hasSongs: Bool = false,
-        currentTime: TimeInterval = 0,
-        duration: TimeInterval = 0,
+        progressState: PlayerProgressState? = nil,
         showProgressBar: Bool = FeatureFlags.showProgressBar,
         onSeek: @escaping (TimeInterval) -> Void = { _ in },
         onAddSongs: @escaping () -> Void = {},
@@ -27,8 +25,7 @@ struct SongInfoDisplay: View {
     ) {
         self.playbackState = playbackState
         self.hasSongs = hasSongs
-        self.currentTime = currentTime
-        self.duration = duration
+        self.progressState = progressState
         self.showProgressBar = showProgressBar
         self.onSeek = onSeek
         self.onAddSongs = onAddSongs
@@ -99,10 +96,9 @@ struct SongInfoDisplay: View {
                 .contentTransition(.opacity)
                 .animation(.easeOut(duration: 0.3), value: song.artist)
 
-            if showProgressBar {
-                PlaybackProgressBar(
-                    currentTime: currentTime,
-                    duration: duration,
+            if showProgressBar, let progressState {
+                LivePlaybackProgressBar(
+                    progressState: progressState,
                     onSeek: onSeek
                 )
                 .padding(.top, 14)
