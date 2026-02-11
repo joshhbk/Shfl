@@ -1453,6 +1453,151 @@ final class ShufflePlayerTests: XCTestCase {
         )
     }
 
+    func testQueueDriftEventListCapsAt20() async throws {
+        // Build an initial queue of 3 songs.
+        for i in 1...3 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let currentSong = await player.lastShuffledQueue.first else {
+            XCTFail("Expected a current song in queue")
+            return
+        }
+
+        // Trigger 25 reconciliation cycles by alternating stop → add song → resume.
+        for cycle in 0..<25 {
+            await mockService.simulatePlaybackState(.stopped)
+            try await Task.sleep(nanoseconds: 50_000_000)
+
+            let extra = Song(id: "extra\(cycle)", title: "Extra \(cycle)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(extra)
+
+            await mockService.simulatePlaybackState(.paused(currentSong))
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        let telemetry = await player.queueDriftTelemetry
+        XCTAssertEqual(telemetry.recentEvents.count, 20, "Event list should be capped at 20")
+        // Most recent event should be first
+        let firstTimestamp = telemetry.recentEvents.first!.timestamp
+        let lastTimestamp = telemetry.recentEvents.last!.timestamp
+        XCTAssertGreaterThanOrEqual(firstTimestamp, lastTimestamp, "Most recent event should be at index 0")
+    }
+
+    func testQueueDriftRepairedCounterIncrements() async throws {
+        // Build an initial queue of 3 songs.
+        for i in 1...3 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let currentSong = await player.lastShuffledQueue.first else {
+            XCTFail("Expected a current song in queue")
+            return
+        }
+
+        // Stop, add a song to create drift, then resume to trigger reconciliation.
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let extra = Song(id: "extra", title: "Extra", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(extra)
+
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let telemetry = await player.queueDriftTelemetry
+        XCTAssertGreaterThanOrEqual(telemetry.reconciliations, 1, "Should have at least one reconciliation")
+        XCTAssertEqual(telemetry.unrepairedDetections, 0, "Drift should be fully repaired")
+    }
+
+    func testQueueDriftEventIncludesTransportParityFields() async throws {
+        // Build an initial queue of 3 songs.
+        for i in 1...3 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let currentSong = await player.lastShuffledQueue.first else {
+            XCTFail("Expected a current song in queue")
+            return
+        }
+
+        // Stop, add songs to force pool/queue count drift.
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        for i in 4...5 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+
+        // Resume to trigger reconciliation.
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let telemetry = await player.queueDriftTelemetry
+        guard let event = telemetry.recentEvents.first else {
+            XCTFail("Expected at least one drift event")
+            return
+        }
+
+        XCTAssertNotNil(event.transportEntryCount, "Event should include transport entry count")
+        // transportCurrentSongId is nil in mock (no MusicKit), but field should be populated.
+        // The mock transport count reflects setQueue calls (3 songs), so it mismatches the
+        // reconciled 5-song domain queue. currentSongId also differs (mock returns nil).
+        XCTAssertTrue(event.transportParityMismatch, "Transport parity should mismatch when domain queue was just reconciled")
+    }
+
+    func testQueueDriftTelemetryMultipleTriggers() async throws {
+        // Build an initial queue of 3 songs.
+        for i in 1...3 {
+            let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let currentSong = await player.lastShuffledQueue.first else {
+            XCTFail("Expected a current song in queue")
+            return
+        }
+
+        // Trigger 1: playback-state-change (stop → add → resume).
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        let extra1 = Song(id: "extra1", title: "Extra 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(extra1)
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Trigger 2: add-song while playing (add song triggers reconcile via add-song path).
+        await mockService.simulatePlaybackState(.playing(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        // Stop again and add to create drift, then resume to trigger another playback-state-change.
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        let extra2 = Song(id: "extra2", title: "Extra 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(extra2)
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let telemetry = await player.queueDriftTelemetry
+        XCTAssertGreaterThanOrEqual(telemetry.detections, 2, "Should have at least 2 drift detections")
+        XCTAssertTrue(
+            telemetry.detectionsByTrigger.keys.contains("playback-state-change"),
+            "Should have playback-state-change trigger"
+        )
+    }
+
     func testReplaceQueueFailureKeepsStateRecoverable() async throws {
         let songs = (1...4).map { i in
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
