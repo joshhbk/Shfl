@@ -106,6 +106,10 @@ struct PlayerView: View {
             // Sync theme to AppSettings for persistence and Live Activity
             appSettings?.currentThemeId = newTheme.id
         }
+        .onChange(of: appSettings?.currentThemeId) { _, newId in
+            guard let id = newId else { return }
+            themeController.setTheme(byId: id)
+        }
     }
 
     // MARK: - Actions
