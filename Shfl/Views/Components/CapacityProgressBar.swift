@@ -32,7 +32,7 @@ struct CapacityProgressBar: View {
             }
             .frame(height: 6)
 
-            Text(isFull ? "Ready!" : "\(current) / \(maximum)")
+            Text("\(current) / \(maximum)")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(isFull ? .green : .secondary)
                 .monospacedDigit()
@@ -73,6 +73,63 @@ struct CapacityProgressBar: View {
         let wasNotFull = previous < maximum
         let isNowFull = current >= maximum
         return wasNotFull && isNowFull
+    }
+}
+
+struct CompactCapacityBar: View {
+    let current: Int
+    let maximum: Int
+
+    @State private var pulseOpacity: Double = 0
+
+    private var progress: Double {
+        CapacityProgressBar.calculateProgress(current: current, maximum: maximum)
+    }
+
+    private var isFull: Bool {
+        current >= maximum
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.08))
+
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(isFull ? Color.green : Color.accentColor)
+                        .frame(width: geometry.size.width * progress)
+                        .brightness(pulseOpacity * 0.3)
+                        .animation(
+                            progress == 0 ? nil : .spring(response: 0.35, dampingFraction: 0.65),
+                            value: progress
+                        )
+                }
+            }
+            .frame(height: 6)
+
+            Text("\(current) / \(maximum)")
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(isFull ? .green : .secondary)
+                .monospacedDigit()
+                .fixedSize()
+        }
+        .onChange(of: current) { oldValue, newValue in
+            if CapacityProgressBar.shouldCelebrate(previous: oldValue, current: newValue, maximum: maximum) {
+                HapticFeedback.success.trigger()
+            }
+
+            if newValue > oldValue && newValue > 0 {
+                HapticFeedback.light.trigger()
+                withAnimation(.easeIn(duration: 0.1)) {
+                    pulseOpacity = 1
+                }
+                withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                    pulseOpacity = 0
+                }
+            }
+        }
     }
 }
 

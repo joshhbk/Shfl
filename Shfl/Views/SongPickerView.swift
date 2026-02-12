@@ -65,13 +65,25 @@ struct SongPickerView: View {
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
-                    CapacityProgressBar(current: selectedSongIds.count, maximum: player.capacity)
-                    headerBar
+                    headerActionRow
+                    headerDivider
                     browseModePickerBar
                 }
+                .padding(.bottom, 4)
+                .background(
+                    Color(.systemGroupedBackground)
+                        .shadow(.drop(color: .black.opacity(0.25), radius: 6, y: 4))
+                )
             }
             .navigationTitle("Add Songs")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if browseMode == .songs {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        sortButton
+                    }
+                }
+            }
             .searchable(text: $searchText, prompt: "Search your library")
             .task {
                 await viewModel.loadInitialPage()
@@ -110,16 +122,55 @@ struct SongPickerView: View {
         }
     }
 
-    // MARK: - Header Bar (Autofill, Clear, Sort)
+    // MARK: - Header
 
-    private var headerBar: some View {
+    private var headerActionRow: some View {
         HStack(spacing: 12) {
-            if browseMode == .songs {
-                sortMenu
+            CompactCapacityBar(current: selectedSongIds.count, maximum: player.capacity)
+
+            Spacer(minLength: 8)
+
+            autofillClearGroup
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var headerDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.06))
+            .frame(height: 0.5)
+            .padding(.horizontal, 16)
+    }
+
+    private var browseModePickerBar: some View {
+        Picker("Browse", selection: $browseMode) {
+            ForEach(BrowseMode.allCases, id: \.self) { mode in
+                Text(mode.rawValue).tag(mode)
             }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
 
-            Spacer()
+    private var sortButton: some View {
+        Menu {
+            Picker("Sort", selection: Binding(
+                get: { appSettings?.librarySortOption ?? .mostPlayed },
+                set: { appSettings?.librarySortOption = $0 }
+            )) {
+                ForEach(SortOption.allCases, id: \.self) { option in
+                    Text(option.displayName).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+    }
 
+    private var autofillClearGroup: some View {
+        HStack(spacing: 0) {
             Button {
                 Task { @MainActor in
                     let algorithm = appSettings?.autofillAlgorithm ?? .random
@@ -135,11 +186,18 @@ struct SongPickerView: View {
                 }
             } label: {
                 Text("Autofill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isAutofillDisabled ? .white.opacity(0.3) : .white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
             }
-            .buttonStyle(.bordered)
-            .disabled(selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading)
+            .disabled(isAutofillDisabled)
 
-            Button(role: .destructive) {
+            Rectangle()
+                .fill(Color.white.opacity(0.12))
+                .frame(width: 0.5, height: 20)
+
+            Button {
                 Task { @MainActor in await onRemoveAllSongs() }
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
@@ -148,42 +206,20 @@ struct SongPickerView: View {
                 }
             } label: {
                 Text("Clear")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(selectedSongIds.isEmpty ? .white.opacity(0.3) : .red.opacity(0.9))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
             }
-            .buttonStyle(.bordered)
             .disabled(selectedSongIds.isEmpty)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
+        .buttonStyle(.plain)
+        .background(Color.white.opacity(0.08), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
     }
 
-    // MARK: - Browse Mode Picker
-
-    private var browseModePickerBar: some View {
-        Picker("Browse", selection: $browseMode) {
-            ForEach(BrowseMode.allCases, id: \.self) { mode in
-                Text(mode.rawValue).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(.systemGroupedBackground))
-    }
-
-    private var sortMenu: some View {
-        Menu {
-            Picker("Sort", selection: Binding(
-                get: { appSettings?.librarySortOption ?? .mostPlayed },
-                set: { appSettings?.librarySortOption = $0 }
-            )) {
-                ForEach(SortOption.allCases, id: \.self) { option in
-                    Text(option.displayName).tag(option)
-                }
-            }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
+    private var isAutofillDisabled: Bool {
+        selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading
     }
 
     // MARK: - Browse Content
