@@ -32,7 +32,7 @@ struct CapacityProgressBar: View {
             }
             .frame(height: 6)
 
-            Text(isFull ? "Ready!" : "\(current) / \(maximum)")
+            Text("\(current) / \(maximum)")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(isFull ? .green : .secondary)
                 .monospacedDigit()
@@ -109,7 +109,7 @@ struct CompactCapacityBar: View {
             }
             .frame(height: 6)
 
-            Text(isFull ? "Ready!" : "\(current) / \(maximum)")
+            Text("\(current) / \(maximum)")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(isFull ? .green : .secondary)
                 .monospacedDigit()
