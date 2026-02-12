@@ -100,12 +100,24 @@ struct QueueState: Equatable, Sendable {
     var hasPrevious: Bool { currentIndex > 0 }
 
     /// Whether the queue is out of sync with the song pool.
-    /// True when songs have been added to or removed from the pool since the queue was built.
+    /// Fast O(n) membership check without allocating full diagnostics.
     var isQueueStale: Bool {
-        queueDriftDiagnostics.isStale
+        guard hasQueue else { return false }
+        guard queueOrder.count == songPool.count else { return true }
+
+        let poolIdSet = Set(songPool.map(\.id))
+        var seen = Set<String>()
+        for song in queueOrder {
+            // Duplicate in queue or not in pool → stale
+            guard poolIdSet.contains(song.id), seen.insert(song.id).inserted else {
+                return true
+            }
+        }
+        return false
     }
 
     /// Detailed invariant diagnostics for queue/pool drift.
+    /// Only called when drift is detected and full details are needed for telemetry.
     var queueDriftDiagnostics: QueueDriftDiagnostics {
         guard hasQueue else {
             return QueueDriftDiagnostics(
@@ -517,10 +529,10 @@ struct QueueState: Equatable, Sendable {
 
 extension QueueState {
     static func == (lhs: QueueState, rhs: QueueState) -> Bool {
-        lhs.songPool.map(\.id) == rhs.songPool.map(\.id) &&
-        lhs.queueOrder.map(\.id) == rhs.queueOrder.map(\.id) &&
-        lhs.playedIds == rhs.playedIds &&
         lhs.currentIndex == rhs.currentIndex &&
-        lhs.algorithm == rhs.algorithm
+        lhs.algorithm == rhs.algorithm &&
+        lhs.playedIds == rhs.playedIds &&
+        lhs.songPool == rhs.songPool &&
+        lhs.queueOrder == rhs.queueOrder
     }
 }

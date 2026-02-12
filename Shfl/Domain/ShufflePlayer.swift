@@ -97,8 +97,8 @@ final class ShufflePlayer {
     }
 
     private func reconcileQueueIfNeeded(reason: String, preferredCurrentSongId: String? = nil) {
+        guard queueState.isQueueStale else { return }
         let diagnostics = queueState.queueDriftDiagnostics
-        guard diagnostics.isStale else { return }
         let beforePoolCount = queueState.songCount
         let beforeQueueCount = queueState.queueOrder.count
         let beforeCurrent = queueState.currentSongId ?? "nil"
