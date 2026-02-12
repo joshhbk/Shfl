@@ -26,6 +26,13 @@ final class ThemeController {
         }
     }
 
+    /// Set the theme by ID (for external sync from Settings)
+    func setTheme(byId id: String) {
+        guard let index = ShuffleTheme.allThemes.firstIndex(where: { $0.id == id }),
+              index != currentThemeIndex else { return }
+        currentThemeIndex = index
+    }
+
     func makeSwipeGesture() -> some Gesture {
         DragGesture(minimumDistance: 30)
             .onChanged { [weak self] value in

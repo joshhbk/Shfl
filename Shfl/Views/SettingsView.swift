@@ -8,6 +8,12 @@ struct SettingsView: View {
             Form {
                 Section("Appearance") {
                     NavigationLink {
+                        ThemeSettingsView()
+                    } label: {
+                        Label("Theme", systemImage: "paintpalette")
+                    }
+
+                    NavigationLink {
                         AppIconSettingsView()
                     } label: {
                         Label("App Icon", systemImage: "app.badge")
