@@ -456,12 +456,10 @@ final class AppleMusicService: MusicService {
             // Initial state
             self.emitCurrentState()
 
-            // MusicKit can emit very chatty objectWillChange bursts on startup/queue mutation.
-            // Coalesce both publishers to keep state mapping bounded and avoid runaway loops.
+            // Observe both state and queue changes from MusicKit.
             let stateChanges = self.player.state.objectWillChange.map { _ in () }
             let queueChanges = self.player.queue.objectWillChange.map { _ in () }
             let mergedChanges = Publishers.Merge(stateChanges, queueChanges)
-                .throttle(for: .milliseconds(250), scheduler: RunLoop.main, latest: true)
 
             for await _ in mergedChanges.values {
                 self.emitCurrentState()

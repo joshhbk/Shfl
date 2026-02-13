@@ -20,6 +20,7 @@ actor MockMusicService: MusicService {
     var shouldThrowOnInsert: Error?
     var shouldThrowOnReplace: Error?
     var shouldThrowOnFetch: Error?
+    var setQueueDelayNanoseconds: UInt64 = 0
     var insertIntoQueueDelayNanoseconds: UInt64 = 0
     var replaceQueueDelayNanoseconds: UInt64 = 0
 
@@ -159,6 +160,9 @@ actor MockMusicService: MusicService {
     }
 
     func setQueue(songs: [Song]) async throws {
+        if setQueueDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: setQueueDelayNanoseconds)
+        }
         setQueueCallCount += 1
         lastQueuedSongs = songs
         queuedSongs = songs  // Don't shuffle - let QueueShuffler handle it
@@ -292,6 +296,10 @@ actor MockMusicService: MusicService {
         insertIntoQueueDelayNanoseconds = nanoseconds
     }
 
+    func setSetQueueDelay(nanoseconds: UInt64) {
+        setQueueDelayNanoseconds = nanoseconds
+    }
+
     func setReplaceQueueDelay(nanoseconds: UInt64) {
         replaceQueueDelayNanoseconds = nanoseconds
     }
@@ -307,6 +315,7 @@ actor MockMusicService: MusicService {
         lastQueuedSongs = []
         lastInsertedSongs = []
         shouldThrowOnReplace = nil
+        setQueueDelayNanoseconds = 0
         insertIntoQueueDelayNanoseconds = 0
         replaceQueueDelayNanoseconds = 0
     }

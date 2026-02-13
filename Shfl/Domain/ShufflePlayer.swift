@@ -7,7 +7,8 @@ final class ShufflePlayer {
 
     @ObservationIgnored private let musicService: MusicService
     @ObservationIgnored private let playbackObserver: PlaybackStateObserver
-    @ObservationIgnored private var transportCommandQueue: Task<Void, Never> = Task { }
+    @ObservationIgnored private var transportCommandQueue: Task<Void, Error>?
+    @ObservationIgnored private var transportCommandQueueHead = 0
 
     /// Single source of truth for queue state
     private(set) var queueState: QueueState = .empty
@@ -133,6 +134,25 @@ final class ShufflePlayer {
         return message
     }
 
+    private enum TransportCommandExecutionError: Error {
+        case staleRevision(commandRevision: Int, queueRevision: Int)
+    }
+
+    @discardableResult
+    private func handleStaleTransportCommand(_ error: Error, source: String) -> Bool {
+        guard case let TransportCommandExecutionError.staleRevision(commandRevision, queueRevision) = error else {
+            return false
+        }
+
+        queueNeedsBuild = true
+        operationNotice = "Queue changed while syncing. Rebuilding queue."
+        recordOperation(
+            "transport-command-stale",
+            detail: "source=\(source), commandRevision=\(commandRevision), queueRevision=\(queueRevision)"
+        )
+        return true
+    }
+
     private static func isLikelyOfflineError(_ error: Error) -> Bool {
         let nsError = error as NSError
         guard nsError.domain == NSURLErrorDomain else { return false }
@@ -205,11 +225,10 @@ final class ShufflePlayer {
 
     private func executeTransportCommand(_ command: TransportCommand) async throws {
         guard command.revision == queueRevision else {
-            recordOperation(
-                "transport-command-skip-stale",
-                detail: "commandRevision=\(command.revision), queueRevision=\(queueRevision)"
+            throw TransportCommandExecutionError.staleRevision(
+                commandRevision: command.revision,
+                queueRevision: queueRevision
             )
-            return
         }
 
         switch command {
@@ -236,16 +255,24 @@ final class ShufflePlayer {
         guard !commands.isEmpty else { return }
 
         let previous = transportCommandQueue
+        transportCommandQueueHead += 1
+        let head = transportCommandQueueHead
+
         let task = Task<Void, Error> { @MainActor [weak self] in
-            await previous.value
+            if let previous {
+                try await previous.value
+            }
             guard let self else { return }
             for command in commands {
                 try await self.executeTransportCommand(command)
             }
         }
 
-        transportCommandQueue = Task {
-            _ = await task.result
+        transportCommandQueue = task
+        defer {
+            if transportCommandQueueHead == head {
+                transportCommandQueue = nil
+            }
         }
 
         try await task.value
@@ -401,6 +428,9 @@ final class ShufflePlayer {
                     recordOperation("reshuffle-algorithm-invalidated", detail: algorithm.rawValue)
                 }
             } catch {
+                if handleStaleTransportCommand(error, source: "reshuffle-algorithm") {
+                    return
+                }
                 queueState = previousState.queueState
                 playbackState = previousState.playbackState
                 queueRevision = previousState.revision
@@ -429,6 +459,10 @@ final class ShufflePlayer {
                 try await enqueueTransportCommands(reduction.transportCommands)
                 recordOperation("add-song-success", detail: "id=\(song.id)")
             } catch {
+                if handleStaleTransportCommand(error, source: "add-song") {
+                    recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
+                    return
+                }
                 // Keep the newly added song in the pool, but roll back queue ordering until next rebuild.
                 queueState = QueueState(
                     songPool: queueState.songPool,
@@ -439,7 +473,6 @@ final class ShufflePlayer {
                 )
                 playbackState = previousState.playbackState
                 queueNeedsBuild = true
-                enforceDomainInvariants(context: "add-song-transport-failure")
                 let message = reportTransportFailure(action: "Couldn't add the song to the active queue", error: error)
                 recordOperation("add-song-failed", detail: "transport-replace-failed id=\(song.id)")
                 throw ShufflePlayerError.playbackFailed(message)
@@ -481,6 +514,10 @@ final class ShufflePlayer {
                 try await enqueueTransportCommands(reduction.transportCommands)
                 recordOperation("add-songs-rebuild-success", detail: "batch=\(newSongs.count)")
             } catch {
+                if handleStaleTransportCommand(error, source: "add-songs-rebuild") {
+                    recordOperation("add-songs-rebuild-deferred", detail: "batch=\(newSongs.count)")
+                    return
+                }
                 // Preserve newly added songs in pool and defer queue rebuild to next play.
                 queueState = QueueState(
                     songPool: queueState.songPool,
@@ -491,7 +528,6 @@ final class ShufflePlayer {
                 )
                 playbackState = previousState.playbackState
                 queueNeedsBuild = true
-                enforceDomainInvariants(context: "add-songs-rebuild-transport-failure")
                 let message = reportTransportFailure(action: "Couldn't sync newly added songs to the active queue", error: error)
                 recordOperation("add-songs-rebuild-failed", detail: "transport-replace-failed")
                 throw ShufflePlayerError.playbackFailed(message)
@@ -517,6 +553,9 @@ final class ShufflePlayer {
                 try await enqueueTransportCommands(reduction.transportCommands)
                 recordOperation("remove-song-success", detail: "id=\(id)")
             } catch {
+                if handleStaleTransportCommand(error, source: "remove-song") {
+                    return
+                }
                 queueState = previousState.queueState
                 playbackState = previousState.playbackState
                 queueRevision = previousState.revision
@@ -540,6 +579,10 @@ final class ShufflePlayer {
             do {
                 try await enqueueTransportCommands(reduction.transportCommands)
             } catch {
+                if handleStaleTransportCommand(error, source: "remove-all-songs") {
+                    recordOperation("remove-all-songs-deferred")
+                    return
+                }
                 _ = reportTransportFailure(action: "Couldn't clear the active queue", error: error)
             }
             recordOperation("remove-all-songs")
@@ -568,6 +611,9 @@ final class ShufflePlayer {
             try await enqueueTransportCommands(reduction.transportCommands)
             recordOperation("prepare-queue-success", detail: queueState.algorithm.rawValue)
         } catch {
+            if handleStaleTransportCommand(error, source: "prepare-queue") {
+                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
+            }
             queueState = previousState.queueState
             playbackState = previousState.playbackState
             queueRevision = previousState.revision
@@ -592,6 +638,9 @@ final class ShufflePlayer {
             try await enqueueTransportCommands(reduction.transportCommands)
             recordOperation("play-success")
         } catch {
+            if handleStaleTransportCommand(error, source: "play") {
+                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
+            }
             queueState = previousState.queueState
             playbackState = previousState.playbackState
             queueRevision = previousState.revision
@@ -606,6 +655,9 @@ final class ShufflePlayer {
         do {
             try await enqueueTransportCommands(reduction.transportCommands)
         } catch {
+            if handleStaleTransportCommand(error, source: "pause") {
+                return
+            }
             _ = reportTransportFailure(action: "Couldn't pause playback", error: error)
         }
         recordOperation("pause")
@@ -614,21 +666,42 @@ final class ShufflePlayer {
     func skipToNext() async throws {
         let reduction = try reduce(.skipToNext)
         applyReduction(reduction)
-        try await enqueueTransportCommands(reduction.transportCommands)
+        do {
+            try await enqueueTransportCommands(reduction.transportCommands)
+        } catch {
+            if handleStaleTransportCommand(error, source: "skip-next") {
+                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
+            }
+            throw error
+        }
         recordOperation("skip-next")
     }
 
     func skipToPrevious() async throws {
         let reduction = try reduce(.skipToPrevious)
         applyReduction(reduction)
-        try await enqueueTransportCommands(reduction.transportCommands)
+        do {
+            try await enqueueTransportCommands(reduction.transportCommands)
+        } catch {
+            if handleStaleTransportCommand(error, source: "skip-previous") {
+                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
+            }
+            throw error
+        }
         recordOperation("skip-previous")
     }
 
     func restartOrSkipToPrevious() async throws {
         let reduction = try reduce(.restartOrSkipToPrevious)
         applyReduction(reduction)
-        try await enqueueTransportCommands(reduction.transportCommands)
+        do {
+            try await enqueueTransportCommands(reduction.transportCommands)
+        } catch {
+            if handleStaleTransportCommand(error, source: "restart-or-skip-previous") {
+                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
+            }
+            throw error
+        }
         recordOperation("restart-or-skip-previous")
     }
 
@@ -645,6 +718,9 @@ final class ShufflePlayer {
             try await enqueueTransportCommands(reduction.transportCommands)
             recordOperation("toggle-playback")
         } catch {
+            if handleStaleTransportCommand(error, source: "toggle-playback") {
+                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
+            }
             queueState = previousState.queueState
             playbackState = previousState.playbackState
             queueRevision = previousState.revision
@@ -686,18 +762,17 @@ final class ShufflePlayer {
             return false
         }
 
-        if let reduction = try? reduce(
-            .restoreSession(
-                queueState: result.restoredQueueState,
-                playbackState: result.restoredPlaybackState
+        do {
+            let reduction = try reduce(
+                .restoreSession(
+                    queueState: result.restoredQueueState,
+                    playbackState: result.restoredPlaybackState
+                )
             )
-        ) {
             applyReduction(reduction)
-        } else {
-            queueState = result.restoredQueueState
-            playbackState = result.restoredPlaybackState
-            queueNeedsBuild = false
-            queueRevision += 1
+        } catch {
+            recordOperation("restore-session-failed", detail: "reducer=\(error.localizedDescription)")
+            return false
         }
         playbackObserver.setLastObservedSongId(result.lastObservedSongId)
         if let seek = result.pendingRestoreSeek {

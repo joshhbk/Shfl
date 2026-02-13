@@ -703,6 +703,40 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(replaceCallCount, 1, "addSong should perform exactly one transport replace")
     }
 
+    func testPlayMarksQueueNeedsBuildWhenTransportCommandRevisionTurnsStale() async throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song)
+        await mockService.setSetQueueDelay(nanoseconds: 150_000_000)
+
+        Task {
+            try? await Task.sleep(nanoseconds: 40_000_000)
+            await self.mockService.simulatePlaybackState(.stopped)
+        }
+
+        do {
+            try await player.play()
+            XCTFail("Expected play() to fail when transport commands become stale")
+        } catch let error as ShufflePlayerError {
+            guard case .playbackFailed(let message) = error else {
+                XCTFail("Expected playbackFailed error, got \(error)")
+                return
+            }
+            XCTAssertFalse(message.isEmpty, "Error should include a user-facing message")
+        }
+
+        let needsBuild = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuild, "Stale command skips should mark queueNeedsBuild for recovery")
+
+        let playCallCount = await mockService.playCallCount
+        XCTAssertEqual(playCallCount, 0, "Stale play command should not execute against transport")
+
+        let operations = await player.recentQueueOperations
+        XCTAssertTrue(
+            operations.contains(where: { $0.operation == "transport-command-stale" }),
+            "Stale command handling should be recorded in operation journal"
+        )
+    }
+
     // MARK: - Playback Position Preservation
 
     /// addSong queue replacement should preserve playback position without explicit seek.
