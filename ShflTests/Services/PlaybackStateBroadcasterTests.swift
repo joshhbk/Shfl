@@ -58,6 +58,25 @@ final class PlaybackStateBroadcasterTests: XCTestCase {
         XCTAssertEqual(broadcaster.subscriberCount, 0)
     }
 
+    func testDuplicateStatesAreNotRepublished() async {
+        let broadcaster = PlaybackStateBroadcaster()
+        let song = Song(
+            id: "song-3",
+            title: "Song 3",
+            artist: "Artist",
+            albumTitle: "Album",
+            artworkURL: nil
+        )
+
+        let stream = broadcaster.stream(replaying: .empty)
+        broadcaster.publish(.empty) // duplicate of replayed state
+        broadcaster.publish(.playing(song))
+        broadcaster.publish(.playing(song)) // duplicate of previous publish
+
+        let states = await collectStates(from: stream, count: 2)
+        XCTAssertEqual(states, [.empty, .playing(song)])
+    }
+
     private func firstState(
         from stream: AsyncStream<PlaybackState>,
         timeoutNanoseconds: UInt64 = 200_000_000

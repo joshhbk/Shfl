@@ -305,9 +305,13 @@ struct QueueState: Equatable, Sendable {
     }
 
     /// Reshuffle upcoming songs while preserving current song and played history.
-    func reshuffledUpcoming(with algorithm: ShuffleAlgorithm? = nil) -> QueueState {
+    func reshuffledUpcoming(
+        with algorithm: ShuffleAlgorithm? = nil,
+        preferredCurrentSongId: String? = nil
+    ) -> QueueState {
         let effectiveAlgorithm = algorithm ?? self.algorithm
-        let reconciled = reconcilingQueue(preferredCurrentSongId: currentSongId)
+        let preferredCurrentSongId = preferredCurrentSongId ?? currentSongId
+        let reconciled = reconcilingQueue(preferredCurrentSongId: preferredCurrentSongId)
         guard let current = reconciled.currentSong else {
             // If current context is invalid, fall back to a full fresh shuffle.
             return reconciled.shuffled(with: effectiveAlgorithm)

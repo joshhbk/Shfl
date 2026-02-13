@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct DebugQueueView: View {
     @Environment(\.shufflePlayer) private var player
@@ -22,10 +23,17 @@ private struct DebugQueueContent: View {
     let player: ShufflePlayer
     let algorithm: ShuffleAlgorithm
 
+    @State private var lastSnapshotCopiedAt: Date?
+    @State private var lastHardResetAt: Date?
+    @State private var isPerformingHardReset = false
+    @State private var showingHardResetConfirmation = false
+
     // Access observed properties directly to ensure SwiftUI tracks them
     private var queue: [Song] { player.lastShuffledQueue }
     private var usedAlgorithm: ShuffleAlgorithm { player.lastUsedAlgorithm }
     private var driftTelemetry: QueueDriftTelemetry { player.queueDriftTelemetry }
+    private var invariantCheck: QueueInvariantCheck { player.queueInvariantCheck }
+    private var recentOperations: [QueueOperationRecord] { player.recentQueueOperations }
 
     private var reasonCounts: [(reason: QueueDriftReason, count: Int)] {
         driftTelemetry.detectionsByReason
@@ -44,10 +52,22 @@ private struct DebugQueueContent: View {
             queueOverviewSection
             driftTelemetrySection
             transportParitySection
+            invariantSection
+            operationsSection
+            diagnosticsExportSection
+            hardResetSection
             driftEventsSection
             shuffledQueueSection
         }
         .navigationTitle("Debug Queue")
+        .alert("Hard Reset Queue?", isPresented: $showingHardResetConfirmation) {
+            Button("Hard Reset", role: .destructive) {
+                Task { await performHardReset() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This clears the current queue, playback state, and debug telemetry so you can start from a clean baseline.")
+        }
     }
 
     @ViewBuilder
@@ -159,6 +179,119 @@ private struct DebugQueueContent: View {
     }
 
     @ViewBuilder
+    private var invariantSection: some View {
+        Section {
+            statusRow(
+                title: "Status",
+                value: invariantCheck.isHealthy ? "Healthy" : "Violation",
+                color: invariantCheck.isHealthy ? .secondary : .red
+            )
+            statusRow(
+                title: "Unique Queue IDs",
+                value: invariantCheck.queueHasUniqueIDs ? "Yes" : "No",
+                color: invariantCheck.queueHasUniqueIDs ? .secondary : .red
+            )
+            statusRow(
+                title: "Pool/Queue Match",
+                value: invariantCheck.poolAndQueueMembershipMatch ? "Yes" : "No",
+                color: invariantCheck.poolAndQueueMembershipMatch ? .secondary : .red
+            )
+            statusRow(
+                title: "Transport Count Match",
+                value: invariantCheck.transportEntryCountMatchesQueue ? "Yes" : "No",
+                color: invariantCheck.transportEntryCountMatchesQueue ? .secondary : .red
+            )
+            statusRow(
+                title: "Transport Current Match",
+                value: invariantCheck.transportCurrentMatchesDomain ? "Yes" : "No",
+                color: invariantCheck.transportCurrentMatchesDomain ? .secondary : .red
+            )
+            statusRow(
+                title: "Reasons",
+                value: "\(invariantCheck.reasons.count)",
+                color: invariantCheck.reasons.isEmpty ? .secondary : .red
+            )
+
+            ForEach(invariantCheck.reasons, id: \.self) { reason in
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Invariant Check")
+        }
+    }
+
+    @ViewBuilder
+    private var operationsSection: some View {
+        Section {
+            statusRow(
+                title: "Stored",
+                value: "\(recentOperations.count)",
+                color: .secondary
+            )
+
+            ForEach(Array(recentOperations.prefix(12))) { operation in
+                QueueOperationRow(operation: operation)
+            }
+        } header: {
+            Text("Recent Operations")
+        } footer: {
+            Text("Operation journal is capped to the most recent \(QueueOperationJournal.maxRecords) entries.")
+        }
+    }
+
+    @ViewBuilder
+    private var diagnosticsExportSection: some View {
+        Section {
+            Button("Copy Diagnostics Snapshot") {
+                let snapshot = player.exportQueueDiagnosticsSnapshot(trigger: "debug-queue-copy")
+                UIPasteboard.general.string = snapshot
+                lastSnapshotCopiedAt = Date()
+            }
+
+            if let copiedAt = lastSnapshotCopiedAt {
+                Text("Copied at \(copiedAt.formatted(date: .omitted, time: .standard))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Snapshot Export")
+        } footer: {
+            Text("Includes queue IDs, invariants, drift telemetry, and operation journal as JSON.")
+        }
+    }
+
+    @ViewBuilder
+    private var hardResetSection: some View {
+        Section {
+            Button(role: .destructive) {
+                showingHardResetConfirmation = true
+            } label: {
+                if isPerformingHardReset {
+                    HStack {
+                        ProgressView()
+                        Text("Resetting Queue...")
+                    }
+                } else {
+                    Text("Hard Reset Queue")
+                }
+            }
+            .disabled(isPerformingHardReset)
+
+            if let resetAt = lastHardResetAt {
+                Text("Last reset at \(resetAt.formatted(date: .omitted, time: .standard))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Recovery")
+        } footer: {
+            Text("Use this when queue/transport state diverges and you want to restart from a known clean state.")
+        }
+    }
+
+    @ViewBuilder
     private var driftEventsSection: some View {
         if !driftTelemetry.recentEvents.isEmpty {
             Section("Recent Drift Events") {
@@ -176,7 +309,7 @@ private struct DebugQueueContent: View {
                 Text("No queue yet. Add songs and press play.")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(Array(queue.enumerated()), id: \.element.id) { index, song in
+                ForEach(Array(queue.enumerated()), id: \.offset) { index, song in
                     ShuffledSongRow(
                         song: song,
                         position: index + 1,
@@ -200,6 +333,43 @@ private struct DebugQueueContent: View {
             Text(value)
                 .foregroundStyle(color)
         }
+    }
+
+    @MainActor
+    private func performHardReset() async {
+        guard !isPerformingHardReset else { return }
+        isPerformingHardReset = true
+        await player.hardResetQueueForDebug()
+        lastHardResetAt = Date()
+        isPerformingHardReset = false
+    }
+}
+
+private struct QueueOperationRow: View {
+    let operation: QueueOperationRecord
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(operation.timestamp, style: .time)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(operation.invariantHealthy ? "Healthy" : "Violation")
+                    .font(.caption2)
+                    .foregroundStyle(operation.invariantHealthy ? Color.secondary : Color.red)
+            }
+
+            Text(operation.operation)
+                .font(.caption)
+
+            if let detail = operation.detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 
