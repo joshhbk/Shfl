@@ -131,7 +131,11 @@ final class ShufflePlayer {
             : "\(action). Please try again."
         operationNotice = message
         print("⚠️ \(action): \(error)")
-        recordOperation("transport-failure", detail: "\(action): \(error.localizedDescription)")
+        recordOperation(
+            "transport-failure",
+            detail: "\(action): \(error.localizedDescription)",
+            refreshTransport: true
+        )
         return message
     }
 
@@ -190,6 +194,68 @@ final class ShufflePlayer {
         queueRevision = reduction.nextState.revision
         queueNeedsBuild = reduction.nextState.queueNeedsBuild
         enforceDomainInvariants(context: "reduction")
+    }
+
+    private enum RollbackPolicy {
+        case none
+        case full
+        case preservePoolAndDeferQueueBuild
+    }
+
+    private enum TransportApplyOutcome {
+        case applied
+        case stale
+    }
+
+    private func restoreEngineState(_ state: QueueEngineState) {
+        queueState = state.queueState
+        playbackState = state.playbackState
+        queueRevision = state.revision
+        queueNeedsBuild = state.queueNeedsBuild
+    }
+
+    private func rollback(to previousState: QueueEngineState, policy: RollbackPolicy) {
+        switch policy {
+        case .none:
+            return
+        case .full:
+            restoreEngineState(previousState)
+        case .preservePoolAndDeferQueueBuild:
+            // Keep newly added songs while reverting queue shape until the next rebuild.
+            queueState = QueueState(
+                songPool: queueState.songPool,
+                queueOrder: previousState.queueState.queueOrder,
+                playedIds: previousState.queueState.playedIds,
+                currentIndex: previousState.queueState.currentIndex,
+                algorithm: previousState.queueState.algorithm
+            )
+            playbackState = previousState.playbackState
+            queueNeedsBuild = true
+        }
+    }
+
+    private func applyReductionWithTransport(
+        _ reduction: QueueEngineReduction,
+        source: String,
+        rollbackPolicy: RollbackPolicy = .full,
+        afterApply: (() -> Void)? = nil
+    ) async throws -> TransportApplyOutcome {
+        let previousState = engineState
+        applyReduction(reduction)
+        afterApply?()
+
+        do {
+            try await enqueueTransportCommands(reduction.transportCommands)
+            _ = refreshTransportSnapshot()
+            return .applied
+        } catch {
+            _ = refreshTransportSnapshot()
+            if handleStaleTransportCommand(error, source: source) {
+                return .stale
+            }
+            rollback(to: previousState, policy: rollbackPolicy)
+            throw error
+        }
     }
 
     private func enforceDomainInvariants(context: String) {
@@ -430,7 +496,10 @@ final class ShufflePlayer {
         )
     }
 
-    private func recordOperation(_ operation: String, detail: String? = nil) {
+    private func recordOperation(_ operation: String, detail: String? = nil, refreshTransport: Bool = false) {
+        if refreshTransport {
+            _ = refreshTransportSnapshot()
+        }
         let invariant = evaluateDomainInvariants()
         let transport = cachedTransportSnapshot
         let record = QueueOperationRecord(
@@ -493,23 +562,23 @@ final class ShufflePlayer {
                 return
             }
 
-            let previousState = engineState
-            applyReduction(reduction)
             do {
-                try await enqueueTransportCommands(reduction.transportCommands)
-                if playbackState.isActive {
-                    recordOperation("reshuffle-algorithm-success", detail: algorithm.rawValue)
-                } else {
-                    recordOperation("reshuffle-algorithm-invalidated", detail: algorithm.rawValue)
-                }
-            } catch {
-                if handleStaleTransportCommand(error, source: "reshuffle-algorithm") {
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "reshuffle-algorithm",
+                    rollbackPolicy: .full
+                )
+                switch outcome {
+                case .applied:
+                    if playbackState.isActive {
+                        recordOperation("reshuffle-algorithm-success", detail: algorithm.rawValue)
+                    } else {
+                        recordOperation("reshuffle-algorithm-invalidated", detail: algorithm.rawValue)
+                    }
+                case .stale:
                     return
                 }
-                queueState = previousState.queueState
-                playbackState = previousState.playbackState
-                queueRevision = previousState.revision
-                queueNeedsBuild = previousState.queueNeedsBuild
+            } catch {
                 _ = reportTransportFailure(action: "Couldn't reshuffle the active queue", error: error)
                 recordOperation("reshuffle-algorithm-failed", detail: error.localizedDescription)
             }
@@ -528,28 +597,22 @@ final class ShufflePlayer {
                 return
             }
 
-            let previousState = engineState
-            applyReduction(reduction)
             do {
-                try await enqueueTransportCommands(reduction.transportCommands)
-                recordOperation("add-song-success", detail: "id=\(song.id)")
-            } catch {
-                if handleStaleTransportCommand(error, source: "add-song") {
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "add-song",
+                    rollbackPolicy: .preservePoolAndDeferQueueBuild
+                )
+                switch outcome {
+                case .applied:
+                    recordOperation("add-song-success", detail: "id=\(song.id)")
+                case .stale:
                     recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
                     return
                 }
-                // Keep the newly added song in the pool, but roll back queue ordering until next rebuild.
-                queueState = QueueState(
-                    songPool: queueState.songPool,
-                    queueOrder: previousState.queueState.queueOrder,
-                    playedIds: previousState.queueState.playedIds,
-                    currentIndex: previousState.queueState.currentIndex,
-                    algorithm: previousState.queueState.algorithm
-                )
-                playbackState = previousState.playbackState
-                queueNeedsBuild = true
+            } catch {
                 let message = reportTransportFailure(action: "Couldn't add the song to the active queue", error: error)
-                recordOperation("add-song-failed", detail: "transport-replace-failed id=\(song.id)")
+                recordOperation("add-song-failed", detail: "transport-sync-failed id=\(song.id)")
                 throw ShufflePlayerError.playbackFailed(message)
             }
         } catch QueueEngineError.capacityReached {
@@ -583,28 +646,22 @@ final class ShufflePlayer {
             let reduction = try reduce(.addSongsWithRebuild(newSongs, algorithm: algorithm))
             guard !reduction.wasNoOp else { return }
 
-            let previousState = engineState
-            applyReduction(reduction)
             do {
-                try await enqueueTransportCommands(reduction.transportCommands)
-                recordOperation("add-songs-rebuild-success", detail: "batch=\(newSongs.count)")
-            } catch {
-                if handleStaleTransportCommand(error, source: "add-songs-rebuild") {
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "add-songs-rebuild",
+                    rollbackPolicy: .preservePoolAndDeferQueueBuild
+                )
+                switch outcome {
+                case .applied:
+                    recordOperation("add-songs-rebuild-success", detail: "batch=\(newSongs.count)")
+                case .stale:
                     recordOperation("add-songs-rebuild-deferred", detail: "batch=\(newSongs.count)")
                     return
                 }
-                // Preserve newly added songs in pool and defer queue rebuild to next play.
-                queueState = QueueState(
-                    songPool: queueState.songPool,
-                    queueOrder: previousState.queueState.queueOrder,
-                    playedIds: previousState.queueState.playedIds,
-                    currentIndex: previousState.queueState.currentIndex,
-                    algorithm: previousState.queueState.algorithm
-                )
-                playbackState = previousState.playbackState
-                queueNeedsBuild = true
+            } catch {
                 let message = reportTransportFailure(action: "Couldn't sync newly added songs to the active queue", error: error)
-                recordOperation("add-songs-rebuild-failed", detail: "transport-replace-failed")
+                recordOperation("add-songs-rebuild-failed", detail: "transport-sync-failed")
                 throw ShufflePlayerError.playbackFailed(message)
             }
         } catch QueueEngineError.capacityReached {
@@ -622,19 +679,15 @@ final class ShufflePlayer {
             let reduction = try reduce(.removeSong(id: id))
             guard !reduction.wasNoOp else { return }
 
-            let previousState = engineState
-            applyReduction(reduction)
             do {
-                try await enqueueTransportCommands(reduction.transportCommands)
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "remove-song",
+                    rollbackPolicy: .full
+                )
+                guard case .applied = outcome else { return }
                 recordOperation("remove-song-success", detail: "id=\(id)")
             } catch {
-                if handleStaleTransportCommand(error, source: "remove-song") {
-                    return
-                }
-                queueState = previousState.queueState
-                playbackState = previousState.playbackState
-                queueRevision = previousState.revision
-                queueNeedsBuild = previousState.queueNeedsBuild
                 _ = reportTransportFailure(action: "Couldn't remove the song from the active queue", error: error)
                 recordOperation("remove-song-failed", detail: "id=\(id)")
             }
@@ -649,18 +702,24 @@ final class ShufflePlayer {
             let reduction = try reduce(.removeAllSongs)
             guard !reduction.wasNoOp else { return }
 
-            applyReduction(reduction)
-            playbackObserver.clearLastObservedSongId()
             do {
-                try await enqueueTransportCommands(reduction.transportCommands)
-            } catch {
-                if handleStaleTransportCommand(error, source: "remove-all-songs") {
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "remove-all-songs",
+                    rollbackPolicy: .none,
+                    afterApply: { self.playbackObserver.clearLastObservedSongId() }
+                )
+                switch outcome {
+                case .applied:
+                    recordOperation("remove-all-songs")
+                case .stale:
                     recordOperation("remove-all-songs-deferred")
                     return
                 }
+            } catch {
                 _ = reportTransportFailure(action: "Couldn't clear the active queue", error: error)
+                recordOperation("remove-all-songs-failed", detail: error.localizedDescription)
             }
-            recordOperation("remove-all-songs")
         } catch {
             _ = reportTransportFailure(action: "Couldn't clear the active queue", error: error)
             recordOperation("remove-all-songs-failed", detail: error.localizedDescription)
@@ -680,20 +739,16 @@ final class ShufflePlayer {
             return
         }
 
-        let previousState = engineState
-        applyReduction(reduction)
-        do {
-            try await enqueueTransportCommands(reduction.transportCommands)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "prepare-queue",
+            rollbackPolicy: .full
+        )
+        switch outcome {
+        case .applied:
             recordOperation("prepare-queue-success", detail: queueState.algorithm.rawValue)
-        } catch {
-            if handleStaleTransportCommand(error, source: "prepare-queue") {
-                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
-            }
-            queueState = previousState.queueState
-            playbackState = previousState.playbackState
-            queueRevision = previousState.revision
-            queueNeedsBuild = previousState.queueNeedsBuild
-            throw error
+        case .stale:
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
         }
     }
 
@@ -706,33 +761,32 @@ final class ShufflePlayer {
             return
         }
 
-        let previousState = engineState
-        applyReduction(reduction)
-        playbackObserver.clearLastObservedSongId()
-        do {
-            try await enqueueTransportCommands(reduction.transportCommands)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "play",
+            rollbackPolicy: .full,
+            afterApply: { self.playbackObserver.clearLastObservedSongId() }
+        )
+        switch outcome {
+        case .applied:
             recordOperation("play-success")
-        } catch {
-            if handleStaleTransportCommand(error, source: "play") {
-                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
-            }
-            queueState = previousState.queueState
-            playbackState = previousState.playbackState
-            queueRevision = previousState.revision
-            queueNeedsBuild = previousState.queueNeedsBuild
-            throw error
+        case .stale:
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
         }
     }
 
     func pause() async {
         guard let reduction = try? reduce(.pause) else { return }
-        applyReduction(reduction)
         do {
-            try await enqueueTransportCommands(reduction.transportCommands)
-        } catch {
-            if handleStaleTransportCommand(error, source: "pause") {
+            let outcome = try await applyReductionWithTransport(
+                reduction,
+                source: "pause",
+                rollbackPolicy: .none
+            )
+            if case .stale = outcome {
                 return
             }
+        } catch {
             _ = reportTransportFailure(action: "Couldn't pause playback", error: error)
         }
         recordOperation("pause")
@@ -740,42 +794,39 @@ final class ShufflePlayer {
 
     func skipToNext() async throws {
         let reduction = try reduce(.skipToNext)
-        applyReduction(reduction)
-        do {
-            try await enqueueTransportCommands(reduction.transportCommands)
-        } catch {
-            if handleStaleTransportCommand(error, source: "skip-next") {
-                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
-            }
-            throw error
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "skip-next",
+            rollbackPolicy: .none
+        )
+        if case .stale = outcome {
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
         }
         recordOperation("skip-next")
     }
 
     func skipToPrevious() async throws {
         let reduction = try reduce(.skipToPrevious)
-        applyReduction(reduction)
-        do {
-            try await enqueueTransportCommands(reduction.transportCommands)
-        } catch {
-            if handleStaleTransportCommand(error, source: "skip-previous") {
-                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
-            }
-            throw error
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "skip-previous",
+            rollbackPolicy: .none
+        )
+        if case .stale = outcome {
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
         }
         recordOperation("skip-previous")
     }
 
     func restartOrSkipToPrevious() async throws {
         let reduction = try reduce(.restartOrSkipToPrevious)
-        applyReduction(reduction)
-        do {
-            try await enqueueTransportCommands(reduction.transportCommands)
-        } catch {
-            if handleStaleTransportCommand(error, source: "restart-or-skip-previous") {
-                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
-            }
-            throw error
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "restart-or-skip-previous",
+            rollbackPolicy: .none
+        )
+        if case .stale = outcome {
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
         }
         recordOperation("restart-or-skip-previous")
     }
@@ -787,20 +838,16 @@ final class ShufflePlayer {
             return
         }
 
-        let previousState = engineState
-        applyReduction(reduction)
-        do {
-            try await enqueueTransportCommands(reduction.transportCommands)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "toggle-playback",
+            rollbackPolicy: .full
+        )
+        switch outcome {
+        case .applied:
             recordOperation("toggle-playback")
-        } catch {
-            if handleStaleTransportCommand(error, source: "toggle-playback") {
-                throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
-            }
-            queueState = previousState.queueState
-            playbackState = previousState.playbackState
-            queueRevision = previousState.revision
-            queueNeedsBuild = previousState.queueNeedsBuild
-            throw error
+        case .stale:
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
         }
     }
 
