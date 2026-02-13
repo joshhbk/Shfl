@@ -17,7 +17,6 @@ final class QueueEngineTests: XCTestCase {
             shouldUpdateCurrentSong: true,
             songIdToMarkPlayed: nil,
             shouldClearHistory: true,
-            shouldReconcile: true,
             pendingSeekConsumed: nil
         )
 
@@ -43,7 +42,6 @@ final class QueueEngineTests: XCTestCase {
             shouldUpdateCurrentSong: true,
             songIdToMarkPlayed: nil,
             shouldClearHistory: true,
-            shouldReconcile: true,
             pendingSeekConsumed: nil
         )
 
@@ -52,5 +50,46 @@ final class QueueEngineTests: XCTestCase {
             reduction.nextState.queueNeedsBuild,
             "Terminal playing->stopped transitions should require a fresh queue build"
         )
+    }
+
+    func testRemoveAllSongsClearsQueueWithoutPendingBuild() throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let queueState = QueueState(songPool: [song], queueOrder: [song], currentIndex: 0)
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .paused(song),
+            revision: 7,
+            queueNeedsBuild: true
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .removeAllSongs)
+        XCTAssertEqual(reduction.nextState.queueState, .empty)
+        XCTAssertEqual(reduction.nextState.playbackState, .empty)
+        XCTAssertFalse(reduction.nextState.queueNeedsBuild, "Empty state should not signal pending queue build")
+    }
+
+    func testAddSongDuringActivePlaybackPreservesCurrentIndexOnAppend() throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+
+        let queueState = QueueState(songPool: [song1, song2], queueOrder: [song1, song2], currentIndex: 1)
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .playing(song2),
+            revision: 2,
+            queueNeedsBuild: false
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .addSong(song3))
+        XCTAssertEqual(reduction.nextState.queueState.currentSongId, song2.id)
+        XCTAssertEqual(reduction.nextState.queueState.currentIndex, 1)
+        XCTAssertEqual(reduction.nextState.queueState.queueOrder.last?.id, song3.id)
+        XCTAssertFalse(reduction.nextState.queueNeedsBuild)
+
+        guard case .insertIntoQueue(let songs, _) = reduction.transportCommands.first else {
+            return XCTFail("Expected insertIntoQueue command for active append")
+        }
+        XCTAssertEqual(songs.map(\.id), [song3.id])
     }
 }

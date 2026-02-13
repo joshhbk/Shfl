@@ -265,10 +265,19 @@ final class ShufflePlayer {
         let head = transportCommandQueueHead
 
         let task = Task<Void, Error> { @MainActor [weak self] in
-            if let previous {
-                try await previous.value
-            }
             guard let self else { return }
+            if let previous {
+                do {
+                    try await previous.value
+                } catch {
+                    // Earlier callers already handle their own transport errors.
+                    // Keep the command queue progressing for newer intents.
+                    self.recordOperation(
+                        "transport-queue-previous-failed",
+                        detail: error.localizedDescription
+                    )
+                }
+            }
             for command in commands {
                 try await self.executeTransportCommand(command)
             }

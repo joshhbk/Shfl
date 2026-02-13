@@ -738,6 +738,33 @@ final class ShufflePlayerTests: XCTestCase {
         )
     }
 
+    func testTransportQueueContinuesAfterPreviousBatchFailure() async throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song)
+        await mockService.setSetQueueDelay(nanoseconds: 150_000_000)
+        await mockService.setShouldThrowOnPlay(NSError(domain: "test", code: 99))
+
+        let playTask = Task {
+            do {
+                try await self.player.play()
+            } catch {
+                // Expected from injected play failure.
+            }
+        }
+
+        try await Task.sleep(nanoseconds: 40_000_000)
+        await player.pause()
+
+        _ = await playTask.result
+
+        let pauseCallCount = await mockService.pauseCallCount
+        XCTAssertEqual(
+            pauseCallCount,
+            1,
+            "Pause transport should still execute even if a previous queued batch fails"
+        )
+    }
+
     // MARK: - Playback Position Preservation
 
     /// addSong transport append should preserve playback position without explicit seek.

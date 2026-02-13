@@ -288,6 +288,10 @@ actor MockMusicService: MusicService {
         shouldThrowOnInsert = error
     }
 
+    func setShouldThrowOnPlay(_ error: Error?) {
+        shouldThrowOnPlay = error
+    }
+
     func setShouldThrowOnReplace(_ error: Error?) {
         shouldThrowOnReplace = error
     }

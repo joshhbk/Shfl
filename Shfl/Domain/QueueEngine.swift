@@ -204,7 +204,7 @@ enum QueueEngineReducer {
         case .removeAllSongs:
             nextQueueState = .empty
             nextPlaybackState = .empty
-            nextQueueNeedsBuild = true
+            nextQueueNeedsBuild = false
             commands.append(.pause(revision: 0))
 
         case .prepareQueue(let algorithm):
@@ -269,21 +269,10 @@ enum QueueEngineReducer {
                 return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
             }
 
-            guard state.playbackState.isActive else {
+            if !state.playbackState.isActive {
                 nextQueueState = state.queueState.invalidatingQueue(using: algorithm)
                 nextQueueNeedsBuild = true
-                let didMutate = nextQueueState != state.queueState || nextQueueNeedsBuild != state.queueNeedsBuild
-                if !didMutate {
-                    return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
-                }
-                let revision = state.revision + 1
-                let nextState = QueueEngineState(
-                    queueState: nextQueueState,
-                    playbackState: nextPlaybackState,
-                    revision: revision,
-                    queueNeedsBuild: nextQueueNeedsBuild
-                )
-                return QueueEngineReduction(nextState: nextState, transportCommands: [], wasNoOp: false)
+                break
             }
 
             guard let currentSongId = state.playbackState.currentSongId,
