@@ -1688,6 +1688,37 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertTrue(invariant.reasons.isEmpty, "No invariant violations should be emitted while rebuild is pending")
     }
 
+    func testInvariantTreatsPlaybackMappedCurrentAsCanonicalWhenTransportIDNamespaceDiffers() async throws {
+        let songs = (1...3).map { i in
+            Song(id: "i.song\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let currentSong = await player.playbackState.currentSong else {
+            XCTFail("Expected current song after play")
+            return
+        }
+
+        // Simulate MusicKit reporting a catalog/raw transport ID while playback mapping resolves to the pool ID.
+        mockService.mockCurrentSongId = "1358312005"
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let invariant = await player.queueInvariantCheck
+        XCTAssertTrue(
+            invariant.isHealthy,
+            "Invariant should not fail when playback mapping matches domain current song but transport ID uses a different namespace"
+        )
+        XCTAssertFalse(
+            invariant.reasons.contains("transport-current-song-mismatch"),
+            "Namespace-only transport/current mismatch should not be treated as queue drift"
+        )
+    }
+
     func testQueueDriftTelemetryMultipleTriggers() async throws {
         // Build an initial queue of 3 songs.
         for i in 1...3 {

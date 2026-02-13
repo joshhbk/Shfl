@@ -305,13 +305,17 @@ final class ShufflePlayer {
         let poolIdSet = Set(poolIds)
         let queueIdSet = Set(queueIds)
         let queueParityExpected = !queueNeedsBuild && (queueState.hasQueue || playbackState.isActive)
+        let playbackCurrentSongId = playbackState.currentSongId
 
         let queueHasUniqueIDs = !queueState.hasQueue || queueIds.count == queueIdSet.count
         let poolAndQueueMembershipMatch = !queueParityExpected || poolIdSet == queueIdSet
         let transportEntryCount = musicService.transportQueueEntryCount
         let transportCurrentSongId = musicService.currentSongId
         let transportEntryCountMatchesQueue = !queueParityExpected || transportEntryCount == queueIds.count
-        let transportCurrentMatchesDomain = !queueParityExpected || transportCurrentSongId == queueState.currentSongId
+        let transportCurrentMatchesDomain =
+            !queueParityExpected ||
+            transportCurrentSongId == queueState.currentSongId ||
+            playbackCurrentSongId == queueState.currentSongId
 
         var reasons: [String] = []
         if !queueHasUniqueIDs {
@@ -326,7 +330,7 @@ final class ShufflePlayer {
         if queueState.hasQueue && queueState.currentSong == nil {
             reasons.append("current-index-out-of-bounds")
         }
-        if let playbackCurrentSongId = playbackState.currentSongId,
+        if let playbackCurrentSongId,
            !poolIdSet.contains(playbackCurrentSongId) {
             reasons.append("playback-song-not-in-pool")
         }
@@ -345,7 +349,7 @@ final class ShufflePlayer {
             playedCount: queueState.playedIds.count,
             currentIndex: queueState.currentIndex,
             domainCurrentSongId: queueState.currentSongId,
-            playbackCurrentSongId: playbackState.currentSongId,
+            playbackCurrentSongId: playbackCurrentSongId,
             transportEntryCount: transportEntryCount,
             transportCurrentSongId: transportCurrentSongId,
             queueHasUniqueIDs: queueHasUniqueIDs,
