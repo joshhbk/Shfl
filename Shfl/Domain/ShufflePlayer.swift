@@ -97,8 +97,16 @@ final class ShufflePlayer {
     }
 
     private func applyResolution(_ resolution: PlaybackStateResolution) {
-        if let reduction = try? reduce(.playbackResolution(resolution)) {
+        do {
+            let reduction = try reduce(.playbackResolution(resolution))
             applyReduction(reduction)
+        } catch {
+#if DEBUG
+            if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+                assertionFailure("Unexpected playbackResolution reducer failure: \(error)")
+            }
+#endif
+            recordOperation("playback-resolution-reducer-failed", detail: error.localizedDescription)
         }
         if let seek = resolution.pendingSeekConsumed {
             musicService.seek(to: seek.position)
@@ -155,6 +163,16 @@ final class ShufflePlayer {
         }
 
         queueNeedsBuild = true
+        if (source == "play" || source == "toggle-playback"),
+           case .loading = playbackState {
+            if let current = queueState.currentSong {
+                playbackState = .paused(current)
+            } else if queueState.isEmpty {
+                playbackState = .empty
+            } else {
+                playbackState = .stopped
+            }
+        }
         operationNotice = "Queue changed while syncing. Rebuilding queue."
         recordOperation(
             "transport-command-stale",
@@ -238,6 +256,7 @@ final class ShufflePlayer {
         _ reduction: QueueEngineReduction,
         source: String,
         rollbackPolicy: RollbackPolicy = .full,
+        staleRollbackPolicy: RollbackPolicy = .none,
         afterApply: (() -> Void)? = nil
     ) async throws -> TransportApplyOutcome {
         let previousState = engineState
@@ -251,6 +270,7 @@ final class ShufflePlayer {
         } catch {
             _ = refreshTransportSnapshot()
             if handleStaleTransportCommand(error, source: source) {
+                rollback(to: previousState, policy: staleRollbackPolicy)
                 return .stale
             }
             rollback(to: previousState, policy: rollbackPolicy)
@@ -707,13 +727,18 @@ final class ShufflePlayer {
                     reduction,
                     source: "remove-all-songs",
                     rollbackPolicy: .none,
+                    staleRollbackPolicy: .none,
                     afterApply: { self.playbackObserver.clearLastObservedSongId() }
                 )
                 switch outcome {
                 case .applied:
                     recordOperation("remove-all-songs")
                 case .stale:
-                    recordOperation("remove-all-songs-deferred")
+                    await musicService.pause()
+                    queueNeedsBuild = false
+                    _ = refreshTransportSnapshot()
+                    operationNotice = "Queue changed while clearing. Playback paused and queue cleared."
+                    recordOperation("remove-all-songs-stale-force-pause", refreshTransport: true)
                     return
                 }
             } catch {

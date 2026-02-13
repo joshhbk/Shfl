@@ -731,6 +731,11 @@ final class ShufflePlayerTests: XCTestCase {
         let playCallCount = await mockService.playCallCount
         XCTAssertEqual(playCallCount, 0, "Stale play command should not execute against transport")
 
+        let playbackState = await player.playbackState
+        if case .loading = playbackState {
+            XCTFail("Stale play recovery should not leave playback state stuck in loading")
+        }
+
         let operations = await player.recentQueueOperations
         XCTAssertTrue(
             operations.contains(where: { $0.operation == "transport-command-stale" }),
@@ -763,6 +768,39 @@ final class ShufflePlayerTests: XCTestCase {
             1,
             "Pause transport should still execute even if a previous queued batch fails"
         )
+    }
+
+    func testRemoveAllSongsStaleCommandForcePausesAndKeepsDomainEmpty() async throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(song)
+        await mockService.setSetQueueDelay(nanoseconds: 150_000_000)
+
+        let playTask = Task { try? await self.player.play() }
+        let firstClearTask = Task {
+            try? await Task.sleep(nanoseconds: 40_000_000)
+            await self.player.removeAllSongs()
+        }
+        let secondClearTask = Task {
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            await self.player.removeAllSongs()
+        }
+
+        _ = await playTask.result
+        _ = await firstClearTask.result
+        _ = await secondClearTask.result
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let operations = await player.recentQueueOperations
+        XCTAssertTrue(
+            operations.contains(where: { $0.operation == "remove-all-songs-stale-force-pause" }),
+            "Stale remove-all path should issue an explicit pause fallback"
+        )
+
+        let songCount = await player.songCount
+        XCTAssertEqual(songCount, 0, "Domain should remain empty after stale remove-all recovery")
+
+        let needsBuild = await player.queueNeedsBuild
+        XCTAssertFalse(needsBuild, "Empty queue should not remain flagged for rebuild after stale remove-all recovery")
     }
 
     // MARK: - Playback Position Preservation
