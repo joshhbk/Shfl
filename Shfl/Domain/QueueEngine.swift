@@ -112,21 +112,18 @@ enum QueueEngineReducer {
             nextQueueState = updatedPoolState
 
             if state.playbackState.isActive && state.queueState.hasQueue {
-                nextQueueState = nextQueueState.appendingToQueue(song)
-                if let currentId = state.playbackState.currentSongId,
-                   nextQueueState.containsSong(id: currentId) {
+                let canAppendViaInsert =
+                    !state.queueNeedsBuild &&
+                    !state.queueState.isQueueStale &&
+                    state.playbackState.currentSongId != nil
+
+                if canAppendViaInsert, let currentId = state.playbackState.currentSongId {
+                    nextQueueState = nextQueueState.appendingToQueue(song)
                     nextQueueState = nextQueueState.settingCurrentSong(id: currentId)
-                    let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
-                    commands.append(
-                        .replaceQueue(
-                            queue: nextQueueState.queueOrder,
-                            startAtSongId: currentId,
-                            policy: policy,
-                            revision: 0
-                        )
-                    )
+                    commands.append(.insertIntoQueue(songs: [song], revision: 0))
                     nextQueueNeedsBuild = false
                 } else {
+                    // Active playback with a stale/unknown queue shape should defer to full rebuild.
                     nextQueueNeedsBuild = true
                 }
             } else if state.queueState.hasQueue {
@@ -355,7 +352,14 @@ enum QueueEngineReducer {
             return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
         }
 
-        let revision = state.revision + 1
+        let revision: Int
+        switch intent {
+        case .playbackResolution:
+            // Playback observer updates should not invalidate in-flight transport batches.
+            revision = state.revision
+        default:
+            revision = state.revision + 1
+        }
         let nextState = QueueEngineState(
             queueState: nextQueueState,
             playbackState: nextPlaybackState,

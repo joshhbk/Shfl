@@ -9,6 +9,7 @@ final class ShufflePlayer {
     @ObservationIgnored private let playbackObserver: PlaybackStateObserver
     @ObservationIgnored private var transportCommandQueue: Task<Void, Error>?
     @ObservationIgnored private var transportCommandQueueHead = 0
+    @ObservationIgnored private var cachedTransportSnapshot = TransportSnapshot(entryCount: 0, currentSongId: nil)
 
     /// Single source of truth for queue state
     private(set) var queueState: QueueState = .empty
@@ -136,6 +137,11 @@ final class ShufflePlayer {
 
     private enum TransportCommandExecutionError: Error {
         case staleRevision(commandRevision: Int, queueRevision: Int)
+    }
+
+    private struct TransportSnapshot {
+        let entryCount: Int
+        let currentSongId: String?
     }
 
     @discardableResult
@@ -299,6 +305,70 @@ final class ShufflePlayer {
         }
     }
 
+    private func domainInvariantReasons(
+        poolIds: [String],
+        queueIds: [String],
+        poolIdSet: Set<String>,
+        queueIdSet: Set<String>,
+        queueParityExpected: Bool,
+        playbackCurrentSongId: String?
+    ) -> [String] {
+        var reasons: [String] = []
+
+        if !queueState.hasQueue || queueIds.count == queueIdSet.count {
+            // no-op
+        } else {
+            reasons.append("duplicate-queue-ids")
+        }
+
+        if !queueParityExpected || poolIdSet == queueIdSet {
+            // no-op
+        } else {
+            reasons.append("pool-queue-membership-mismatch")
+        }
+
+        if queueParityExpected && queueIds.count != poolIds.count {
+            reasons.append("pool-queue-count-mismatch")
+        }
+
+        if queueState.hasQueue && queueState.currentSong == nil {
+            reasons.append("current-index-out-of-bounds")
+        }
+
+        if let playbackCurrentSongId,
+           !poolIdSet.contains(playbackCurrentSongId) {
+            reasons.append("playback-song-not-in-pool")
+        }
+
+        return reasons
+    }
+
+    private func evaluateDomainInvariants() -> (isHealthy: Bool, reasons: [String]) {
+        let poolIds = queueState.songPool.map(\.id)
+        let queueIds = queueState.queueOrder.map(\.id)
+        let poolIdSet = Set(poolIds)
+        let queueIdSet = Set(queueIds)
+        let queueParityExpected = !queueNeedsBuild && (queueState.hasQueue || playbackState.isActive)
+        let reasons = domainInvariantReasons(
+            poolIds: poolIds,
+            queueIds: queueIds,
+            poolIdSet: poolIdSet,
+            queueIdSet: queueIdSet,
+            queueParityExpected: queueParityExpected,
+            playbackCurrentSongId: playbackState.currentSongId
+        )
+        return (isHealthy: reasons.isEmpty, reasons: reasons)
+    }
+
+    private func refreshTransportSnapshot() -> TransportSnapshot {
+        let snapshot = TransportSnapshot(
+            entryCount: musicService.transportQueueEntryCount,
+            currentSongId: musicService.currentSongId
+        )
+        cachedTransportSnapshot = snapshot
+        return snapshot
+    }
+
     private func evaluateQueueInvariants() -> QueueInvariantCheck {
         let poolIds = queueState.songPool.map(\.id)
         let queueIds = queueState.queueOrder.map(\.id)
@@ -309,31 +379,23 @@ final class ShufflePlayer {
 
         let queueHasUniqueIDs = !queueState.hasQueue || queueIds.count == queueIdSet.count
         let poolAndQueueMembershipMatch = !queueParityExpected || poolIdSet == queueIdSet
-        let transportEntryCount = musicService.transportQueueEntryCount
-        let transportCurrentSongId = musicService.currentSongId
+        let transportSnapshot = refreshTransportSnapshot()
+        let transportEntryCount = transportSnapshot.entryCount
+        let transportCurrentSongId = transportSnapshot.currentSongId
         let transportEntryCountMatchesQueue = !queueParityExpected || transportEntryCount == queueIds.count
         let transportCurrentMatchesDomain =
             !queueParityExpected ||
             transportCurrentSongId == queueState.currentSongId ||
             playbackCurrentSongId == queueState.currentSongId
 
-        var reasons: [String] = []
-        if !queueHasUniqueIDs {
-            reasons.append("duplicate-queue-ids")
-        }
-        if !poolAndQueueMembershipMatch {
-            reasons.append("pool-queue-membership-mismatch")
-        }
-        if queueParityExpected && queueIds.count != poolIds.count {
-            reasons.append("pool-queue-count-mismatch")
-        }
-        if queueState.hasQueue && queueState.currentSong == nil {
-            reasons.append("current-index-out-of-bounds")
-        }
-        if let playbackCurrentSongId,
-           !poolIdSet.contains(playbackCurrentSongId) {
-            reasons.append("playback-song-not-in-pool")
-        }
+        var reasons = domainInvariantReasons(
+            poolIds: poolIds,
+            queueIds: queueIds,
+            poolIdSet: poolIdSet,
+            queueIdSet: queueIdSet,
+            queueParityExpected: queueParityExpected,
+            playbackCurrentSongId: playbackCurrentSongId
+        )
         if !transportEntryCountMatchesQueue {
             reasons.append("transport-entry-count-mismatch")
         }
@@ -360,7 +422,8 @@ final class ShufflePlayer {
     }
 
     private func recordOperation(_ operation: String, detail: String? = nil) {
-        let invariant = evaluateQueueInvariants()
+        let invariant = evaluateDomainInvariants()
+        let transport = cachedTransportSnapshot
         let record = QueueOperationRecord(
             id: UUID(),
             timestamp: Date(),
@@ -370,8 +433,8 @@ final class ShufflePlayer {
             poolCount: queueState.songPool.count,
             queueCount: queueState.queueOrder.count,
             currentSongId: queueState.currentSongId,
-            transportEntryCount: invariant.transportEntryCount,
-            transportCurrentSongId: invariant.transportCurrentSongId,
+            transportEntryCount: transport.entryCount,
+            transportCurrentSongId: transport.currentSongId,
             invariantHealthy: invariant.isHealthy,
             invariantReasons: invariant.reasons
         )
@@ -379,9 +442,8 @@ final class ShufflePlayer {
     }
 
     func exportQueueDiagnosticsSnapshot(trigger: String = "manual-export", detail: String? = nil) -> String {
-        recordOperation("snapshot-export", detail: [trigger, detail].compactMap { $0 }.joined(separator: " | "))
-
         let invariant = evaluateQueueInvariants()
+        recordOperation("snapshot-export", detail: [trigger, detail].compactMap { $0 }.joined(separator: " | "))
         let snapshot = QueueDiagnosticsSnapshot(
             exportedAt: Date(),
             trigger: trigger,
