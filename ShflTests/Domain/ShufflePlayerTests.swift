@@ -1004,7 +1004,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(setQueueCallCount, 1, "setQueue should be called to rebuild stale queue")
     }
 
-    func testQueueDriftTelemetryRecordsReasonsOnPlaybackStateReconcile() async throws {
+    func testPlaybackStateChangesDoNotAutoRebuildPendingQueue() async throws {
         // Build an initial queue of 3 songs.
         for i in 1...3 {
             let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1039,10 +1039,6 @@ final class ShufflePlayerTests: XCTestCase {
         // Playback state changes should NOT auto-reconcile while a rebuild is pending.
         await mockService.simulatePlaybackState(.paused(currentSong))
         try await Task.sleep(nanoseconds: 100_000_000)
-
-        let telemetry = await player.queueDriftTelemetry
-        XCTAssertEqual(telemetry.detections, 0, "Phase-2 flow should avoid auto-reconcile telemetry side-effects")
-        XCTAssertEqual(telemetry.reconciliations, 0, "Reconciliation now happens on explicit queue rebuild")
 
         let staleAfter = await player.queueState.isQueueStale
         XCTAssertTrue(staleAfter, "Playback-state changes should not silently repair a stale queue")
@@ -1652,7 +1648,7 @@ final class ShufflePlayerTests: XCTestCase {
         )
     }
 
-    func testQueueDriftEventListCapsAt20() async throws {
+    func testRepeatedStaleCyclesKeepQueueRebuildPending() async throws {
         // Build an initial queue of 3 songs.
         for i in 1...3 {
             let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1678,16 +1674,11 @@ final class ShufflePlayerTests: XCTestCase {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
 
-        let telemetry = await player.queueDriftTelemetry
-        XCTAssertEqual(telemetry.recentEvents.count, 0, "Phase-2 queue engine no longer emits drift events")
-        XCTAssertEqual(telemetry.detections, 0)
-        XCTAssertEqual(telemetry.reconciliations, 0)
-
         let needsBuild = await player.queueNeedsBuild
         XCTAssertTrue(needsBuild, "Repeated stale cycles should keep rebuild pending")
     }
 
-    func testQueueDriftRepairedCounterIncrements() async throws {
+    func testPlayRebuildClearsQueueNeedsBuildFlag() async throws {
         // Build an initial queue of 3 songs.
         for i in 1...3 {
             let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1695,11 +1686,6 @@ final class ShufflePlayerTests: XCTestCase {
         }
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
-
-        guard let currentSong = await player.lastShuffledQueue.first else {
-            XCTFail("Expected a current song in queue")
-            return
-        }
 
         // Stop and add a song to create drift.
         await mockService.simulatePlaybackState(.stopped)
@@ -1722,7 +1708,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertFalse(needsBuildAfterPlay, "Rebuild flag should clear after successful play")
     }
 
-    func testQueueDriftEventIncludesTransportParityFields() async throws {
+    func testInvariantAllowsPoolQueueCountDriftWhileBuildPending() async throws {
         // Build an initial queue of 3 songs.
         for i in 1...3 {
             let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1730,11 +1716,6 @@ final class ShufflePlayerTests: XCTestCase {
         }
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
-
-        guard let currentSong = await player.lastShuffledQueue.first else {
-            XCTFail("Expected a current song in queue")
-            return
-        }
 
         // Stop, add songs to force pool/queue count drift.
         await mockService.simulatePlaybackState(.stopped)
@@ -1785,7 +1766,7 @@ final class ShufflePlayerTests: XCTestCase {
         )
     }
 
-    func testQueueDriftTelemetryMultipleTriggers() async throws {
+    func testRepeatedStoppedAddsTriggerExplicitRebuilds() async throws {
         // Build an initial queue of 3 songs.
         for i in 1...3 {
             let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1809,9 +1790,6 @@ final class ShufflePlayerTests: XCTestCase {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
 
-        let telemetry = await player.queueDriftTelemetry
-        XCTAssertEqual(telemetry.detections, 0, "Phase-2 flow should not depend on drift telemetry triggers")
-        XCTAssertEqual(telemetry.reconciliations, 0)
     }
 
     func testHardResetQueueForDebugClearsQueueAndDiagnostics() async throws {
@@ -1831,11 +1809,6 @@ final class ShufflePlayerTests: XCTestCase {
 
         let queue = await player.lastShuffledQueue
         XCTAssertTrue(queue.isEmpty, "Hard reset should clear queue order")
-
-        let telemetry = await player.queueDriftTelemetry
-        XCTAssertEqual(telemetry.detections, 0)
-        XCTAssertEqual(telemetry.reconciliations, 0)
-        XCTAssertTrue(telemetry.recentEvents.isEmpty, "Hard reset should clear telemetry history")
 
         let notice = await player.operationNotice
         XCTAssertNil(notice, "Hard reset should clear any operation notice")

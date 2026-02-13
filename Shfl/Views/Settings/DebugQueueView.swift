@@ -31,32 +31,17 @@ private struct DebugQueueContent: View {
     // Access observed properties directly to ensure SwiftUI tracks them
     private var queue: [Song] { player.lastShuffledQueue }
     private var usedAlgorithm: ShuffleAlgorithm { player.lastUsedAlgorithm }
-    private var driftTelemetry: QueueDriftTelemetry { player.queueDriftTelemetry }
     private var invariantCheck: QueueInvariantCheck { player.queueInvariantCheck }
     private var recentOperations: [QueueOperationRecord] { player.recentQueueOperations }
-
-    private var reasonCounts: [(reason: QueueDriftReason, count: Int)] {
-        driftTelemetry.detectionsByReason
-            .map { ($0.key, $0.value) }
-            .sorted { $0.reason.rawValue < $1.reason.rawValue }
-    }
-
-    private var triggerCounts: [(trigger: String, count: Int)] {
-        driftTelemetry.detectionsByTrigger
-            .map { ($0.key, $0.value) }
-            .sorted { $0.trigger < $1.trigger }
-    }
 
     var body: some View {
         List {
             queueOverviewSection
-            driftTelemetrySection
             transportParitySection
             invariantSection
             operationsSection
             diagnosticsExportSection
             hardResetSection
-            driftEventsSection
             shuffledQueueSection
         }
         .navigationTitle("Debug Queue")
@@ -66,7 +51,7 @@ private struct DebugQueueContent: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This clears the current queue, playback state, and debug telemetry so you can start from a clean baseline.")
+            Text("This clears the current queue, playback state, and operation journal so you can start from a clean baseline.")
         }
     }
 
@@ -104,50 +89,6 @@ private struct DebugQueueContent: View {
             Text("⚠️ Press play again to apply the new algorithm")
         } else if queue.count != player.songCount && queue.count > 0 {
             Text("⚠️ Queue size doesn't match pool! Check console logs for details.")
-        }
-    }
-
-    @ViewBuilder
-    private var driftTelemetrySection: some View {
-        Section {
-            statusRow(
-                title: "Detections",
-                value: "\(driftTelemetry.detections)",
-                color: driftTelemetry.detections == 0 ? .secondary : .primary
-            )
-            statusRow(
-                title: "Reconciliations",
-                value: "\(driftTelemetry.reconciliations)",
-                color: .secondary
-            )
-            statusRow(
-                title: "Unrepaired",
-                value: "\(driftTelemetry.unrepairedDetections)",
-                color: driftTelemetry.unrepairedDetections == 0 ? .secondary : .red
-            )
-
-            ForEach(reasonCounts, id: \.reason) { entry in
-                statusRow(
-                    title: entry.reason.displayName,
-                    value: "\(entry.count)",
-                    color: .secondary
-                )
-            }
-
-            ForEach(triggerCounts, id: \.trigger) { entry in
-                statusRow(
-                    title: "Trigger: \(entry.trigger)",
-                    value: "\(entry.count)",
-                    color: .secondary,
-                    titleFont: .caption
-                )
-            }
-        } header: {
-            Text("Drift Telemetry")
-        } footer: {
-            if driftTelemetry.detections == 0 {
-                Text("No queue drift detected in this session.")
-            }
         }
     }
 
@@ -258,7 +199,7 @@ private struct DebugQueueContent: View {
         } header: {
             Text("Snapshot Export")
         } footer: {
-            Text("Includes queue IDs, invariants, drift telemetry, and operation journal as JSON.")
+            Text("Includes queue IDs, invariants, and operation journal as JSON.")
         }
     }
 
@@ -288,17 +229,6 @@ private struct DebugQueueContent: View {
             Text("Recovery")
         } footer: {
             Text("Use this when queue/transport state diverges and you want to restart from a known clean state.")
-        }
-    }
-
-    @ViewBuilder
-    private var driftEventsSection: some View {
-        if !driftTelemetry.recentEvents.isEmpty {
-            Section("Recent Drift Events") {
-                ForEach(driftTelemetry.recentEvents) { event in
-                    DriftEventRow(event: event)
-                }
-            }
         }
     }
 
@@ -370,52 +300,6 @@ private struct QueueOperationRow: View {
             }
         }
         .padding(.vertical, 2)
-    }
-}
-
-private struct DriftEventRow: View {
-    let event: QueueDriftEvent
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(event.timestamp, style: .time)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if event.transportParityMismatch {
-                    Text("Transport Mismatch")
-                        .font(.caption2)
-                        .foregroundStyle(.red)
-                }
-                Text(event.repaired ? "Repaired" : "Unrepaired")
-                    .font(.caption)
-                    .foregroundStyle(event.repaired ? Color.secondary : Color.red)
-            }
-
-            Text("Trigger: \(event.trigger)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Text(reasonSummary)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            if let transportCount = event.transportEntryCount {
-                Text("Transport: \(transportCount) entries, current: \(event.transportCurrentSongId ?? "nil")")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 2)
-    }
-
-    private var reasonSummary: String {
-        if event.reasons.isEmpty {
-            return "Reasons: none"
-        }
-        let reasons = event.reasons.map(\.displayName).joined(separator: ", ")
-        return "Reasons: \(reasons)"
     }
 }
 

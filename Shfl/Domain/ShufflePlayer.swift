@@ -23,9 +23,6 @@ final class ShufflePlayer {
     /// Whether playback should rebuild transport queue before attempting play.
     private(set) var queueNeedsBuild = true
 
-    /// Diagnostics for queue drift detection and reconciliation.
-    private(set) var queueDriftTelemetry = QueueDriftTelemetry()
-
     /// Rolling operation journal for queue diagnostics.
     private(set) var queueOperationJournal = QueueOperationJournal()
 
@@ -125,7 +122,6 @@ final class ShufflePlayer {
     /// Debug-only escape hatch to return queue and diagnostics to a clean baseline.
     func hardResetQueueForDebug() async {
         await removeAllSongs()
-        queueDriftTelemetry = QueueDriftTelemetry()
         queueOperationJournal = QueueOperationJournal()
         operationNotice = nil
         playbackObserver.clearLastObservedSongId()
@@ -350,6 +346,9 @@ final class ShufflePlayer {
         transportCommandQueueHead += 1
         let head = transportCommandQueueHead
 
+        // Commands are serialized as a linked task chain.
+        // This intentionally favors ordering over throughput, and relies on
+        // playbackResolution never emitting transport commands to avoid unbounded growth.
         let task = Task<Void, Error> { @MainActor [weak self] in
             guard let self else { return }
             if let previous {
@@ -555,7 +554,6 @@ final class ShufflePlayer {
             transportEntryCount: invariant.transportEntryCount,
             transportCurrentSongId: invariant.transportCurrentSongId,
             invariantCheck: invariant,
-            driftTelemetry: QueueDriftTelemetrySnapshot(queueDriftTelemetry),
             operationJournal: queueOperationJournal.records
         )
 
