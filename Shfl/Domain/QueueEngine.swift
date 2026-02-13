@@ -324,6 +324,12 @@ enum QueueEngineReducer {
                 }
             }
             nextPlaybackState = resolution.resolvedState
+            if !commands.isEmpty {
+#if DEBUG
+                assertionFailure("playbackResolution must not emit transport commands")
+#endif
+                commands.removeAll()
+            }
 
         case .restoreSession(let restoredQueueState, let restoredPlaybackState):
             nextQueueState = restoredQueueState

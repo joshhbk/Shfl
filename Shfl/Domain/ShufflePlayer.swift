@@ -7,8 +7,10 @@ final class ShufflePlayer {
 
     @ObservationIgnored private let musicService: MusicService
     @ObservationIgnored private let playbackObserver: PlaybackStateObserver
-    @ObservationIgnored private var transportCommandQueue: Task<Void, Error>?
-    @ObservationIgnored private var transportCommandQueueHead = 0
+    @ObservationIgnored private lazy var transportCommandExecutor = TransportCommandExecutor { [weak self] command in
+        guard let self else { return }
+        try await self.executeTransportCommand(command)
+    }
     @ObservationIgnored private var cachedTransportSnapshot = TransportSnapshot(entryCount: 0, currentSongId: nil)
 
     /// Single source of truth for queue state
@@ -24,7 +26,8 @@ final class ShufflePlayer {
     private(set) var queueNeedsBuild = true
 
     /// Rolling operation journal for queue diagnostics.
-    private(set) var queueOperationJournal = QueueOperationJournal()
+    @ObservationIgnored private(set) var queueOperationJournal = QueueOperationJournal()
+    private(set) var operationJournalVersion = 0
 
     /// Non-blocking operation notice for queue/transport sync failures.
     private(set) var operationNotice: String?
@@ -50,7 +53,10 @@ final class ShufflePlayer {
     var transportCurrentSongId: String? { musicService.currentSongId }
 
     /// Debug: recent queue operations (most recent first).
-    var recentQueueOperations: [QueueOperationRecord] { queueOperationJournal.records }
+    var recentQueueOperations: [QueueOperationRecord] {
+        _ = operationJournalVersion
+        return queueOperationJournal.records
+    }
 
     /// Debug: latest invariant check over domain + transport queue state.
     var queueInvariantCheck: QueueInvariantCheck { evaluateQueueInvariants() }
@@ -96,6 +102,15 @@ final class ShufflePlayer {
     private func applyResolution(_ resolution: PlaybackStateResolution) {
         do {
             let reduction = try reduce(.playbackResolution(resolution))
+            if !reduction.transportCommands.isEmpty {
+#if DEBUG
+                assertionFailure("playbackResolution emitted transport commands")
+#endif
+                recordOperation(
+                    "playback-resolution-illegal-transport",
+                    detail: "count=\(reduction.transportCommands.count)"
+                )
+            }
             applyReduction(reduction)
         } catch {
 #if DEBUG
@@ -123,6 +138,7 @@ final class ShufflePlayer {
     func hardResetQueueForDebug() async {
         await removeAllSongs()
         queueOperationJournal = QueueOperationJournal()
+        operationJournalVersion &+= 1
         operationNotice = nil
         playbackObserver.clearLastObservedSongId()
         playbackObserver.clearPendingRestoreSeek()
@@ -152,6 +168,65 @@ final class ShufflePlayer {
         let currentSongId: String?
     }
 
+    private struct DomainInvariantSnapshot {
+        let poolIds: [String]
+        let queueIds: [String]
+        let poolIdSet: Set<String>
+        let queueIdSet: Set<String>
+        let queueParityExpected: Bool
+        let playbackCurrentSongId: String?
+        let reasons: [String]
+
+        var isHealthy: Bool { reasons.isEmpty }
+    }
+
+    /// Serializes transport command batches without building an unbounded linked task chain.
+    private final class TransportCommandExecutor {
+        typealias CommandRunner = (TransportCommand) async throws -> Void
+
+        private struct Batch {
+            let commands: [TransportCommand]
+            let continuation: CheckedContinuation<Void, Error>
+        }
+
+        private let runCommand: CommandRunner
+        private var pendingBatches: [Batch] = []
+        private var isDraining = false
+
+        init(runCommand: @escaping CommandRunner) {
+            self.runCommand = runCommand
+        }
+
+        func enqueue(_ commands: [TransportCommand]) async throws {
+            guard !commands.isEmpty else { return }
+
+            try await withCheckedThrowingContinuation { continuation in
+                pendingBatches.append(Batch(commands: commands, continuation: continuation))
+                guard !isDraining else { return }
+                isDraining = true
+                Task { @MainActor [weak self] in
+                    await self?.drain()
+                }
+            }
+        }
+
+        private func drain() async {
+            while !pendingBatches.isEmpty {
+                let batch = pendingBatches.removeFirst()
+                do {
+                    for command in batch.commands {
+                        try await runCommand(command)
+                    }
+                    batch.continuation.resume(returning: ())
+                } catch {
+                    batch.continuation.resume(throwing: error)
+                }
+            }
+
+            isDraining = false
+        }
+    }
+
     @discardableResult
     private func handleStaleTransportCommand(_ error: Error, source: String) -> Bool {
         guard case let TransportCommandExecutionError.staleRevision(commandRevision, queueRevision) = error else {
@@ -159,8 +234,7 @@ final class ShufflePlayer {
         }
 
         queueNeedsBuild = true
-        if (source == "play" || source == "toggle-playback"),
-           case .loading = playbackState {
+        if case .loading = playbackState {
             if let current = queueState.currentSong {
                 playbackState = .paused(current)
             } else if queueState.isEmpty {
@@ -244,6 +318,7 @@ final class ShufflePlayer {
                 algorithm: previousState.queueState.algorithm
             )
             playbackState = previousState.playbackState
+            queueRevision = previousState.revision
             queueNeedsBuild = true
         }
     }
@@ -296,6 +371,9 @@ final class ShufflePlayer {
         guard !queueState.isEmpty else { return }
         guard !isHealthy else { return }
 
+        // Any invariant break should push the system into an explicit rebuild path.
+        queueNeedsBuild = true
+
 #if DEBUG
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
             assertionFailure("Queue invariant violation [\(context)]")
@@ -340,42 +418,7 @@ final class ShufflePlayer {
     }
 
     private func enqueueTransportCommands(_ commands: [TransportCommand]) async throws {
-        guard !commands.isEmpty else { return }
-
-        let previous = transportCommandQueue
-        transportCommandQueueHead += 1
-        let head = transportCommandQueueHead
-
-        // Commands are serialized as a linked task chain.
-        // This intentionally favors ordering over throughput, and relies on
-        // playbackResolution never emitting transport commands to avoid unbounded growth.
-        let task = Task<Void, Error> { @MainActor [weak self] in
-            guard let self else { return }
-            if let previous {
-                do {
-                    try await previous.value
-                } catch {
-                    // Earlier callers already handle their own transport errors.
-                    // Keep the command queue progressing for newer intents.
-                    self.recordOperation(
-                        "transport-queue-previous-failed",
-                        detail: error.localizedDescription
-                    )
-                }
-            }
-            for command in commands {
-                try await self.executeTransportCommand(command)
-            }
-        }
-
-        transportCommandQueue = task
-        defer {
-            if transportCommandQueueHead == head {
-                transportCommandQueue = nil
-            }
-        }
-
-        try await task.value
+        try await transportCommandExecutor.enqueue(commands)
     }
 
     private func reduce(_ intent: QueueIntent) throws -> QueueEngineReduction {
@@ -437,21 +480,35 @@ final class ShufflePlayer {
         return reasons
     }
 
-    private func evaluateDomainInvariants() -> (isHealthy: Bool, reasons: [String]) {
+    private func makeDomainInvariantSnapshot() -> DomainInvariantSnapshot {
         let poolIds = queueState.songPool.map(\.id)
         let queueIds = queueState.queueOrder.map(\.id)
         let poolIdSet = Set(poolIds)
         let queueIdSet = Set(queueIds)
         let queueParityExpected = !queueNeedsBuild && (queueState.hasQueue || playbackState.isActive)
+        let playbackCurrentSongId = playbackState.currentSongId
         let reasons = domainInvariantReasons(
             poolIds: poolIds,
             queueIds: queueIds,
             poolIdSet: poolIdSet,
             queueIdSet: queueIdSet,
             queueParityExpected: queueParityExpected,
-            playbackCurrentSongId: playbackState.currentSongId
+            playbackCurrentSongId: playbackCurrentSongId
         )
-        return (isHealthy: reasons.isEmpty, reasons: reasons)
+        return DomainInvariantSnapshot(
+            poolIds: poolIds,
+            queueIds: queueIds,
+            poolIdSet: poolIdSet,
+            queueIdSet: queueIdSet,
+            queueParityExpected: queueParityExpected,
+            playbackCurrentSongId: playbackCurrentSongId,
+            reasons: reasons
+        )
+    }
+
+    private func evaluateDomainInvariants() -> (isHealthy: Bool, reasons: [String]) {
+        let snapshot = makeDomainInvariantSnapshot()
+        return (isHealthy: snapshot.isHealthy, reasons: snapshot.reasons)
     }
 
     private func refreshTransportSnapshot() -> TransportSnapshot {
@@ -464,32 +521,20 @@ final class ShufflePlayer {
     }
 
     private func evaluateQueueInvariants() -> QueueInvariantCheck {
-        let poolIds = queueState.songPool.map(\.id)
-        let queueIds = queueState.queueOrder.map(\.id)
-        let poolIdSet = Set(poolIds)
-        let queueIdSet = Set(queueIds)
-        let queueParityExpected = !queueNeedsBuild && (queueState.hasQueue || playbackState.isActive)
-        let playbackCurrentSongId = playbackState.currentSongId
+        let snapshot = makeDomainInvariantSnapshot()
 
-        let queueHasUniqueIDs = !queueState.hasQueue || queueIds.count == queueIdSet.count
-        let poolAndQueueMembershipMatch = !queueParityExpected || poolIdSet == queueIdSet
+        let queueHasUniqueIDs = !queueState.hasQueue || snapshot.queueIds.count == snapshot.queueIdSet.count
+        let poolAndQueueMembershipMatch = !snapshot.queueParityExpected || snapshot.poolIdSet == snapshot.queueIdSet
         let transportSnapshot = refreshTransportSnapshot()
         let transportEntryCount = transportSnapshot.entryCount
         let transportCurrentSongId = transportSnapshot.currentSongId
-        let transportEntryCountMatchesQueue = !queueParityExpected || transportEntryCount == queueIds.count
+        let transportEntryCountMatchesQueue = !snapshot.queueParityExpected || transportEntryCount == snapshot.queueIds.count
         let transportCurrentMatchesDomain =
-            !queueParityExpected ||
+            !snapshot.queueParityExpected ||
             transportCurrentSongId == queueState.currentSongId ||
-            playbackCurrentSongId == queueState.currentSongId
+            snapshot.playbackCurrentSongId == queueState.currentSongId
 
-        var reasons = domainInvariantReasons(
-            poolIds: poolIds,
-            queueIds: queueIds,
-            poolIdSet: poolIdSet,
-            queueIdSet: queueIdSet,
-            queueParityExpected: queueParityExpected,
-            playbackCurrentSongId: playbackCurrentSongId
-        )
+        var reasons = snapshot.reasons
         if !transportEntryCountMatchesQueue {
             reasons.append("transport-entry-count-mismatch")
         }
@@ -505,7 +550,7 @@ final class ShufflePlayer {
             playedCount: queueState.playedIds.count,
             currentIndex: queueState.currentIndex,
             domainCurrentSongId: queueState.currentSongId,
-            playbackCurrentSongId: playbackCurrentSongId,
+            playbackCurrentSongId: snapshot.playbackCurrentSongId,
             transportEntryCount: transportEntryCount,
             transportCurrentSongId: transportCurrentSongId,
             queueHasUniqueIDs: queueHasUniqueIDs,
@@ -536,6 +581,7 @@ final class ShufflePlayer {
             invariantReasons: invariant.reasons
         )
         queueOperationJournal.append(record)
+        operationJournalVersion &+= 1
     }
 
     func exportQueueDiagnosticsSnapshot(trigger: String = "manual-export", detail: String? = nil) -> String {
@@ -623,7 +669,16 @@ final class ShufflePlayer {
                 )
                 switch outcome {
                 case .applied:
-                    recordOperation("add-song-success", detail: "id=\(song.id)")
+                    let deferredActiveQueueSync =
+                        reduction.transportCommands.isEmpty &&
+                        reduction.nextState.queueNeedsBuild &&
+                        reduction.nextState.playbackState.isActive
+                    if deferredActiveQueueSync {
+                        operationNotice = "Song added. Queue will refresh on next play."
+                        recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
+                    } else {
+                        recordOperation("add-song-success", detail: "id=\(song.id)")
+                    }
                 case .stale:
                     recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
                     return
