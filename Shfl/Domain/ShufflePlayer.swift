@@ -3,8 +3,6 @@ import Foundation
 @Observable
 @MainActor
 final class ShufflePlayer {
-    static let maxSongs = 120
-
     @ObservationIgnored private let musicService: MusicService
     @ObservationIgnored private let playbackObserver: PlaybackStateObserver
     @ObservationIgnored private lazy var transportCommandExecutor = TransportCommandExecutor { [weak self] command in
@@ -41,9 +39,8 @@ final class ShufflePlayer {
         case draining(pendingPass: Bool)
     }
 
-    // MARK: - Computed Properties (for compatibility)
+    // MARK: - Computed Properties
 
-    var songs: [Song] { queueState.songPool }
     var songCount: Int { queueState.songCount }
     var allSongs: [Song] { queueState.songPool }
     var capacity: Int { QueueState.maxSongs }
@@ -1211,18 +1208,4 @@ final class ShufflePlayer {
         return true
     }
 
-    /// Backward-compat wrapper.
-    func restoreQueue(
-        queueOrder: [String],
-        currentSongId: String?,
-        playedIds: Set<String>,
-        playbackPosition: TimeInterval
-    ) async -> Bool {
-        await restoreSession(
-            queueOrder: queueOrder,
-            currentSongId: currentSongId,
-            playedIds: playedIds,
-            playbackPosition: playbackPosition
-        )
-    }
 }

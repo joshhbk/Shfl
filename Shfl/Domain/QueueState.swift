@@ -1,29 +1,5 @@
 import Foundation
 
-enum QueueDriftReason: String, CaseIterable, Hashable, Sendable {
-    case countMismatch
-    case duplicateQueueIDs
-    case membershipMismatch
-
-    var displayName: String {
-        switch self {
-        case .countMismatch: return "Count mismatch"
-        case .duplicateQueueIDs: return "Duplicate queue IDs"
-        case .membershipMismatch: return "Pool/queue membership mismatch"
-        }
-    }
-}
-
-struct QueueDriftDiagnostics: Equatable, Sendable {
-    let isStale: Bool
-    let reasons: Set<QueueDriftReason>
-    let poolCount: Int
-    let queueCount: Int
-    let duplicateQueueIDs: [String]
-    let missingFromQueue: [String]
-    let missingFromPool: [String]
-}
-
 /// Immutable queue state - single source of truth for queue management.
 /// All mutations return a new state instance, making state transitions explicit and testable.
 struct QueueState: Equatable, Sendable {
@@ -72,12 +48,6 @@ struct QueueState: Equatable, Sendable {
     /// ID of the current song.
     var currentSongId: String? { currentSong?.id }
 
-    /// Songs remaining in the queue (including current).
-    var upcomingSongs: [Song] {
-        guard currentIndex < queueOrder.count else { return [] }
-        return Array(queueOrder[currentIndex...])
-    }
-
     /// Number of songs in the pool.
     var songCount: Int { songPool.count }
 
@@ -92,12 +62,6 @@ struct QueueState: Equatable, Sendable {
 
     /// Whether there's a valid queue ready to play.
     var hasQueue: Bool { !queueOrder.isEmpty }
-
-    /// Whether there are more songs after the current one.
-    var hasNext: Bool { currentIndex < queueOrder.count - 1 }
-
-    /// Whether there are songs before the current one.
-    var hasPrevious: Bool { currentIndex > 0 }
 
     /// Whether the queue is out of sync with the song pool.
     /// Fast O(n) membership check without allocating full diagnostics.
@@ -114,59 +78,6 @@ struct QueueState: Equatable, Sendable {
             }
         }
         return false
-    }
-
-    /// Detailed invariant diagnostics for queue/pool drift.
-    /// Only called when drift is detected and full details are needed for telemetry.
-    var queueDriftDiagnostics: QueueDriftDiagnostics {
-        guard hasQueue else {
-            return QueueDriftDiagnostics(
-                isStale: false,
-                reasons: [],
-                poolCount: songPool.count,
-                queueCount: 0,
-                duplicateQueueIDs: [],
-                missingFromQueue: [],
-                missingFromPool: []
-            )
-        }
-
-        let queueIds = queueOrder.map(\.id)
-        let poolIds = songPool.map(\.id)
-        let queueIdSet = Set(queueIds)
-        let poolIdSet = Set(poolIds)
-
-        var reasons = Set<QueueDriftReason>()
-        if queueIds.count != poolIds.count {
-            reasons.insert(.countMismatch)
-        }
-
-        var seen = Set<String>()
-        var duplicateQueueIDs: [String] = []
-        for id in queueIds where !seen.insert(id).inserted {
-            if !duplicateQueueIDs.contains(id) {
-                duplicateQueueIDs.append(id)
-            }
-        }
-        if !duplicateQueueIDs.isEmpty {
-            reasons.insert(.duplicateQueueIDs)
-        }
-
-        let missingFromQueue = poolIds.filter { !queueIdSet.contains($0) }
-        let missingFromPool = queueIds.filter { !poolIdSet.contains($0) }
-        if !missingFromQueue.isEmpty || !missingFromPool.isEmpty {
-            reasons.insert(.membershipMismatch)
-        }
-
-        return QueueDriftDiagnostics(
-            isStale: !reasons.isEmpty,
-            reasons: reasons,
-            poolCount: poolIds.count,
-            queueCount: queueIds.count,
-            duplicateQueueIDs: duplicateQueueIDs,
-            missingFromQueue: missingFromQueue,
-            missingFromPool: missingFromPool
-        )
     }
 
     /// Invalidate the queue while preserving the song pool.
@@ -187,11 +98,6 @@ struct QueueState: Equatable, Sendable {
     /// Check if a song is in the pool.
     func containsSong(id: String) -> Bool {
         songPool.contains(where: { $0.id == id })
-    }
-
-    /// Check if a song has been played.
-    func hasPlayed(id: String) -> Bool {
-        playedIds.contains(id)
     }
 
     // MARK: - Song Pool Mutations
@@ -244,11 +150,6 @@ struct QueueState: Equatable, Sendable {
             currentIndex: min(newIndex, max(0, newQueue.count - 1)),
             algorithm: algorithm
         )
-    }
-
-    /// Remove all songs and reset state.
-    func cleared() -> QueueState {
-        .empty
     }
 
     /// Align current index to an observed song ID while preserving queue order/history.
@@ -310,43 +211,6 @@ struct QueueState: Equatable, Sendable {
             playedIds: reconciled.playedIds,
             currentIndex: playedPrefix.count,
             algorithm: effectiveAlgorithm
-        )
-    }
-
-    /// Advance to the next song.
-    func advancedToNext() -> QueueState {
-        guard hasNext else { return self }
-
-        // Add current song to played history
-        var newPlayedIds = playedIds
-        if let currentId = currentSongId {
-            newPlayedIds.insert(currentId)
-        }
-
-        return QueueState(
-            songPool: songPool,
-            queueOrder: queueOrder,
-            playedIds: newPlayedIds,
-            currentIndex: currentIndex + 1,
-            algorithm: algorithm
-        )
-    }
-
-    /// Go back to the previous song.
-    func revertedToPrevious() -> QueueState {
-        guard hasPrevious else { return self }
-
-        // Remove current song from played history (going back)
-        let previousSong = queueOrder[currentIndex - 1]
-        var newPlayedIds = playedIds
-        newPlayedIds.remove(previousSong.id)
-
-        return QueueState(
-            songPool: songPool,
-            queueOrder: queueOrder,
-            playedIds: newPlayedIds,
-            currentIndex: currentIndex - 1,
-            algorithm: algorithm
         )
     }
 

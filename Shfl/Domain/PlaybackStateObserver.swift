@@ -78,11 +78,6 @@ final class PlaybackStateObserver {
         }
     }
 
-    func stopObserving() {
-        stateTask?.cancel()
-        stateTask = nil
-    }
-
     /// Resolves a raw MusicKit state against the current queue state.
     /// Returns a description of what mutations to apply.
     /// Note: mutates `lastObservedSongId` and `pendingRestoreSeek` as side effects.

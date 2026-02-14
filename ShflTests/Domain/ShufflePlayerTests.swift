@@ -1459,7 +1459,7 @@ final class ShufflePlayerTests: XCTestCase {
         // Restore queue with song 3 as current
         let queueOrder = ["1", "2", "3", "4", "5"]
         let playedIds: Set<String> = ["1", "2"]
-        let success = await player.restoreQueue(
+        let success = await player.restoreSession(
             queueOrder: queueOrder,
             currentSongId: "3",
             playedIds: playedIds,
@@ -1490,7 +1490,7 @@ final class ShufflePlayerTests: XCTestCase {
         }
 
         let queueOrder = ["1", "2", "3", "4", "5"]
-        _ = await player.restoreQueue(
+        _ = await player.restoreSession(
             queueOrder: queueOrder,
             currentSongId: "3",
             playedIds: [],
@@ -1506,7 +1506,7 @@ final class ShufflePlayerTests: XCTestCase {
     func testRestoreQueueFailsWithEmptySongs() async throws {
         // Don't add any songs to player
         let queueOrder = ["1", "2", "3"]
-        let success = await player.restoreQueue(
+        let success = await player.restoreSession(
             queueOrder: queueOrder,
             currentSongId: "1",
             playedIds: [],
@@ -1524,7 +1524,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song3)
 
         let queueOrder = ["1", "2", "3", "4", "5"]  // 2, 4, 5 don't exist
-        let success = await player.restoreQueue(
+        let success = await player.restoreSession(
             queueOrder: queueOrder,
             currentSongId: "3",
             playedIds: [],
@@ -1550,7 +1550,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         await mockService.resetQueueTracking()
 
-        let success = await player.restoreQueue(
+        let success = await player.restoreSession(
             queueOrder: ["1", "2", "3"],
             currentSongId: "2",
             playedIds: ["1"],
@@ -1572,7 +1572,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
 
-        let success = await player.restoreQueue(
+        let success = await player.restoreSession(
             queueOrder: ["1", "2", "3"],
             currentSongId: "2",
             playedIds: ["1"],
@@ -1609,7 +1609,7 @@ final class ShufflePlayerTests: XCTestCase {
         await mockService.simulatePlaybackState(.paused(hydratedSong))
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let success = await player.restoreQueue(
+        let success = await player.restoreSession(
             queueOrder: ["1", "2", "3"],
             currentSongId: "2",
             playedIds: ["1"],
@@ -1635,7 +1635,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
 
-        let success = await player.restoreQueue(
+        let success = await player.restoreSession(
             queueOrder: ["1", "2", "3"],
             currentSongId: "2",
             playedIds: ["1"],

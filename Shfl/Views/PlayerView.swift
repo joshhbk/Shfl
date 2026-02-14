@@ -185,7 +185,6 @@ private final class PreviewMockMusicService: MusicService {
         }
     }
     func requestAuthorization() async -> Bool { true }
-    func prefetchLibrary() async {}
     func fetchLibrarySongs(sortedBy: SortOption, limit: Int, offset: Int) async throws -> LibraryPage {
         LibraryPage(songs: [], hasMore: false)
     }
