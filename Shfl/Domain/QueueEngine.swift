@@ -85,6 +85,10 @@ struct QueueEngineReduction: Sendable {
     let nextState: QueueEngineState
     let transportCommands: [TransportCommand]
     let wasNoOp: Bool
+
+    var requiresActiveTransportSync: Bool {
+        nextState.playbackState.isActive && !transportCommands.isEmpty
+    }
 }
 
 enum QueueEngineReducer {
@@ -354,6 +358,8 @@ enum QueueEngineReducer {
             nextQueueNeedsBuild = value
 
         case .playbackResolution(let resolution):
+            // Observer-level normalization already handles transient stop/empty transport blips.
+            // Reducer-level rebuild decisions here should react only to durable error states.
             if resolution.shouldUpdateCurrentSong, let songId = resolution.resolvedSongId {
                 nextQueueState = nextQueueState.settingCurrentSong(id: songId)
             }

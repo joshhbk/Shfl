@@ -34,6 +34,8 @@ final class ShufflePlayer {
     /// Non-blocking operation notice for queue/transport sync failures.
     private(set) var operationNotice: String?
 
+    // Retry orchestration state intentionally lives outside the reducer.
+    // It controls when we reinvoke reducer intents, not domain queue semantics.
     private enum ActiveAddResyncState {
         case idle
         case draining(pendingPass: Bool)
@@ -320,60 +322,7 @@ final class ShufflePlayer {
             activeAddResyncState = .draining(pendingPass: false)
             passCount += 1
 
-            let attemptCount = Self.activeAddRetryDelaysNanoseconds.count + 1
-            var didSync = false
-
-            attempts: for attempt in 1...attemptCount {
-                guard !Task.isCancelled else { break }
-                recordOperation(.activeAddSyncRetryAttempt, detail: "attempt=\(attempt)")
-                do {
-                    // Recompute from the latest state each attempt. @MainActor serialization and
-                    // revision fencing ensure interleavings fail stale instead of applying incorrectly.
-                    let reduction = try reduce(.resyncActiveAddTransport)
-                    guard !reduction.wasNoOp else {
-                        didSync = true
-                        break
-                    }
-
-                    let outcome = try await applyReductionWithTransport(
-                        reduction,
-                        source: "active-add-retry",
-                        rollbackPolicy: .preservePoolAndDeferQueueBuild,
-                        staleRollbackPolicy: .preservePoolAndDeferQueueBuild,
-                        showStaleNotice: false
-                    )
-                    switch outcome {
-                    case .applied:
-                        recordOperation(.activeAddSyncRetrySuccess, detail: "attempt=\(attempt)")
-                        didSync = true
-                        break attempts
-                    case .stale:
-                        if attempt == attemptCount {
-                            break attempts
-                        }
-                        let delay = Self.activeAddRetryDelaysNanoseconds[attempt - 1]
-                        try? await Task.sleep(nanoseconds: delay)
-                        guard !Task.isCancelled else { break attempts }
-                        continue
-                    }
-                } catch {
-                    if !Self.isTransientAddSyncError(error) {
-                        recordOperation(
-                            .activeAddSyncNonTransientFailed,
-                            detail: "attempt=\(attempt), error=\(error.localizedDescription)"
-                        )
-                        break attempts
-                    }
-
-                    if attempt == attemptCount {
-                        break attempts
-                    }
-
-                    let delay = Self.activeAddRetryDelaysNanoseconds[attempt - 1]
-                    try? await Task.sleep(nanoseconds: delay)
-                    guard !Task.isCancelled else { break attempts }
-                }
-            }
+            let didSync = await executeActiveAddResyncAttemptPass()
 
             guard !Task.isCancelled else { break }
             if !didSync {
@@ -388,6 +337,65 @@ final class ShufflePlayer {
                 detail: "pass-cap=\(Self.activeAddRetryMaxPasses)"
             )
         }
+    }
+
+    private func executeActiveAddResyncAttemptPass() async -> Bool {
+        let attemptCount = Self.activeAddRetryDelaysNanoseconds.count + 1
+        var didSync = false
+
+        attempts: for attempt in 1...attemptCount {
+            guard !Task.isCancelled else { break }
+            recordOperation(.activeAddSyncRetryAttempt, detail: "attempt=\(attempt)")
+            do {
+                // Recompute from the latest state each attempt. @MainActor serialization and
+                // revision fencing ensure interleavings fail stale instead of applying incorrectly.
+                let reduction = try reduce(.resyncActiveAddTransport)
+                guard !reduction.wasNoOp else {
+                    didSync = true
+                    break
+                }
+
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "active-add-retry",
+                    rollbackPolicy: .preservePoolAndDeferQueueBuild,
+                    staleRollbackPolicy: .preservePoolAndDeferQueueBuild,
+                    showStaleNotice: false
+                )
+                switch outcome {
+                case .applied:
+                    recordOperation(.activeAddSyncRetrySuccess, detail: "attempt=\(attempt)")
+                    didSync = true
+                    break attempts
+                case .stale:
+                    if attempt == attemptCount {
+                        break attempts
+                    }
+                    let delay = Self.activeAddRetryDelaysNanoseconds[attempt - 1]
+                    try? await Task.sleep(nanoseconds: delay)
+                    guard !Task.isCancelled else { break attempts }
+                    continue
+                }
+            } catch {
+                if !Self.isTransientAddSyncError(error) {
+                    recordOperation(
+                        .activeAddSyncNonTransientFailed,
+                        detail: "attempt=\(attempt), error=\(error.localizedDescription)"
+                    )
+                    break attempts
+                }
+
+                if attempt == attemptCount {
+                    break attempts
+                }
+
+                let delay = Self.activeAddRetryDelaysNanoseconds[attempt - 1]
+                try? await Task.sleep(nanoseconds: delay)
+                guard !Task.isCancelled else { break attempts }
+            }
+        }
+
+        return didSync
     }
 
     private var engineState: QueueEngineState {
@@ -567,10 +575,7 @@ final class ShufflePlayer {
             guard !reduction.wasNoOp else { return }
             applyReduction(reduction)
         } catch {
-#if DEBUG
-            assertionFailure("Failed to reduce queueNeedsBuild mutation: \(error)")
-#endif
-            queueNeedsBuild = value
+            preconditionFailure("Failed to reduce queueNeedsBuild mutation: \(error)")
         }
     }
 
@@ -882,8 +887,7 @@ final class ShufflePlayer {
                 return
             }
 
-            let isActiveSync = reduction.nextState.playbackState.isActive && !reduction.transportCommands.isEmpty
-            if !isActiveSync {
+            if !reduction.requiresActiveTransportSync {
                 try await applyNonActiveAddReduction(
                     reduction,
                     context: NonActiveAddReductionContext(
@@ -938,8 +942,7 @@ final class ShufflePlayer {
             let reduction = try reduce(.addSongsWithRebuild(newSongs, algorithm: algorithm))
             guard !reduction.wasNoOp else { return }
 
-            let isActiveSync = reduction.nextState.playbackState.isActive && !reduction.transportCommands.isEmpty
-            if !isActiveSync {
+            if !reduction.requiresActiveTransportSync {
                 try await applyNonActiveAddReduction(
                     reduction,
                     context: NonActiveAddReductionContext(
