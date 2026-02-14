@@ -68,7 +68,7 @@ final class QueueEngineTests: XCTestCase {
         XCTAssertFalse(reduction.nextState.queueNeedsBuild, "Empty state should not signal pending queue build")
     }
 
-    func testAddSongDuringActivePlaybackPreservesCurrentIndexOnAppend() throws {
+    func testAddSongDuringActivePlaybackRebuildsUpcomingAndPreservesCurrentAnchor() throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -83,14 +83,20 @@ final class QueueEngineTests: XCTestCase {
 
         let reduction = try QueueEngineReducer.reduce(state: state, intent: .addSong(song3))
         XCTAssertEqual(reduction.nextState.queueState.currentSongId, song2.id)
-        XCTAssertEqual(reduction.nextState.queueState.currentIndex, 1)
-        XCTAssertEqual(reduction.nextState.queueState.queueOrder.last?.id, song3.id)
+        XCTAssertEqual(reduction.nextState.queueState.currentIndex, 0)
+        XCTAssertTrue(reduction.nextState.queueState.queueOrder.contains(where: { $0.id == song3.id }))
         XCTAssertFalse(reduction.nextState.queueNeedsBuild)
+        XCTAssertEqual(
+            Set(reduction.nextState.queueState.queueOrder.map(\.id)),
+            Set([song1.id, song2.id, song3.id]),
+            "Active add should keep queue membership canonical after upcoming reshuffle"
+        )
 
-        guard case .insertIntoQueue(let songs, _) = reduction.transportCommands.first else {
-            return XCTFail("Expected insertIntoQueue command for active append")
+        guard case .replaceQueue(let queue, let startAtSongId, _, _) = reduction.transportCommands.first else {
+            return XCTFail("Expected replaceQueue command for active add")
         }
-        XCTAssertEqual(songs.map(\.id), [song3.id])
+        XCTAssertEqual(Set(queue.map(\.id)), Set([song1.id, song2.id, song3.id]))
+        XCTAssertEqual(startAtSongId, song2.id)
     }
 
     func testAddSongDuringActivePlaybackRebuildsImmediatelyWhenCurrentSongIsNotInQueue() throws {
@@ -116,5 +122,36 @@ final class QueueEngineTests: XCTestCase {
         }
         XCTAssertEqual(Set(queue.map(\.id)), Set([song1.id, song2.id, song3.id]))
         XCTAssertNotNil(startAtSongId, "Rebuild should choose a valid current anchor")
+    }
+
+    func testAddSongsWithRebuildDuringActivePlaybackUsesFallbackAnchorWhenPlaybackSongMissing() throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let newSongs = [
+            Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil),
+            Song(id: "4", title: "Song 4", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        ]
+        let ghostCurrent = Song(id: "ghost", title: "Ghost", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+
+        let queueState = QueueState(songPool: [song1, song2], queueOrder: [song1, song2], currentIndex: 1)
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .paused(ghostCurrent),
+            revision: 9,
+            queueNeedsBuild: true
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .addSongsWithRebuild(newSongs, algorithm: nil))
+        XCTAssertFalse(reduction.nextState.queueNeedsBuild)
+        XCTAssertEqual(
+            Set(reduction.nextState.queueState.queueOrder.map(\.id)),
+            Set([song1.id, song2.id, "3", "4"])
+        )
+
+        guard case .replaceQueue(let queue, let startAtSongId, _, _) = reduction.transportCommands.first else {
+            return XCTFail("Expected replaceQueue command for active batch add")
+        }
+        XCTAssertEqual(Set(queue.map(\.id)), Set([song1.id, song2.id, "3", "4"]))
+        XCTAssertNotNil(startAtSongId, "Batch active add should still choose a valid current anchor")
     }
 }

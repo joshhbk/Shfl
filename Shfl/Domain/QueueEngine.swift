@@ -111,36 +111,25 @@ enum QueueEngineReducer {
 
             nextQueueState = updatedPoolState
 
-            if state.playbackState.isActive && state.queueState.hasQueue {
-                let canAppendViaInsert =
-                    !state.queueNeedsBuild &&
-                    !state.queueState.isQueueStale &&
-                    state.playbackState.currentSongId != nil
+            if state.playbackState.isActive {
+                // During active playback, always keep a single canonical queue by rebuilding upcoming in-place.
+                let algorithm = nextQueueState.algorithm
+                let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
+                nextQueueState = nextQueueState.reshuffledUpcoming(
+                    with: algorithm,
+                    preferredCurrentSongId: preferredCurrentSongId
+                )
 
-                if canAppendViaInsert, let currentId = state.playbackState.currentSongId {
-                    nextQueueState = nextQueueState.appendingToQueue(song)
-                    nextQueueState = nextQueueState.settingCurrentSong(id: currentId)
-                    commands.append(.insertIntoQueue(songs: [song], revision: 0))
-                    nextQueueNeedsBuild = false
-                } else {
-                    // Active playback with stale queue shape: rebuild immediately instead of deferring UX.
-                    let algorithm = nextQueueState.algorithm
-                    let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
-                    nextQueueState = nextQueueState.reshuffledUpcoming(
-                        with: algorithm,
-                        preferredCurrentSongId: preferredCurrentSongId
+                let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
+                commands.append(
+                    .replaceQueue(
+                        queue: nextQueueState.queueOrder,
+                        startAtSongId: nextQueueState.currentSongId,
+                        policy: policy,
+                        revision: 0
                     )
-                    let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
-                    commands.append(
-                        .replaceQueue(
-                            queue: nextQueueState.queueOrder,
-                            startAtSongId: nextQueueState.currentSongId,
-                            policy: policy,
-                            revision: 0
-                        )
-                    )
-                    nextQueueNeedsBuild = false
-                }
+                )
+                nextQueueNeedsBuild = false
             } else if state.queueState.hasQueue {
                 // Keep the existing queue for now; rebuild on next play.
                 nextQueueNeedsBuild = true
@@ -161,28 +150,24 @@ enum QueueEngineReducer {
             }
             nextQueueState = updatedPoolState
 
-            if state.playbackState.isActive,
-               let currentSongId = state.playbackState.currentSongId,
-               nextQueueState.containsSong(id: currentSongId) {
+            if state.playbackState.isActive {
                 let effectiveAlgorithm = algorithm ?? nextQueueState.algorithm
-                nextQueueState = nextQueueState.settingCurrentSong(id: currentSongId)
+                let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
                 nextQueueState = nextQueueState.reshuffledUpcoming(
                     with: effectiveAlgorithm,
-                    preferredCurrentSongId: currentSongId
+                    preferredCurrentSongId: preferredCurrentSongId
                 )
 
                 let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
                 commands.append(
                     .replaceQueue(
                         queue: nextQueueState.queueOrder,
-                        startAtSongId: currentSongId,
+                        startAtSongId: nextQueueState.currentSongId,
                         policy: policy,
                         revision: 0
                     )
                 )
                 nextQueueNeedsBuild = false
-            } else if state.playbackState.isActive {
-                nextQueueNeedsBuild = true
             } else if state.queueState.hasQueue {
                 // Queue is now stale relative to pool while inactive.
                 nextQueueNeedsBuild = true
