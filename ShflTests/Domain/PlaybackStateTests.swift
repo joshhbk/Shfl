@@ -7,7 +7,7 @@ struct PlaybackStateTests {
     @Test("Empty state has no song and is not playing")
     func emptyState() {
         let state = PlaybackState.empty
-        #expect(state.isEmpty)
+        #expect(state == .empty)
         #expect(state.currentSong == nil)
         #expect(!state.isPlaying)
     }
@@ -15,7 +15,7 @@ struct PlaybackStateTests {
     @Test("Stopped state is not empty and has no song")
     func stoppedState() {
         let state = PlaybackState.stopped
-        #expect(!state.isEmpty)
+        #expect(state != .empty)
         #expect(state.currentSong == nil)
         #expect(!state.isPlaying)
     }
@@ -25,7 +25,7 @@ struct PlaybackStateTests {
         let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let state = PlaybackState.playing(song)
 
-        #expect(!state.isEmpty)
+        #expect(state != .empty)
         #expect(state.currentSong == song)
         #expect(state.isPlaying)
     }
@@ -35,7 +35,7 @@ struct PlaybackStateTests {
         let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let state = PlaybackState.paused(song)
 
-        #expect(!state.isEmpty)
+        #expect(state != .empty)
         #expect(state.currentSong == song)
         #expect(!state.isPlaying)
     }

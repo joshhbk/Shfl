@@ -8,11 +8,6 @@ enum PlaybackState: Equatable, Sendable {
     case paused(Song)
     case error(Error)
 
-    var isEmpty: Bool {
-        if case .empty = self { return true }
-        return false
-    }
-
     var currentSong: Song? {
         switch self {
         case .loading(let song), .playing(let song), .paused(let song):

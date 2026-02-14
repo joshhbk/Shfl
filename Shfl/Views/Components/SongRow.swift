@@ -6,7 +6,6 @@ struct SongRow: View, Equatable {
     let isAtCapacity: Bool
     let onToggle: () -> Void
 
-    @State private var isPressed = false
     @State private var showNope = false
     @State private var showGlow = false
     @State private var checkmarkBounce = false
@@ -40,7 +39,7 @@ struct SongRow: View, Equatable {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
                     .foregroundStyle(isSelected ? .blue : .gray.opacity(0.3))
-                    .scaleEffect(checkmarkBounce ? 1.2 : (isPressed ? 0.9 : 1.0))
+                    .scaleEffect(checkmarkBounce ? 1.2 : 1.0)
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 16)

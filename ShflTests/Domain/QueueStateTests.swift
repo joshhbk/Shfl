@@ -106,17 +106,6 @@ final class QueueStateTests: XCTestCase {
         XCTAssertFalse(newState.queueOrder.contains { $0.id == "2" })
     }
 
-    func testCleared() {
-        let songs = (1...5).map { makeSong(id: "\($0)") }
-        let state = QueueState.empty.addingSongs(songs)!.shuffled()
-
-        let clearedState = state.cleared()
-
-        XCTAssertTrue(clearedState.isEmpty)
-        XCTAssertFalse(clearedState.hasQueue)
-        XCTAssertTrue(clearedState.playedIds.isEmpty)
-    }
-
     // MARK: - Shuffling
 
     func testShuffled() {
@@ -165,9 +154,13 @@ final class QueueStateTests: XCTestCase {
         let songs = (1...5).map { makeSong(id: "\($0)") }
         var state = QueueState.empty.addingSongs(songs)!.shuffled()
 
-        // Simulate playing through first two songs
-        state = state.advancedToNext()
-        state = state.advancedToNext()
+        // Simulate playing through first two songs using production APIs
+        let firstSongId = state.queueOrder[0].id
+        let secondSongId = state.queueOrder[1].id
+        state = state.markingAsPlayed(id: firstSongId)
+            .settingCurrentSong(id: secondSongId)
+        state = state.markingAsPlayed(id: secondSongId)
+            .settingCurrentSong(id: state.queueOrder[2].id)
 
         // Now reshuffle upcoming
         let newState = state.reshuffledUpcoming()
@@ -187,68 +180,6 @@ final class QueueStateTests: XCTestCase {
         }
     }
 
-    // MARK: - Navigation
-
-    func testAdvancedToNext() {
-        let songs = (1...3).map { makeSong(id: "\($0)") }
-        let state = QueueState.empty.addingSongs(songs)!.shuffled()
-        let firstSongId = state.currentSongId
-
-        let newState = state.advancedToNext()
-
-        XCTAssertEqual(newState.currentIndex, 1)
-        XCTAssertNotEqual(newState.currentSongId, firstSongId)
-        XCTAssertTrue(newState.playedIds.contains(firstSongId!), "First song should be in history")
-    }
-
-    func testAdvancedToNextAtEnd() {
-        let songs = (1...2).map { makeSong(id: "\($0)") }
-        var state = QueueState.empty.addingSongs(songs)!.shuffled()
-        state = state.advancedToNext() // Now at last song
-
-        let newState = state.advancedToNext()
-
-        XCTAssertEqual(newState.currentIndex, state.currentIndex, "Should not advance past end")
-    }
-
-    func testRevertedToPrevious() {
-        let songs = (1...3).map { makeSong(id: "\($0)") }
-        var state = QueueState.empty.addingSongs(songs)!.shuffled()
-        state = state.advancedToNext()
-        let secondSongId = state.currentSongId
-
-        let newState = state.revertedToPrevious()
-
-        XCTAssertEqual(newState.currentIndex, 0)
-        XCTAssertFalse(newState.playedIds.contains(newState.currentSongId!),
-                       "Current song should be removed from history when going back")
-    }
-
-    func testRevertedToPreviousAtStart() {
-        let songs = (1...2).map { makeSong(id: "\($0)") }
-        let state = QueueState.empty.addingSongs(songs)!.shuffled()
-
-        let newState = state.revertedToPrevious()
-
-        XCTAssertEqual(newState.currentIndex, 0, "Should not go before start")
-    }
-
-    func testHasNextAndHasPrevious() {
-        let songs = (1...3).map { makeSong(id: "\($0)") }
-        var state = QueueState.empty.addingSongs(songs)!.shuffled()
-
-        XCTAssertTrue(state.hasNext)
-        XCTAssertFalse(state.hasPrevious)
-
-        state = state.advancedToNext()
-        XCTAssertTrue(state.hasNext)
-        XCTAssertTrue(state.hasPrevious)
-
-        state = state.advancedToNext()
-        XCTAssertFalse(state.hasNext)
-        XCTAssertTrue(state.hasPrevious)
-    }
-
     // MARK: - Played History
 
     func testMarkingAsPlayed() {
@@ -257,14 +188,18 @@ final class QueueStateTests: XCTestCase {
 
         let newState = state.markingAsPlayed(id: "1")
 
-        XCTAssertTrue(newState.hasPlayed(id: "1"))
+        XCTAssertTrue(newState.playedIds.contains("1"))
     }
 
     func testClearingPlayedHistory() {
         let songs = (1...3).map { makeSong(id: "\($0)") }
         var state = QueueState.empty.addingSongs(songs)!.shuffled()
-        state = state.advancedToNext()
-        state = state.advancedToNext()
+
+        // Mark some songs as played using production API
+        state = state.markingAsPlayed(id: state.queueOrder[0].id)
+            .settingCurrentSong(id: state.queueOrder[1].id)
+        state = state.markingAsPlayed(id: state.queueOrder[1].id)
+            .settingCurrentSong(id: state.queueOrder[2].id)
 
         let clearedState = state.clearingPlayedHistory()
 
@@ -288,7 +223,7 @@ final class QueueStateTests: XCTestCase {
         XCTAssertEqual(restoredState?.currentSongId, "4")
         XCTAssertEqual(restoredState?.currentIndex, 1)
         XCTAssertEqual(restoredState?.queueOrderIds, ["3", "4", "5", "1", "2"])
-        XCTAssertTrue(restoredState?.hasPlayed(id: "3") ?? false)
+        XCTAssertTrue(restoredState?.playedIds.contains("3") ?? false)
     }
 
     func testRestoredWithMissingSongs() {
@@ -305,8 +240,8 @@ final class QueueStateTests: XCTestCase {
         XCTAssertNotNil(restoredState)
         XCTAssertEqual(restoredState?.queueOrder.count, 3) // Only valid songs
         XCTAssertEqual(restoredState?.currentSongId, "3")
-        XCTAssertTrue(restoredState?.hasPlayed(id: "1") ?? false)
-        XCTAssertFalse(restoredState?.hasPlayed(id: "2") ?? true) // Invalid song filtered out
+        XCTAssertTrue(restoredState?.playedIds.contains("1") ?? false)
+        XCTAssertFalse(restoredState?.playedIds.contains("2") ?? true) // Invalid song filtered out
     }
 
     func testRestoredWithEmptyPool() {
@@ -434,44 +369,6 @@ final class QueueStateTests: XCTestCase {
         )
 
         XCTAssertTrue(state.isQueueStale, "Queue should be stale when duplicate IDs are present")
-    }
-
-    func testQueueDriftDiagnosticsReportsCountAndMembershipMismatch() {
-        let songs = (1...3).map { makeSong(id: "\($0)") }
-        let state = QueueState(
-            songPool: songs,
-            queueOrder: [songs[0], songs[1]],
-            playedIds: [],
-            currentIndex: 0,
-            algorithm: .noRepeat
-        )
-
-        let diagnostics = state.queueDriftDiagnostics
-
-        XCTAssertTrue(diagnostics.isStale)
-        XCTAssertTrue(diagnostics.reasons.contains(.countMismatch))
-        XCTAssertTrue(diagnostics.reasons.contains(.membershipMismatch))
-        XCTAssertEqual(diagnostics.poolCount, 3)
-        XCTAssertEqual(diagnostics.queueCount, 2)
-        XCTAssertEqual(diagnostics.missingFromQueue, ["3"])
-        XCTAssertEqual(diagnostics.missingFromPool, [])
-    }
-
-    func testQueueDriftDiagnosticsReportsDuplicateQueueIDs() {
-        let songs = (1...3).map { makeSong(id: "\($0)") }
-        let state = QueueState(
-            songPool: songs,
-            queueOrder: [songs[0], songs[0], songs[1]],
-            playedIds: [],
-            currentIndex: 0,
-            algorithm: .noRepeat
-        )
-
-        let diagnostics = state.queueDriftDiagnostics
-
-        XCTAssertTrue(diagnostics.isStale)
-        XCTAssertTrue(diagnostics.reasons.contains(.duplicateQueueIDs))
-        XCTAssertEqual(diagnostics.duplicateQueueIDs, ["1"])
     }
 
     func testReconcilingQueueRepairsMissingAndDuplicateEntries() {

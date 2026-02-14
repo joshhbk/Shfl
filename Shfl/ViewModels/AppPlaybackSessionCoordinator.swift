@@ -70,7 +70,7 @@ final class AppPlaybackSessionCoordinator {
             try? await playbackCoordinator.seedSongs(songs)
         }
 
-        if !player.songs.isEmpty {
+        if !player.allSongs.isEmpty {
             loadingMessage = "Preparing playback..."
 
             if let state = playbackState {

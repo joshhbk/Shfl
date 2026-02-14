@@ -7,7 +7,6 @@ struct SongInfoDisplay: View {
     let playbackState: PlaybackState
     let hasSongs: Bool
     let progressState: PlayerProgressState?
-    let showProgressBar: Bool
     let onSeek: (TimeInterval) -> Void
     let onAddSongs: () -> Void
     let onShuffle: () -> Void
@@ -17,7 +16,6 @@ struct SongInfoDisplay: View {
         playbackState: PlaybackState,
         hasSongs: Bool = false,
         progressState: PlayerProgressState? = nil,
-        showProgressBar: Bool = FeatureFlags.showProgressBar,
         onSeek: @escaping (TimeInterval) -> Void = { _ in },
         onAddSongs: @escaping () -> Void = {},
         onShuffle: @escaping () -> Void = {},
@@ -26,7 +24,6 @@ struct SongInfoDisplay: View {
         self.playbackState = playbackState
         self.hasSongs = hasSongs
         self.progressState = progressState
-        self.showProgressBar = showProgressBar
         self.onSeek = onSeek
         self.onAddSongs = onAddSongs
         self.onShuffle = onShuffle
@@ -68,15 +65,13 @@ struct SongInfoDisplay: View {
             Text(" ")
                 .font(.system(size: 15, weight: .medium))
                 .lineLimit(1)
-            if showProgressBar {
-                // Matches PlaybackProgressBar layout: track + spacing + time labels
-                VStack(spacing: 6) {
-                    Color.clear.frame(height: 12)
-                    Text(" ")
-                        .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
-                }
-                .padding(.top, 14)
+            // Matches PlaybackProgressBar layout: track + spacing + time labels
+            VStack(spacing: 6) {
+                Color.clear.frame(height: 12)
+                Text(" ")
+                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
             }
+            .padding(.top, 14)
         }
     }
 
@@ -96,7 +91,7 @@ struct SongInfoDisplay: View {
                 .contentTransition(.opacity)
                 .animation(.easeOut(duration: 0.3), value: song.artist)
 
-            if showProgressBar, let progressState {
+            if let progressState {
                 LivePlaybackProgressBar(
                     progressState: progressState,
                     onSeek: onSeek

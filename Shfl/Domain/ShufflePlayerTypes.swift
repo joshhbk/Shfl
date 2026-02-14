@@ -2,7 +2,6 @@ import Foundation
 
 enum ShufflePlayerError: Error, Equatable {
     case capacityReached
-    case notAuthorized
     case playbackFailed(String)
 }
 
@@ -11,8 +10,6 @@ extension ShufflePlayerError: LocalizedError {
         switch self {
         case .capacityReached:
             return "Song limit reached."
-        case .notAuthorized:
-            return "Apple Music authorization is required."
         case .playbackFailed(let message):
             return message
         }

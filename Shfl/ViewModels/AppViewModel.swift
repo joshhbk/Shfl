@@ -98,7 +98,7 @@ final class AppViewModel {
                 musicService: musicService,
                 algorithm: appSettings.autofillAlgorithm
             )
-            let songs = try await source.fetchSongs(excluding: Set(), limit: ShufflePlayer.maxSongs)
+            let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
             try await playbackCoordinator.seedSongs(songs)
             try await playbackCoordinator.play()
             sessionCoordinator.persistSongs()
