@@ -455,6 +455,55 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(queuedIds.count, Set(queuedIds).count, "Transport queue should remain duplicate-free")
     }
 
+    func testAddSongDuringPlaybackRebuildsImmediatelyWhenQueueNeedsBuildIsSet() async throws {
+        let songs = (1...3).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let currentSong = await player.playbackState.currentSong else {
+            XCTFail("Expected an active current song")
+            return
+        }
+
+        // Force a stale queue while inactive, then reactivate without pressing play.
+        await mockService.simulatePlaybackState(.stopped)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        try await player.addSong(
+            Song(id: "4", title: "Song 4", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        )
+        let needsBuildBefore = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildBefore, "Stopped add should mark queue rebuild pending")
+
+        await mockService.simulatePlaybackState(.paused(currentSong))
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+
+        try await player.addSong(
+            Song(id: "5", title: "Song 5", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        )
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let replaceCallCount = await mockService.replaceQueueCallCount
+        let insertCallCount = await mockService.insertIntoQueueCallCount
+        XCTAssertEqual(replaceCallCount, 1, "Stale active add should trigger immediate queue rebuild")
+        XCTAssertEqual(insertCallCount, 0, "Stale active add should not use incremental insert")
+
+        let needsBuildAfter = await player.queueNeedsBuild
+        XCTAssertFalse(needsBuildAfter, "Immediate rebuild should clear pending rebuild flag")
+
+        let queueIds = await Set(player.lastShuffledQueue.map(\.id))
+        XCTAssertEqual(queueIds, Set(["1", "2", "3", "4", "5"]))
+
+        let notice = await player.operationNotice
+        XCTAssertNil(notice, "Successful active rebuild add should not surface a warning banner")
+    }
+
     /// addSongsWithQueueRebuild should preserve a single canonical full queue in transport.
     func testAddSongsWithQueueRebuildKeepsTransportMirroringDomainQueue() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)

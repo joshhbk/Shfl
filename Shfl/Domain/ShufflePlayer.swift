@@ -669,16 +669,7 @@ final class ShufflePlayer {
                 )
                 switch outcome {
                 case .applied:
-                    let deferredActiveQueueSync =
-                        reduction.transportCommands.isEmpty &&
-                        reduction.nextState.queueNeedsBuild &&
-                        reduction.nextState.playbackState.isActive
-                    if deferredActiveQueueSync {
-                        operationNotice = "Song added. Queue will refresh on next play."
-                        recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
-                    } else {
-                        recordOperation("add-song-success", detail: "id=\(song.id)")
-                    }
+                    recordOperation("add-song-success", detail: "id=\(song.id)")
                 case .stale:
                     recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
                     return

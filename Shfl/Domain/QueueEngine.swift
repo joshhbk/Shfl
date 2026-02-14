@@ -123,8 +123,23 @@ enum QueueEngineReducer {
                     commands.append(.insertIntoQueue(songs: [song], revision: 0))
                     nextQueueNeedsBuild = false
                 } else {
-                    // Active playback with a stale/unknown queue shape should defer to full rebuild.
-                    nextQueueNeedsBuild = true
+                    // Active playback with stale queue shape: rebuild immediately instead of deferring UX.
+                    let algorithm = nextQueueState.algorithm
+                    let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
+                    nextQueueState = nextQueueState.reshuffledUpcoming(
+                        with: algorithm,
+                        preferredCurrentSongId: preferredCurrentSongId
+                    )
+                    let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
+                    commands.append(
+                        .replaceQueue(
+                            queue: nextQueueState.queueOrder,
+                            startAtSongId: nextQueueState.currentSongId,
+                            policy: policy,
+                            revision: 0
+                        )
+                    )
+                    nextQueueNeedsBuild = false
                 }
             } else if state.queueState.hasQueue {
                 // Keep the existing queue for now; rebuild on next play.
