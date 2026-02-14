@@ -9,7 +9,6 @@ struct QueueEngineState: Equatable, Sendable {
 
 enum TransportCommand: Sendable {
     case setQueue(songs: [Song], revision: Int)
-    case insertIntoQueue(songs: [Song], revision: Int)
     case replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy, revision: Int)
     case play(revision: Int)
     case pause(revision: Int)
@@ -20,8 +19,6 @@ enum TransportCommand: Sendable {
     var revision: Int {
         switch self {
         case .setQueue(_, let revision):
-            return revision
-        case .insertIntoQueue(_, let revision):
             return revision
         case .replaceQueue(_, _, _, let revision):
             return revision
@@ -42,8 +39,6 @@ enum TransportCommand: Sendable {
         switch self {
         case .setQueue(let songs, _):
             return .setQueue(songs: songs, revision: revision)
-        case .insertIntoQueue(let songs, _):
-            return .insertIntoQueue(songs: songs, revision: revision)
         case .replaceQueue(let queue, let startAtSongId, let policy, _):
             return .replaceQueue(queue: queue, startAtSongId: startAtSongId, policy: policy, revision: revision)
         case .play:
@@ -74,6 +69,7 @@ enum QueueIntent: Sendable {
     case restartOrSkipToPrevious
     case togglePlayback(algorithm: ShuffleAlgorithm?)
     case reshuffleAlgorithm(ShuffleAlgorithm)
+    case resyncActiveAddTransport
     case playbackResolution(PlaybackStateResolution)
     case restoreSession(queueState: QueueState, playbackState: PlaybackState)
 }
@@ -298,6 +294,27 @@ enum QueueEngineReducer {
                 .replaceQueue(
                     queue: nextQueueState.queueOrder,
                     startAtSongId: currentSongId,
+                    policy: policy,
+                    revision: 0
+                )
+            )
+
+        case .resyncActiveAddTransport:
+            guard state.playbackState.isActive && state.queueState.hasQueue else {
+                return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
+            }
+            let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
+            nextQueueState = state.queueState.reshuffledUpcoming(
+                with: state.queueState.algorithm,
+                preferredCurrentSongId: preferredCurrentSongId
+            )
+            nextQueueNeedsBuild = false
+
+            let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
+            commands.append(
+                .replaceQueue(
+                    queue: nextQueueState.queueOrder,
+                    startAtSongId: nextQueueState.currentSongId,
                     policy: policy,
                     revision: 0
                 )

@@ -211,7 +211,6 @@ private final class PreviewMockMusicService: MusicService {
         LibraryPage(songs: [], hasMore: false)
     }
     func setQueue(songs: [Song]) async throws {}
-    func insertIntoQueue(songs: [Song]) async throws {}
     func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {}
     func play() async throws {}
     func pause() async {}

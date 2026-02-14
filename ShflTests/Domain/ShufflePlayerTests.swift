@@ -403,9 +403,6 @@ final class ShufflePlayerTests: XCTestCase {
         // Verify MusicKit was also updated
         let replaceCallCount = await mockService.replaceQueueCallCount
         XCTAssertEqual(replaceCallCount, 1, "Active add should perform a canonical replaceQueue update")
-
-        let insertCallCount = await mockService.insertIntoQueueCallCount
-        XCTAssertEqual(insertCallCount, 0, "Active add should not use incremental insert transport")
     }
 
     func testAddSongWhileStoppedDoesNotRebuildQueue() async throws {
@@ -447,8 +444,6 @@ final class ShufflePlayerTests: XCTestCase {
 
         let replaceCallCount = await mockService.replaceQueueCallCount
         XCTAssertEqual(replaceCallCount, 1, "Active add should rebuild canonical transport queue")
-        let insertCallCount = await mockService.insertIntoQueueCallCount
-        XCTAssertEqual(insertCallCount, 0, "Active add should not use incremental insert transport update")
 
         let queuedIds = await mockService.lastQueuedSongs.map(\.id)
         XCTAssertTrue(queuedIds.contains("3"), "New song should be represented in transport queue")
@@ -490,9 +485,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
 
         let replaceCallCount = await mockService.replaceQueueCallCount
-        let insertCallCount = await mockService.insertIntoQueueCallCount
         XCTAssertEqual(replaceCallCount, 1, "Stale active add should trigger immediate queue rebuild")
-        XCTAssertEqual(insertCallCount, 0, "Stale active add should not use incremental insert")
 
         let needsBuildAfter = await player.queueNeedsBuild
         XCTAssertFalse(needsBuildAfter, "Immediate rebuild should clear pending rebuild flag")
@@ -719,7 +712,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let operations = await player.recentQueueOperations
         XCTAssertTrue(
-            operations.contains(where: { $0.operation == "active-add-sync-nontransient-failed" }),
+            operations.contains(where: { $0.operation == QueueOperationID.activeAddSyncNonTransientFailed.rawValue }),
             "Non-transient add sync failures should be journaled for diagnostics"
         )
     }
@@ -926,6 +919,7 @@ final class ShufflePlayerTests: XCTestCase {
         let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSongsWithQueueRebuild([song3])
         try await Task.sleep(nanoseconds: 100_000_000)
+        let revisionAfterDegradedAdd = await player.queueRevision
 
         let containsSong3 = await player.containsSong(id: "3")
         XCTAssertTrue(containsSong3, "Added songs should remain in pool after replace failure")
@@ -938,7 +932,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let operations = await player.recentQueueOperations
         XCTAssertTrue(
-            operations.contains(where: { $0.operation == "active-add-sync-retry-scheduled" }),
+            operations.contains(where: { $0.operation == QueueOperationID.activeAddSyncRetryScheduled.rawValue }),
             "Transient add sync failures should schedule retries"
         )
 
@@ -953,6 +947,12 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(replaceCallCount, 1, "Retry loop should eventually resync via replaceQueue")
         let needsBuildAfterRetry = await player.queueNeedsBuild
         XCTAssertFalse(needsBuildAfterRetry, "Successful retry should clear rebuild-pending flag")
+        let revisionAfterRetrySuccess = await player.queueRevision
+        XCTAssertGreaterThan(
+            revisionAfterRetrySuccess,
+            revisionAfterDegradedAdd,
+            "Retry resync should advance revision through reducer-based mutation path"
+        )
     }
 
     func testAddSongsWithQueueRebuildIncludesAllSongs() async throws {

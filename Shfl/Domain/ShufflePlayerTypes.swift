@@ -51,6 +51,20 @@ struct QueueOperationRecord: Equatable, Sendable, Identifiable, Codable {
     let invariantReasons: [String]
 }
 
+enum QueueOperationID: String, Sendable {
+    case addSongSuccess = "add-song-success"
+    case addSongDeferredRebuild = "add-song-deferred-rebuild"
+    case addSongSyncDegraded = "add-song-sync-degraded"
+    case addSongsRebuildSuccess = "add-songs-rebuild-success"
+    case addSongsRebuildDeferred = "add-songs-rebuild-deferred"
+    case addSongsRebuildSyncDegraded = "add-songs-rebuild-sync-degraded"
+    case activeAddSyncRetryScheduled = "active-add-sync-retry-scheduled"
+    case activeAddSyncRetryAttempt = "active-add-sync-retry-attempt"
+    case activeAddSyncRetrySuccess = "active-add-sync-retry-success"
+    case activeAddSyncRetryExhausted = "active-add-sync-retry-exhausted"
+    case activeAddSyncNonTransientFailed = "active-add-sync-nontransient-failed"
+}
+
 struct QueueOperationJournal: Equatable, Sendable {
     static let maxRecords = 250
 

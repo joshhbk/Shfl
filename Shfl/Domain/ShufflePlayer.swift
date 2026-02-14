@@ -295,34 +295,11 @@ final class ShufflePlayer {
         activeAddResyncTask = nil
     }
 
-    private func activeAddResyncTargetState() -> QueueState? {
-        guard playbackState.isActive else { return nil }
-        guard queueState.hasQueue else { return nil }
-
-        let preferredCurrentSongId = playbackState.currentSongId ?? queueState.currentSongId
-        return queueState.reshuffledUpcoming(
-            with: queueState.algorithm,
-            preferredCurrentSongId: preferredCurrentSongId
-        )
-    }
-
-    private func makeActiveAddResyncCommands(targetState: QueueState) -> [TransportCommand] {
-        let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
-        return [
-            .replaceQueue(
-                queue: targetState.queueOrder,
-                startAtSongId: targetState.currentSongId,
-                policy: policy,
-                revision: queueRevision
-            )
-        ]
-    }
-
     private func scheduleActiveAddResyncRetry(source: String, failureKind: ActiveAddSyncFailureKind) {
         queueNeedsBuild = true
         activeAddResyncRequested = true
         recordOperation(
-            "active-add-sync-retry-scheduled",
+            .activeAddSyncRetryScheduled,
             detail: "source=\(source), reason=\(failureKind.rawValue)"
         )
 
@@ -344,28 +321,46 @@ final class ShufflePlayer {
 
             for attempt in 1...attemptCount {
                 guard !Task.isCancelled else { break }
-                recordOperation("active-add-sync-retry-attempt", detail: "attempt=\(attempt)")
+                recordOperation(.activeAddSyncRetryAttempt, detail: "attempt=\(attempt)")
                 do {
-                    guard let targetState = activeAddResyncTargetState() else {
+                    // Recompute from the latest state each attempt. @MainActor serialization and
+                    // revision fencing ensure interleavings fail stale instead of applying incorrectly.
+                    let reduction = try reduce(.resyncActiveAddTransport)
+                    guard !reduction.wasNoOp else {
                         didSync = true
                         break
                     }
-                    let commands = makeActiveAddResyncCommands(targetState: targetState)
-                    try await enqueueTransportCommands(commands)
-                    _ = refreshTransportSnapshot()
-                    queueState = targetState
-                    queueNeedsBuild = false
-                    enforceDomainInvariants(context: "active-add-retry-success")
-                    recordOperation("active-add-sync-retry-success", detail: "attempt=\(attempt)")
-                    didSync = true
-                    break
-                } catch {
-                    _ = refreshTransportSnapshot()
-                    queueNeedsBuild = true
 
+                    let outcome = try await applyReductionWithTransport(
+                        reduction,
+                        source: "active-add-retry",
+                        rollbackPolicy: .preservePoolAndDeferQueueBuild,
+                        staleRollbackPolicy: .preservePoolAndDeferQueueBuild,
+                        showStaleNotice: false
+                    )
+                    var shouldBreakAttemptLoop = false
+                    switch outcome {
+                    case .applied:
+                        recordOperation(.activeAddSyncRetrySuccess, detail: "attempt=\(attempt)")
+                        didSync = true
+                        shouldBreakAttemptLoop = true
+                    case .stale:
+                        if attempt == attemptCount {
+                            shouldBreakAttemptLoop = true
+                            break
+                        }
+                        let delay = Self.activeAddRetryDelaysNanoseconds[attempt - 1]
+                        try? await Task.sleep(nanoseconds: delay)
+                        guard !Task.isCancelled else { break }
+                        continue
+                    }
+                    if shouldBreakAttemptLoop {
+                        break
+                    }
+                } catch {
                     if !Self.isTransientAddSyncError(error) {
                         recordOperation(
-                            "active-add-sync-nontransient-failed",
+                            .activeAddSyncNonTransientFailed,
                             detail: "attempt=\(attempt), error=\(error.localizedDescription)"
                         )
                         break
@@ -383,7 +378,7 @@ final class ShufflePlayer {
 
             guard !Task.isCancelled else { break }
             if !didSync {
-                recordOperation("active-add-sync-retry-exhausted")
+                recordOperation(.activeAddSyncRetryExhausted)
             }
         }
     }
@@ -522,8 +517,6 @@ final class ShufflePlayer {
         switch command {
         case .setQueue(let songs, _):
             try await musicService.setQueue(songs: songs)
-        case .insertIntoQueue(let songs, _):
-            try await musicService.insertIntoQueue(songs: songs)
         case .replaceQueue(let queue, let startAtSongId, let policy, _):
             try await musicService.replaceQueue(queue: queue, startAtSongId: startAtSongId, policy: policy)
         case .play:
@@ -706,6 +699,10 @@ final class ShufflePlayer {
         operationJournalVersion &+= 1
     }
 
+    private func recordOperation(_ operation: QueueOperationID, detail: String? = nil, refreshTransport: Bool = false) {
+        recordOperation(operation.rawValue, detail: detail, refreshTransport: refreshTransport)
+    }
+
     func exportQueueDiagnosticsSnapshot(trigger: String = "manual-export", detail: String? = nil) -> String {
         let invariant = evaluateQueueInvariants()
         recordOperation("snapshot-export", detail: [trigger, detail].compactMap { $0 }.joined(separator: " | "))
@@ -778,8 +775,8 @@ final class ShufflePlayer {
     private func applyActiveAddReductionWithRetry(
         _ reduction: QueueEngineReduction,
         source: String,
-        successOperation: String,
-        degradedOperation: String,
+        successOperation: QueueOperationID,
+        degradedOperation: QueueOperationID,
         successDetail: String
     ) async {
         do {
@@ -805,12 +802,41 @@ final class ShufflePlayer {
             } else {
                 queueNeedsBuild = true
                 recordOperation(
-                    "active-add-sync-nontransient-failed",
+                    .activeAddSyncNonTransientFailed,
                     detail: "source=\(source), error=\(error.localizedDescription)"
                 )
                 failureReason = "non-transient"
             }
             recordOperation(degradedOperation, detail: "\(successDetail), reason=\(failureReason)")
+        }
+    }
+
+    private func applyNonActiveAddReduction(
+        _ reduction: QueueEngineReduction,
+        source: String,
+        actionDescription: String,
+        successOperation: QueueOperationID,
+        deferredOperation: QueueOperationID,
+        failureOperation: String,
+        successDetail: String,
+        failureDetail: String
+    ) async throws {
+        do {
+            let outcome = try await applyReductionWithTransport(
+                reduction,
+                source: source,
+                rollbackPolicy: .preservePoolAndDeferQueueBuild
+            )
+            switch outcome {
+            case .applied:
+                recordOperation(successOperation, detail: successDetail)
+            case .stale:
+                recordOperation(deferredOperation, detail: successDetail)
+            }
+        } catch {
+            let message = reportTransportFailure(action: actionDescription, error: error)
+            recordOperation(failureOperation, detail: failureDetail)
+            throw ShufflePlayerError.playbackFailed(message)
         }
     }
 
@@ -824,31 +850,24 @@ final class ShufflePlayer {
 
             let isActiveSync = reduction.nextState.playbackState.isActive && !reduction.transportCommands.isEmpty
             if !isActiveSync {
-                do {
-                    let outcome = try await applyReductionWithTransport(
-                        reduction,
-                        source: "add-song",
-                        rollbackPolicy: .preservePoolAndDeferQueueBuild
-                    )
-                    switch outcome {
-                    case .applied:
-                        recordOperation("add-song-success", detail: "id=\(song.id)")
-                    case .stale:
-                        recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
-                    }
-                } catch {
-                    let message = reportTransportFailure(action: "Couldn't add the song to the active queue", error: error)
-                    recordOperation("add-song-failed", detail: "transport-sync-failed id=\(song.id)")
-                    throw ShufflePlayerError.playbackFailed(message)
-                }
+                try await applyNonActiveAddReduction(
+                    reduction,
+                    source: "add-song",
+                    actionDescription: "Couldn't add the song to the active queue",
+                    successOperation: .addSongSuccess,
+                    deferredOperation: .addSongDeferredRebuild,
+                    failureOperation: "add-song-failed",
+                    successDetail: "id=\(song.id)",
+                    failureDetail: "transport-sync-failed id=\(song.id)"
+                )
                 return
             }
 
             await applyActiveAddReductionWithRetry(
                 reduction,
                 source: "add-song",
-                successOperation: "add-song-success",
-                degradedOperation: "add-song-sync-degraded",
+                successOperation: .addSongSuccess,
+                degradedOperation: .addSongSyncDegraded,
                 successDetail: "id=\(song.id)"
             )
         } catch QueueEngineError.capacityReached {
@@ -884,31 +903,24 @@ final class ShufflePlayer {
 
             let isActiveSync = reduction.nextState.playbackState.isActive && !reduction.transportCommands.isEmpty
             if !isActiveSync {
-                do {
-                    let outcome = try await applyReductionWithTransport(
-                        reduction,
-                        source: "add-songs-rebuild",
-                        rollbackPolicy: .preservePoolAndDeferQueueBuild
-                    )
-                    switch outcome {
-                    case .applied:
-                        recordOperation("add-songs-rebuild-success", detail: "batch=\(newSongs.count)")
-                    case .stale:
-                        recordOperation("add-songs-rebuild-deferred", detail: "batch=\(newSongs.count)")
-                    }
-                } catch {
-                    let message = reportTransportFailure(action: "Couldn't sync newly added songs to the active queue", error: error)
-                    recordOperation("add-songs-rebuild-failed", detail: "transport-sync-failed")
-                    throw ShufflePlayerError.playbackFailed(message)
-                }
+                try await applyNonActiveAddReduction(
+                    reduction,
+                    source: "add-songs-rebuild",
+                    actionDescription: "Couldn't sync newly added songs to the active queue",
+                    successOperation: .addSongsRebuildSuccess,
+                    deferredOperation: .addSongsRebuildDeferred,
+                    failureOperation: "add-songs-rebuild-failed",
+                    successDetail: "batch=\(newSongs.count)",
+                    failureDetail: "transport-sync-failed"
+                )
                 return
             }
 
             await applyActiveAddReductionWithRetry(
                 reduction,
                 source: "add-songs-rebuild",
-                successOperation: "add-songs-rebuild-success",
-                degradedOperation: "add-songs-rebuild-sync-degraded",
+                successOperation: .addSongsRebuildSuccess,
+                degradedOperation: .addSongsRebuildSyncDegraded,
                 successDetail: "batch=\(newSongs.count)"
             )
         } catch QueueEngineError.capacityReached {

@@ -76,9 +76,6 @@ protocol MusicService: Sendable {
     /// Set the playback queue with songs and shuffle them
     func setQueue(songs: [Song]) async throws
 
-    /// Insert songs into the existing queue without disrupting playback
-    func insertIntoQueue(songs: [Song]) async throws
-
     /// Replace queue entries with explicit playback behavior.
     /// - Parameters:
     ///   - queue: Full queue order to install in transport
