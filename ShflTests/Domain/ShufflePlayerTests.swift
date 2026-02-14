@@ -943,7 +943,11 @@ final class ShufflePlayerTests: XCTestCase {
         )
 
         await mockService.setShouldThrowOnReplace(nil)
-        try await Task.sleep(nanoseconds: 1_700_000_000)
+        let didRecover = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let needsBuild = await self.player!.queueNeedsBuild
+            return !needsBuild
+        }
+        XCTAssertTrue(didRecover, "Retry loop should eventually clear rebuild-pending state")
 
         let replaceCallCount = await mockService.replaceQueueCallCount
         XCTAssertGreaterThanOrEqual(replaceCallCount, 1, "Retry loop should eventually resync via replaceQueue")
@@ -1937,5 +1941,20 @@ final class ShufflePlayerTests: XCTestCase {
             snapshot.transportEntryCount,
             "Snapshot transport fields should match invariant payload"
         )
+    }
+
+    private func waitForCondition(
+        timeoutNanoseconds: UInt64,
+        pollNanoseconds: UInt64 = 50_000_000,
+        condition: @escaping @MainActor () async -> Bool
+    ) async -> Bool {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while DispatchTime.now().uptimeNanoseconds < deadline {
+            if await condition() {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: pollNanoseconds)
+        }
+        return await condition()
     }
 }

@@ -111,7 +111,7 @@ enum QueueEngineReducer {
 
             nextQueueState = updatedPoolState
 
-            if state.playbackState.isActive {
+            if state.playbackState.isActive && state.queueState.hasQueue {
                 // During active playback, always keep a single canonical queue by rebuilding upcoming in-place.
                 let algorithm = nextQueueState.algorithm
                 let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
@@ -130,6 +130,9 @@ enum QueueEngineReducer {
                     )
                 )
                 nextQueueNeedsBuild = false
+            } else if state.playbackState.isActive {
+                // Active playback can briefly exist before queue build is complete; defer until queue exists.
+                nextQueueNeedsBuild = true
             } else if state.queueState.hasQueue {
                 // Keep the existing queue for now; rebuild on next play.
                 nextQueueNeedsBuild = true
@@ -150,7 +153,7 @@ enum QueueEngineReducer {
             }
             nextQueueState = updatedPoolState
 
-            if state.playbackState.isActive {
+            if state.playbackState.isActive && state.queueState.hasQueue {
                 let effectiveAlgorithm = algorithm ?? nextQueueState.algorithm
                 let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
                 nextQueueState = nextQueueState.reshuffledUpcoming(
@@ -168,6 +171,9 @@ enum QueueEngineReducer {
                     )
                 )
                 nextQueueNeedsBuild = false
+            } else if state.playbackState.isActive {
+                // Active playback can briefly exist before queue build is complete; defer until queue exists.
+                nextQueueNeedsBuild = true
             } else if state.queueState.hasQueue {
                 // Queue is now stale relative to pool while inactive.
                 nextQueueNeedsBuild = true
