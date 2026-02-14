@@ -34,6 +34,16 @@ final class QueueShufflerTests: XCTestCase {
         XCTAssertLessThanOrEqual(uniqueIds.count, 3)
     }
 
+    func testPureRandomDefaultCountContainsAllSongsOnce() {
+        let songs = (1...25).map { makeSong(id: "\($0)") }
+        let shuffler = QueueShuffler(algorithm: .pureRandom)
+
+        let result = shuffler.shuffle(songs)
+
+        XCTAssertEqual(result.count, songs.count)
+        XCTAssertEqual(Set(result.map(\.id)), Set(songs.map(\.id)))
+    }
+
     // MARK: - No Repeat
 
     func testNoRepeatContainsAllSongsOnce() {

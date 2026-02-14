@@ -10,7 +10,16 @@ import SwiftData
 
 @main
 struct ShuffledApp: App {
-    var sharedModelContainer: ModelContainer = {
+    @State private var appSettings: AppSettings
+    @State private var appViewModel: AppViewModel
+
+    private let sharedModelContainer: ModelContainer
+
+    private var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    init() {
         let schema = Schema([
             PersistedSong.self,
             PersistedPlaybackState.self
@@ -18,18 +27,31 @@ struct ShuffledApp: App {
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            self.sharedModelContainer = container
+
+            let settings = AppSettings()
+            let musicService = AppleMusicService()
+            _appSettings = State(wrappedValue: settings)
+            _appViewModel = State(
+                wrappedValue: AppViewModel(
+                    musicService: musicService,
+                    modelContext: container.mainContext,
+                    appSettings: settings
+                )
+            )
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
-    }()
+    }
 
     var body: some Scene {
         WindowGroup {
-            MainView(
-                musicService: AppleMusicService(),
-                modelContext: sharedModelContainer.mainContext
-            )
+            if isRunningTests {
+                Color.clear
+            } else {
+                MainView(viewModel: appViewModel, appSettings: appSettings)
+            }
         }
         .modelContainer(sharedModelContainer)
     }

@@ -7,7 +7,6 @@ struct PlaybackStateResolution {
     let shouldUpdateCurrentSong: Bool
     let songIdToMarkPlayed: String?
     let shouldClearHistory: Bool
-    let shouldReconcile: Bool
     let pendingSeekConsumed: (songId: String, position: TimeInterval)?
 }
 
@@ -108,7 +107,6 @@ final class PlaybackStateObserver {
                 shouldUpdateCurrentSong: false,
                 songIdToMarkPlayed: nil,
                 shouldClearHistory: false,
-                shouldReconcile: false,
                 pendingSeekConsumed: nil
             )
         }
@@ -192,7 +190,6 @@ final class PlaybackStateObserver {
             shouldUpdateCurrentSong: resolvedSongId != nil,
             songIdToMarkPlayed: songIdToMarkPlayed,
             shouldClearHistory: shouldClearHistory,
-            shouldReconcile: true,
             pendingSeekConsumed: pendingSeekConsumed
         )
     }

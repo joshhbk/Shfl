@@ -151,6 +151,16 @@ final class QueueStateTests: XCTestCase {
         XCTAssertEqual(state.currentIndex, 0)
     }
 
+    func testReshuffledUpcomingHonorsPreferredCurrentSongId() {
+        let songs = (1...5).map { makeSong(id: "\($0)") }
+        let state = QueueState.empty.addingSongs(songs)!.shuffled()
+
+        let reshuffled = state.reshuffledUpcoming(with: nil, preferredCurrentSongId: "4")
+
+        XCTAssertEqual(reshuffled.currentSongId, "4", "Preferred current song should anchor upcoming reshuffle")
+        XCTAssertFalse(reshuffled.isQueueStale, "Reshuffled queue should remain in sync with pool")
+    }
+
     func testReshuffledUpcomingPreservesInvariantAndKeepsPlayedBeforeCurrent() {
         let songs = (1...5).map { makeSong(id: "\($0)") }
         var state = QueueState.empty.addingSongs(songs)!.shuffled()

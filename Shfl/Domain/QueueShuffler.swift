@@ -23,7 +23,21 @@ struct QueueShuffler: Sendable {
     // MARK: - Pure Random
 
     private func pureRandom(_ songs: [Song], count: Int) -> [Song] {
-        (0..<count).map { _ in songs.randomElement()! }
+        guard count > 0 else { return [] }
+
+        // Queue-domain invariants require unique song IDs for normal queue builds.
+        // For standard playback (`count == songs.count`), produce a full random permutation.
+        if count <= songs.count {
+            return Array(songs.shuffled().prefix(count))
+        }
+
+        // If a caller explicitly asks for more than available, allow repeats to fill overflow.
+        var result = songs.shuffled()
+        result.reserveCapacity(count)
+        for _ in 0..<(count - songs.count) {
+            result.append(songs.randomElement()!)
+        }
+        return result
     }
 
     // MARK: - Weighted by Recency

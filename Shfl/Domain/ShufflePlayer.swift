@@ -7,6 +7,11 @@ final class ShufflePlayer {
 
     @ObservationIgnored private let musicService: MusicService
     @ObservationIgnored private let playbackObserver: PlaybackStateObserver
+    @ObservationIgnored private lazy var transportCommandExecutor = TransportCommandExecutor { [weak self] command in
+        guard let self else { return }
+        try await self.executeTransportCommand(command)
+    }
+    @ObservationIgnored private var cachedTransportSnapshot = TransportSnapshot(entryCount: 0, currentSongId: nil)
 
     /// Single source of truth for queue state
     private(set) var queueState: QueueState = .empty
@@ -14,8 +19,15 @@ final class ShufflePlayer {
     /// Current playback state from MusicKit
     private(set) var playbackState: PlaybackState = .empty
 
-    /// Diagnostics for queue drift detection and reconciliation.
-    private(set) var queueDriftTelemetry = QueueDriftTelemetry()
+    /// Monotonic revision used to gate stale transport commands.
+    private(set) var queueRevision: Int = 0
+
+    /// Whether playback should rebuild transport queue before attempting play.
+    private(set) var queueNeedsBuild = true
+
+    /// Rolling operation journal for queue diagnostics.
+    @ObservationIgnored private(set) var queueOperationJournal = QueueOperationJournal()
+    private(set) var operationJournalVersion = 0
 
     /// Non-blocking operation notice for queue/transport sync failures.
     private(set) var operationNotice: String?
@@ -40,6 +52,15 @@ final class ShufflePlayer {
     /// Debug: ID of the song currently selected in the MusicKit transport
     var transportCurrentSongId: String? { musicService.currentSongId }
 
+    /// Debug: recent queue operations (most recent first).
+    var recentQueueOperations: [QueueOperationRecord] {
+        _ = operationJournalVersion
+        return queueOperationJournal.records
+    }
+
+    /// Debug: latest invariant check over domain + transport queue state.
+    var queueInvariantCheck: QueueInvariantCheck { evaluateQueueInvariants() }
+
     /// Exposed for testing only
     var playedSongIdsForTesting: Set<String> { queueState.playedIds }
 
@@ -60,6 +81,7 @@ final class ShufflePlayer {
         self.musicService = musicService
         self.playbackObserver = PlaybackStateObserver(musicService: musicService)
         startObserving()
+        recordOperation("player-init")
     }
 
     deinit {
@@ -78,85 +100,49 @@ final class ShufflePlayer {
     }
 
     private func applyResolution(_ resolution: PlaybackStateResolution) {
-        if resolution.shouldUpdateCurrentSong, let songId = resolution.resolvedSongId {
-            queueState = queueState.settingCurrentSong(id: songId)
-        }
-        if let playedId = resolution.songIdToMarkPlayed {
-            queueState = queueState.markingAsPlayed(id: playedId)
-        }
-        if resolution.shouldClearHistory {
-            queueState = queueState.clearingPlayedHistory()
-        }
-        if resolution.shouldReconcile {
-            reconcileQueueIfNeeded(reason: "playback-state-change", preferredCurrentSongId: resolution.resolvedSongId)
+        do {
+            let reduction = try reduce(.playbackResolution(resolution))
+            if !reduction.transportCommands.isEmpty {
+#if DEBUG
+                assertionFailure("playbackResolution emitted transport commands")
+#endif
+                recordOperation(
+                    "playback-resolution-illegal-transport",
+                    detail: "count=\(reduction.transportCommands.count)"
+                )
+            }
+            applyReduction(reduction)
+        } catch {
+#if DEBUG
+            if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+                assertionFailure("Unexpected playbackResolution reducer failure: \(error)")
+            }
+#endif
+            recordOperation("playback-resolution-reducer-failed", detail: error.localizedDescription)
         }
         if let seek = resolution.pendingSeekConsumed {
             musicService.seek(to: seek.position)
         }
-        playbackState = resolution.resolvedState
-    }
-
-    private func reconcileQueueIfNeeded(reason: String, preferredCurrentSongId: String? = nil) {
-        guard queueState.isQueueStale else { return }
-        let diagnostics = queueState.queueDriftDiagnostics
-        let beforePoolCount = queueState.songCount
-        let beforeQueueCount = queueState.queueOrder.count
-        let beforeCurrent = queueState.currentSongId ?? "nil"
-
-        queueDriftTelemetry.detections += 1
-        queueDriftTelemetry.detectionsByTrigger[reason, default: 0] += 1
-        for driftReason in diagnostics.reasons {
-            queueDriftTelemetry.detectionsByReason[driftReason, default: 0] += 1
-        }
-
-        queueState = queueState.reconcilingQueue(preferredCurrentSongId: preferredCurrentSongId)
-
-        let afterPoolCount = queueState.songCount
-        let afterQueueCount = queueState.queueOrder.count
-        let afterCurrent = queueState.currentSongId ?? "nil"
-        let repaired = !queueState.isQueueStale
-        queueDriftTelemetry.reconciliations += 1
-        if !repaired {
-            queueDriftTelemetry.unrepairedDetections += 1
-        }
-
-        let transportCount = musicService.transportQueueEntryCount
-        let transportCurrentId = musicService.currentSongId
-        let transportParityMismatch = transportCount != queueState.queueOrder.count
-            || transportCurrentId != queueState.currentSongId
-
-        let event = QueueDriftEvent(
-            timestamp: Date(),
-            trigger: reason,
-            reasons: diagnostics.reasons.sorted { $0.rawValue < $1.rawValue },
-            poolCount: diagnostics.poolCount,
-            queueCount: diagnostics.queueCount,
-            duplicateCount: diagnostics.duplicateQueueIDs.count,
-            missingFromQueueCount: diagnostics.missingFromQueue.count,
-            missingFromPoolCount: diagnostics.missingFromPool.count,
-            currentSongId: queueState.currentSongId,
-            preferredCurrentSongId: preferredCurrentSongId,
-            repaired: repaired,
-            transportEntryCount: transportCount,
-            transportCurrentSongId: transportCurrentId,
-            transportParityMismatch: transportParityMismatch
-        )
-        queueDriftTelemetry.recentEvents.insert(event, at: 0)
-        if queueDriftTelemetry.recentEvents.count > 20 {
-            queueDriftTelemetry.recentEvents.removeLast(queueDriftTelemetry.recentEvents.count - 20)
-        }
-
-        print(
-            "🛠️ Queue reconciliation [\(reason)] pool \(beforePoolCount)->\(afterPoolCount), " +
-            "queue \(beforeQueueCount)->\(afterQueueCount), current \(beforeCurrent)->\(afterCurrent), " +
-            "reasons=\(event.reasons.map(\.rawValue)), duplicateIDs=\(diagnostics.duplicateQueueIDs.count), " +
-            "missingFromQueue=\(diagnostics.missingFromQueue.count), missingFromPool=\(diagnostics.missingFromPool.count), " +
-            "repaired=\(repaired)"
+        recordOperation(
+            "playback-resolution",
+            detail: "state=\(playbackStateLabel(resolution.resolvedState)), song=\(resolution.resolvedSongId ?? "nil")"
         )
     }
 
     func clearOperationNotice() {
         operationNotice = nil
+        recordOperation("clear-operation-notice")
+    }
+
+    /// Debug-only escape hatch to return queue and diagnostics to a clean baseline.
+    func hardResetQueueForDebug() async {
+        await removeAllSongs()
+        queueOperationJournal = QueueOperationJournal()
+        operationJournalVersion &+= 1
+        operationNotice = nil
+        playbackObserver.clearLastObservedSongId()
+        playbackObserver.clearPendingRestoreSeek()
+        recordOperation("hard-reset-queue")
     }
 
     private func reportTransportFailure(action: String, error: Error) -> String {
@@ -165,7 +151,104 @@ final class ShufflePlayer {
             : "\(action). Please try again."
         operationNotice = message
         print("⚠️ \(action): \(error)")
+        recordOperation(
+            "transport-failure",
+            detail: "\(action): \(error.localizedDescription)",
+            refreshTransport: true
+        )
         return message
+    }
+
+    private enum TransportCommandExecutionError: Error {
+        case staleRevision(commandRevision: Int, queueRevision: Int)
+    }
+
+    private struct TransportSnapshot {
+        let entryCount: Int
+        let currentSongId: String?
+    }
+
+    private struct DomainInvariantSnapshot {
+        let poolIds: [String]
+        let queueIds: [String]
+        let poolIdSet: Set<String>
+        let queueIdSet: Set<String>
+        let queueParityExpected: Bool
+        let playbackCurrentSongId: String?
+        let reasons: [String]
+
+        var isHealthy: Bool { reasons.isEmpty }
+    }
+
+    /// Serializes transport command batches without building an unbounded linked task chain.
+    private final class TransportCommandExecutor {
+        typealias CommandRunner = (TransportCommand) async throws -> Void
+
+        private struct Batch {
+            let commands: [TransportCommand]
+            let continuation: CheckedContinuation<Void, Error>
+        }
+
+        private let runCommand: CommandRunner
+        private var pendingBatches: [Batch] = []
+        private var isDraining = false
+
+        init(runCommand: @escaping CommandRunner) {
+            self.runCommand = runCommand
+        }
+
+        func enqueue(_ commands: [TransportCommand]) async throws {
+            guard !commands.isEmpty else { return }
+
+            try await withCheckedThrowingContinuation { continuation in
+                pendingBatches.append(Batch(commands: commands, continuation: continuation))
+                guard !isDraining else { return }
+                isDraining = true
+                Task { @MainActor [weak self] in
+                    await self?.drain()
+                }
+            }
+        }
+
+        private func drain() async {
+            while !pendingBatches.isEmpty {
+                let batch = pendingBatches.removeFirst()
+                do {
+                    for command in batch.commands {
+                        try await runCommand(command)
+                    }
+                    batch.continuation.resume(returning: ())
+                } catch {
+                    batch.continuation.resume(throwing: error)
+                }
+            }
+
+            isDraining = false
+        }
+    }
+
+    @discardableResult
+    private func handleStaleTransportCommand(_ error: Error, source: String) -> Bool {
+        guard case let TransportCommandExecutionError.staleRevision(commandRevision, queueRevision) = error else {
+            return false
+        }
+
+        queueNeedsBuild = true
+        if case .loading = playbackState {
+            if let current = queueState.currentSong {
+                playbackState = .paused(current)
+            } else if queueState.isEmpty {
+                playbackState = .empty
+            } else {
+                playbackState = .stopped
+            }
+        }
+        operationNotice = "Queue changed while syncing. Rebuilding queue."
+        recordOperation(
+            "transport-command-stale",
+            detail: "source=\(source), commandRevision=\(commandRevision), queueRevision=\(queueRevision)"
+        )
+        return true
     }
 
     private static func isLikelyOfflineError(_ error: Error) -> Bool {
@@ -184,202 +267,532 @@ final class ShufflePlayer {
         ].contains(nsError.code)
     }
 
+    private var engineState: QueueEngineState {
+        QueueEngineState(
+            queueState: queueState,
+            playbackState: playbackState,
+            revision: queueRevision,
+            queueNeedsBuild: queueNeedsBuild
+        )
+    }
+
+    private func applyReduction(_ reduction: QueueEngineReduction) {
+        queueState = reduction.nextState.queueState
+        playbackState = reduction.nextState.playbackState
+        queueRevision = reduction.nextState.revision
+        queueNeedsBuild = reduction.nextState.queueNeedsBuild
+        enforceDomainInvariants(context: "reduction")
+    }
+
+    private enum RollbackPolicy {
+        case none
+        case full
+        case preservePoolAndDeferQueueBuild
+    }
+
+    private enum TransportApplyOutcome {
+        case applied
+        case stale
+    }
+
+    private func restoreEngineState(_ state: QueueEngineState) {
+        queueState = state.queueState
+        playbackState = state.playbackState
+        queueRevision = state.revision
+        queueNeedsBuild = state.queueNeedsBuild
+    }
+
+    private func rollback(to previousState: QueueEngineState, policy: RollbackPolicy) {
+        switch policy {
+        case .none:
+            return
+        case .full:
+            restoreEngineState(previousState)
+        case .preservePoolAndDeferQueueBuild:
+            // Keep newly added songs while reverting queue shape until the next rebuild.
+            queueState = QueueState(
+                songPool: queueState.songPool,
+                queueOrder: previousState.queueState.queueOrder,
+                playedIds: previousState.queueState.playedIds,
+                currentIndex: previousState.queueState.currentIndex,
+                algorithm: previousState.queueState.algorithm
+            )
+            playbackState = previousState.playbackState
+            queueRevision = previousState.revision
+            queueNeedsBuild = true
+        }
+    }
+
+    private func applyReductionWithTransport(
+        _ reduction: QueueEngineReduction,
+        source: String,
+        rollbackPolicy: RollbackPolicy = .full,
+        staleRollbackPolicy: RollbackPolicy = .none,
+        afterApply: (() -> Void)? = nil
+    ) async throws -> TransportApplyOutcome {
+        let previousState = engineState
+        applyReduction(reduction)
+        afterApply?()
+
+        do {
+            try await enqueueTransportCommands(reduction.transportCommands)
+            _ = refreshTransportSnapshot()
+            return .applied
+        } catch {
+            _ = refreshTransportSnapshot()
+            if handleStaleTransportCommand(error, source: source) {
+                rollback(to: previousState, policy: staleRollbackPolicy)
+                return .stale
+            }
+            rollback(to: previousState, policy: rollbackPolicy)
+            throw error
+        }
+    }
+
+    private func enforceDomainInvariants(context: String) {
+        let queueIds = queueState.queueOrder.map(\.id)
+        let queueIdSet = Set(queueIds)
+        let poolIdSet = Set(queueState.songPool.map(\.id))
+        let hasValidCurrent = !queueState.hasQueue || queueState.currentSong != nil
+        let queueMembershipIsValid: Bool
+        if queueState.hasQueue {
+            if queueNeedsBuild {
+                // Degraded mode: transport sync failed or queue was invalidated; rebuild is pending.
+                queueMembershipIsValid = true
+            } else {
+                queueMembershipIsValid = queueIds.count == queueIdSet.count && queueIdSet == poolIdSet
+            }
+        } else {
+            // It's valid to have songs in the pool with no queue yet; queue is lazily built on play.
+            queueMembershipIsValid = queueState.isEmpty || queueNeedsBuild || !playbackState.isActive
+        }
+        let isHealthy = queueMembershipIsValid && hasValidCurrent
+
+        guard !queueState.isEmpty else { return }
+        guard !isHealthy else { return }
+
+        // Any invariant break should push the system into an explicit rebuild path.
+        queueNeedsBuild = true
+
+#if DEBUG
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            assertionFailure("Queue invariant violation [\(context)]")
+        } else {
+            operationNotice = "Queue sync issue detected. Rebuilding queue."
+        }
+#else
+        operationNotice = "Queue sync issue detected. Rebuilding queue."
+#endif
+        recordOperation(
+            "invariant-violation",
+            detail: "context=\(context), pool=\(queueState.songPool.count), queue=\(queueState.queueOrder.count)"
+        )
+    }
+
+    private func executeTransportCommand(_ command: TransportCommand) async throws {
+        guard command.revision == queueRevision else {
+            throw TransportCommandExecutionError.staleRevision(
+                commandRevision: command.revision,
+                queueRevision: queueRevision
+            )
+        }
+
+        switch command {
+        case .setQueue(let songs, _):
+            try await musicService.setQueue(songs: songs)
+        case .insertIntoQueue(let songs, _):
+            try await musicService.insertIntoQueue(songs: songs)
+        case .replaceQueue(let queue, let startAtSongId, let policy, _):
+            try await musicService.replaceQueue(queue: queue, startAtSongId: startAtSongId, policy: policy)
+        case .play:
+            try await musicService.play()
+        case .pause:
+            await musicService.pause()
+        case .skipToNext:
+            try await musicService.skipToNext()
+        case .skipToPrevious:
+            try await musicService.skipToPrevious()
+        case .restartOrSkipToPrevious:
+            try await musicService.restartOrSkipToPrevious()
+        }
+    }
+
+    private func enqueueTransportCommands(_ commands: [TransportCommand]) async throws {
+        try await transportCommandExecutor.enqueue(commands)
+    }
+
+    private func reduce(_ intent: QueueIntent) throws -> QueueEngineReduction {
+        try QueueEngineReducer.reduce(state: engineState, intent: intent)
+    }
+
+    private func playbackStateLabel(_ state: PlaybackState) -> String {
+        switch state {
+        case .empty:
+            return "empty"
+        case .stopped:
+            return "stopped"
+        case .loading:
+            return "loading"
+        case .playing:
+            return "playing"
+        case .paused:
+            return "paused"
+        case .error(let error):
+            return "error(\(error.localizedDescription))"
+        }
+    }
+
+    private func domainInvariantReasons(
+        poolIds: [String],
+        queueIds: [String],
+        poolIdSet: Set<String>,
+        queueIdSet: Set<String>,
+        queueParityExpected: Bool,
+        playbackCurrentSongId: String?
+    ) -> [String] {
+        var reasons: [String] = []
+
+        if !queueState.hasQueue || queueIds.count == queueIdSet.count {
+            // no-op
+        } else {
+            reasons.append("duplicate-queue-ids")
+        }
+
+        if !queueParityExpected || poolIdSet == queueIdSet {
+            // no-op
+        } else {
+            reasons.append("pool-queue-membership-mismatch")
+        }
+
+        if queueParityExpected && queueIds.count != poolIds.count {
+            reasons.append("pool-queue-count-mismatch")
+        }
+
+        if queueState.hasQueue && queueState.currentSong == nil {
+            reasons.append("current-index-out-of-bounds")
+        }
+
+        if let playbackCurrentSongId,
+           !poolIdSet.contains(playbackCurrentSongId) {
+            reasons.append("playback-song-not-in-pool")
+        }
+
+        return reasons
+    }
+
+    private func makeDomainInvariantSnapshot() -> DomainInvariantSnapshot {
+        let poolIds = queueState.songPool.map(\.id)
+        let queueIds = queueState.queueOrder.map(\.id)
+        let poolIdSet = Set(poolIds)
+        let queueIdSet = Set(queueIds)
+        let queueParityExpected = !queueNeedsBuild && (queueState.hasQueue || playbackState.isActive)
+        let playbackCurrentSongId = playbackState.currentSongId
+        let reasons = domainInvariantReasons(
+            poolIds: poolIds,
+            queueIds: queueIds,
+            poolIdSet: poolIdSet,
+            queueIdSet: queueIdSet,
+            queueParityExpected: queueParityExpected,
+            playbackCurrentSongId: playbackCurrentSongId
+        )
+        return DomainInvariantSnapshot(
+            poolIds: poolIds,
+            queueIds: queueIds,
+            poolIdSet: poolIdSet,
+            queueIdSet: queueIdSet,
+            queueParityExpected: queueParityExpected,
+            playbackCurrentSongId: playbackCurrentSongId,
+            reasons: reasons
+        )
+    }
+
+    private func evaluateDomainInvariants() -> (isHealthy: Bool, reasons: [String]) {
+        let snapshot = makeDomainInvariantSnapshot()
+        return (isHealthy: snapshot.isHealthy, reasons: snapshot.reasons)
+    }
+
+    private func refreshTransportSnapshot() -> TransportSnapshot {
+        let snapshot = TransportSnapshot(
+            entryCount: musicService.transportQueueEntryCount,
+            currentSongId: musicService.currentSongId
+        )
+        cachedTransportSnapshot = snapshot
+        return snapshot
+    }
+
+    private func evaluateQueueInvariants() -> QueueInvariantCheck {
+        let snapshot = makeDomainInvariantSnapshot()
+
+        let queueHasUniqueIDs = !queueState.hasQueue || snapshot.queueIds.count == snapshot.queueIdSet.count
+        let poolAndQueueMembershipMatch = !snapshot.queueParityExpected || snapshot.poolIdSet == snapshot.queueIdSet
+        let transportSnapshot = refreshTransportSnapshot()
+        let transportEntryCount = transportSnapshot.entryCount
+        let transportCurrentSongId = transportSnapshot.currentSongId
+        let transportEntryCountMatchesQueue = !snapshot.queueParityExpected || transportEntryCount == snapshot.queueIds.count
+        let transportCurrentMatchesDomain =
+            !snapshot.queueParityExpected ||
+            transportCurrentSongId == queueState.currentSongId ||
+            snapshot.playbackCurrentSongId == queueState.currentSongId
+
+        var reasons = snapshot.reasons
+        if !transportEntryCountMatchesQueue {
+            reasons.append("transport-entry-count-mismatch")
+        }
+        if !transportCurrentMatchesDomain {
+            reasons.append("transport-current-song-mismatch")
+        }
+
+        return QueueInvariantCheck(
+            isHealthy: reasons.isEmpty,
+            reasons: reasons,
+            poolCount: queueState.songPool.count,
+            queueCount: queueState.queueOrder.count,
+            playedCount: queueState.playedIds.count,
+            currentIndex: queueState.currentIndex,
+            domainCurrentSongId: queueState.currentSongId,
+            playbackCurrentSongId: snapshot.playbackCurrentSongId,
+            transportEntryCount: transportEntryCount,
+            transportCurrentSongId: transportCurrentSongId,
+            queueHasUniqueIDs: queueHasUniqueIDs,
+            poolAndQueueMembershipMatch: poolAndQueueMembershipMatch,
+            transportEntryCountMatchesQueue: transportEntryCountMatchesQueue,
+            transportCurrentMatchesDomain: transportCurrentMatchesDomain
+        )
+    }
+
+    private func recordOperation(_ operation: String, detail: String? = nil, refreshTransport: Bool = false) {
+        if refreshTransport {
+            _ = refreshTransportSnapshot()
+        }
+        let invariant = evaluateDomainInvariants()
+        let transport = cachedTransportSnapshot
+        let record = QueueOperationRecord(
+            id: UUID(),
+            timestamp: Date(),
+            operation: operation,
+            detail: detail,
+            playbackState: playbackStateLabel(playbackState),
+            poolCount: queueState.songPool.count,
+            queueCount: queueState.queueOrder.count,
+            currentSongId: queueState.currentSongId,
+            transportEntryCount: transport.entryCount,
+            transportCurrentSongId: transport.currentSongId,
+            invariantHealthy: invariant.isHealthy,
+            invariantReasons: invariant.reasons
+        )
+        queueOperationJournal.append(record)
+        operationJournalVersion &+= 1
+    }
+
+    func exportQueueDiagnosticsSnapshot(trigger: String = "manual-export", detail: String? = nil) -> String {
+        let invariant = evaluateQueueInvariants()
+        recordOperation("snapshot-export", detail: [trigger, detail].compactMap { $0 }.joined(separator: " | "))
+        let snapshot = QueueDiagnosticsSnapshot(
+            exportedAt: Date(),
+            trigger: trigger,
+            detail: detail,
+            playbackState: playbackStateLabel(playbackState),
+            poolSongIds: queueState.songPool.map(\.id),
+            queueSongIds: queueState.queueOrder.map(\.id),
+            playedSongIds: queueState.playedIds.sorted(),
+            currentIndex: queueState.currentIndex,
+            currentSongId: queueState.currentSongId,
+            transportEntryCount: invariant.transportEntryCount,
+            transportCurrentSongId: invariant.transportCurrentSongId,
+            invariantCheck: invariant,
+            operationJournal: queueOperationJournal.records
+        )
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(snapshot)
+            return String(decoding: data, as: UTF8.self)
+        } catch {
+            recordOperation("snapshot-export-failed", detail: error.localizedDescription)
+            return "{\"error\":\"snapshot-export-failed\"}"
+        }
+    }
+
     // MARK: - Algorithm Change
 
     /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
     func reshuffleWithNewAlgorithm(_ algorithm: ShuffleAlgorithm) async {
-        guard !queueState.isEmpty else { return }
-        reconcileQueueIfNeeded(reason: "reshuffle-start", preferredCurrentSongId: playbackState.currentSongId)
-
-        // If not actively playing, invalidate the queue so next play() rebuilds with the new algorithm
-        guard playbackState.isActive else {
-            print("🎲 Algorithm changed to \(algorithm.displayName) while not active, invalidating queue")
-            queueState = queueState.invalidatingQueue(using: algorithm)
-            return
-        }
-
-        print("🎲 Algorithm changed to \(algorithm.displayName), reshuffling...")
-
-        guard let currentSong = playbackState.currentSong,
-              queueState.containsSong(id: currentSong.id) else {
-            print("🎲 No current song found, skipping reshuffle")
-            return
-        }
-
-        let stateBeforeReshuffle = queueState
-
-        // Update queue state with reshuffled upcoming songs
-        queueState = queueState.reshuffledUpcoming(with: algorithm)
-
-        print("🎲 New queue order: \(queueState.queueOrder.map { "\($0.title) by \($0.artist)" })")
-
         do {
-            let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
-            try await musicService.replaceQueue(
-                queue: queueState.upcomingSongs,
-                startAtSongId: currentSong.id,
-                policy: policy
-            )
-            print("🎲 replaceQueue succeeded")
+            let reduction = try reduce(.reshuffleAlgorithm(algorithm))
+            guard !reduction.wasNoOp else {
+                recordOperation("reshuffle-algorithm-skip", detail: "no-op")
+                return
+            }
+
+            do {
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "reshuffle-algorithm",
+                    rollbackPolicy: .full
+                )
+                switch outcome {
+                case .applied:
+                    if playbackState.isActive {
+                        recordOperation("reshuffle-algorithm-success", detail: algorithm.rawValue)
+                    } else {
+                        recordOperation("reshuffle-algorithm-invalidated", detail: algorithm.rawValue)
+                    }
+                case .stale:
+                    return
+                }
+            } catch {
+                _ = reportTransportFailure(action: "Couldn't reshuffle the active queue", error: error)
+                recordOperation("reshuffle-algorithm-failed", detail: error.localizedDescription)
+            }
         } catch {
-            queueState = stateBeforeReshuffle
-            _ = reportTransportFailure(action: "Couldn't reshuffle the active queue", error: error)
-            print("🎲 replaceQueue FAILED: \(error)")
+            recordOperation("reshuffle-algorithm-failed", detail: error.localizedDescription)
         }
     }
 
     // MARK: - Song Management
 
     func addSong(_ song: Song) async throws {
-        print("➕ addSong(\(song.title)): current songCount=\(queueState.songCount), queueOrder=\(queueState.queueOrder.count), isActive=\(playbackState.isActive)")
-        guard let newState = queueState.addingSong(song) else {
-            print("➕ addSong: capacity reached!")
-            throw ShufflePlayerError.capacityReached
-        }
+        do {
+            let reduction = try reduce(.addSong(song))
+            guard !reduction.wasNoOp else {
+                recordOperation("add-song-skip", detail: "duplicate id=\(song.id)")
+                return
+            }
 
-        // Check if it was actually added (not a duplicate)
-        guard newState.songCount > queueState.songCount else {
-            print("➕ addSong: already exists, skipping")
-            return // Already added
-        }
-
-        queueState = newState
-        print("➕ addSong: added to pool, new songCount=\(queueState.songCount)")
-
-        // If playing, also add to our internal queue order and MusicKit queue
-        if playbackState.isActive && queueState.hasQueue {
-            // Add to our internal queue order
-            queueState = queueState.appendingToQueue(song)
-            print("➕ addSong: appended to queueOrder, now \(queueState.queueOrder.count) songs")
-
-            // Insert into MusicKit queue (with rollback on failure)
             do {
-                try await musicService.insertIntoQueue(songs: [song])
-                print("🎵 Successfully inserted \(song.title) into MusicKit queue")
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "add-song",
+                    rollbackPolicy: .preservePoolAndDeferQueueBuild
+                )
+                switch outcome {
+                case .applied:
+                    recordOperation("add-song-success", detail: "id=\(song.id)")
+                case .stale:
+                    recordOperation("add-song-deferred-rebuild", detail: "id=\(song.id)")
+                    return
+                }
             } catch {
-                // Rollback completely so pool/queue invariants remain intact.
-                queueState = queueState.removingSong(id: song.id)
-                print("⚠️ Rolled back \(song.title) from pool+queue after insert failure: \(error)")
                 let message = reportTransportFailure(action: "Couldn't add the song to the active queue", error: error)
+                recordOperation("add-song-failed", detail: "transport-sync-failed id=\(song.id)")
                 throw ShufflePlayerError.playbackFailed(message)
             }
-        } else {
-            print("➕ addSong: playback not active or no queue yet, song only added to pool")
-        }
-        if playbackState.isActive {
-            reconcileQueueIfNeeded(reason: "add-song", preferredCurrentSongId: playbackState.currentSongId)
+        } catch QueueEngineError.capacityReached {
+            recordOperation("add-song-failed", detail: "capacity-reached id=\(song.id)")
+            throw ShufflePlayerError.capacityReached
+        } catch {
+            let message = reportTransportFailure(action: "Couldn't add the song to the active queue", error: error)
+            recordOperation("add-song-failed", detail: "unexpected id=\(song.id)")
+            throw ShufflePlayerError.playbackFailed(message)
         }
     }
 
     func addSongs(_ newSongs: [Song]) throws {
-        guard let newState = queueState.addingSongs(newSongs) else {
+        do {
+            let reduction = try reduce(.addSongs(newSongs))
+            guard !reduction.wasNoOp else { return }
+            applyReduction(reduction)
+            recordOperation("add-songs-success", detail: "batch=\(newSongs.count)")
+        } catch QueueEngineError.capacityReached {
+            recordOperation("add-songs-failed", detail: "capacity-reached batch=\(newSongs.count)")
             throw ShufflePlayerError.capacityReached
+        } catch {
+            recordOperation("add-songs-failed", detail: "unexpected batch=\(newSongs.count)")
+            throw ShufflePlayerError.playbackFailed(error.localizedDescription)
         }
-        queueState = newState
-        // Don't rebuild queue during initial load - not playing yet
     }
 
     /// Add songs and reshuffle queue if playing (interleaves new songs throughout upcoming queue)
     func addSongsWithQueueRebuild(_ newSongs: [Song], algorithm: ShuffleAlgorithm? = nil) async throws {
-        print("🔍 addSongsWithQueueRebuild: Received \(newSongs.count) songs")
-
-        guard let newState = queueState.addingSongs(newSongs) else {
-            print("🔍 addSongsWithQueueRebuild: Capacity exceeded!")
-            throw ShufflePlayerError.capacityReached
-        }
-
-        let addedCount = newState.songCount - queueState.songCount
-        print("🔍 addSongsWithQueueRebuild: \(addedCount) unique after filtering")
-
-        queueState = newState
-        let stateBeforeQueueRebuild = queueState
-        print("🔍 addSongsWithQueueRebuild: Added to internal list, playbackState.isActive = \(playbackState.isActive)")
-
-        // If playing, reshuffle to interleave new songs throughout upcoming queue
-        if playbackState.isActive {
-            guard let currentSong = playbackState.currentSong,
-                  queueState.containsSong(id: currentSong.id) else {
-                print("🔍 addSongsWithQueueRebuild: No current song, skipping reshuffle")
-                return
-            }
-
-            let effectiveAlgorithm = algorithm ?? queueState.algorithm
-
-            // Reshuffle upcoming songs (this excludes played songs and current song)
-            queueState = queueState.reshuffledUpcoming(with: effectiveAlgorithm)
-
-            print("🎵 Reshuffling with \(addedCount) new songs interleaved")
+        do {
+            let reduction = try reduce(.addSongsWithRebuild(newSongs, algorithm: algorithm))
+            guard !reduction.wasNoOp else { return }
 
             do {
-                let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
-                try await musicService.replaceQueue(
-                    queue: queueState.upcomingSongs,
-                    startAtSongId: currentSong.id,
-                    policy: policy
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "add-songs-rebuild",
+                    rollbackPolicy: .preservePoolAndDeferQueueBuild
                 )
-                print("🎵 Successfully reshuffled queue with \(queueState.queueOrder.count) total songs")
+                switch outcome {
+                case .applied:
+                    recordOperation("add-songs-rebuild-success", detail: "batch=\(newSongs.count)")
+                case .stale:
+                    recordOperation("add-songs-rebuild-deferred", detail: "batch=\(newSongs.count)")
+                    return
+                }
             } catch {
-                queueState = stateBeforeQueueRebuild
                 let message = reportTransportFailure(action: "Couldn't sync newly added songs to the active queue", error: error)
-                print("🎵 Failed to reshuffle queue: \(error)")
+                recordOperation("add-songs-rebuild-failed", detail: "transport-sync-failed")
                 throw ShufflePlayerError.playbackFailed(message)
             }
+        } catch QueueEngineError.capacityReached {
+            recordOperation("add-songs-rebuild-failed", detail: "capacity-reached batch=\(newSongs.count)")
+            throw ShufflePlayerError.capacityReached
+        } catch {
+            let message = reportTransportFailure(action: "Couldn't sync newly added songs to the active queue", error: error)
+            recordOperation("add-songs-rebuild-failed", detail: "unexpected")
+            throw ShufflePlayerError.playbackFailed(message)
         }
-        if playbackState.isActive {
-            reconcileQueueIfNeeded(reason: "add-songs-with-rebuild", preferredCurrentSongId: playbackState.currentSongId)
-        }
-        print("🔍 addSongsWithQueueRebuild: Complete")
     }
 
     func removeSong(id: String) async {
-        let previousState = queueState
-        let isRemovingCurrentSong = playbackState.currentSongId == id
-        queueState = queueState.removingSong(id: id)
+        do {
+            let reduction = try reduce(.removeSong(id: id))
+            guard !reduction.wasNoOp else { return }
 
-        // Update MusicKit queue if actively playing
-        guard playbackState.isActive else { return }
-
-        if isRemovingCurrentSong {
-            // Removing current song - skip to next
             do {
-                try await musicService.skipToNext()
-                print("🎵 Skipped to next after removing current song")
-            } catch {
-                queueState = previousState
-                _ = reportTransportFailure(action: "Couldn't remove the currently playing song", error: error)
-                print("🎵 Failed to skip after removing current song: \(error)")
-            }
-        } else if let currentSong = playbackState.currentSong,
-                  queueState.containsSong(id: currentSong.id) {
-            // Removing upcoming song - rebuild queue without it while preserving current entry.
-            do {
-                let policy: QueueApplyPolicy = playbackState.isPlaying ? .forcePlaying : .forcePaused
-                try await musicService.replaceQueue(
-                    queue: queueState.upcomingSongs,
-                    startAtSongId: currentSong.id,
-                    policy: policy
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "remove-song",
+                    rollbackPolicy: .full
                 )
-                print("🎵 Removed song \(id) from MusicKit queue")
+                guard case .applied = outcome else { return }
+                recordOperation("remove-song-success", detail: "id=\(id)")
             } catch {
-                queueState = previousState
                 _ = reportTransportFailure(action: "Couldn't remove the song from the active queue", error: error)
-                print("🎵 Failed to remove song from MusicKit queue: \(error)")
+                recordOperation("remove-song-failed", detail: "id=\(id)")
             }
+        } catch {
+            _ = reportTransportFailure(action: "Couldn't remove the song from the active queue", error: error)
+            recordOperation("remove-song-failed", detail: "id=\(id), unexpected")
         }
-
-        reconcileQueueIfNeeded(reason: "remove-song", preferredCurrentSongId: playbackState.currentSongId)
     }
 
     func removeAllSongs() async {
-        print("🗑️ removeAllSongs() called: had \(queueState.songCount) songs, queueOrder had \(queueState.queueOrder.count)")
-        queueState = queueState.cleared()
-        playbackObserver.clearLastObservedSongId()
+        do {
+            let reduction = try reduce(.removeAllSongs)
+            guard !reduction.wasNoOp else { return }
 
-        // Stop MusicKit playback so it doesn't continue with stale queue
-        await musicService.pause()
-        playbackState = .empty
-
-        print("🗑️ removeAllSongs() complete: now \(queueState.songCount) songs, queueOrder has \(queueState.queueOrder.count)")
+            do {
+                let outcome = try await applyReductionWithTransport(
+                    reduction,
+                    source: "remove-all-songs",
+                    rollbackPolicy: .none,
+                    staleRollbackPolicy: .none,
+                    afterApply: { self.playbackObserver.clearLastObservedSongId() }
+                )
+                switch outcome {
+                case .applied:
+                    recordOperation("remove-all-songs")
+                case .stale:
+                    await musicService.pause()
+                    queueNeedsBuild = false
+                    _ = refreshTransportSnapshot()
+                    operationNotice = "Queue changed while clearing. Playback paused and queue cleared."
+                    recordOperation("remove-all-songs-stale-force-pause", refreshTransport: true)
+                    return
+                }
+            } catch {
+                _ = reportTransportFailure(action: "Couldn't clear the active queue", error: error)
+                recordOperation("remove-all-songs-failed", detail: error.localizedDescription)
+            }
+        } catch {
+            _ = reportTransportFailure(action: "Couldn't clear the active queue", error: error)
+            recordOperation("remove-all-songs-failed", detail: error.localizedDescription)
+        }
     }
 
     func containsSong(id: String) -> Bool {
@@ -389,81 +802,121 @@ final class ShufflePlayer {
     // MARK: - Queue Preparation
 
     func prepareQueue(algorithm: ShuffleAlgorithm? = nil) async throws {
-        guard !queueState.isEmpty else { return }
+        let reduction = try reduce(.prepareQueue(algorithm: algorithm))
+        guard !reduction.wasNoOp else {
+            recordOperation("prepare-queue-skip", detail: "empty-pool")
+            return
+        }
 
-        let effectiveAlgorithm = algorithm ?? queueState.algorithm
-
-        print("🎲 prepareQueue: songPool has \(queueState.songCount) songs")
-
-        // Shuffle the queue
-        queueState = queueState.shuffled(with: effectiveAlgorithm)
-        print("🎲 Prepared queue with algorithm: \(effectiveAlgorithm.displayName)")
-        print("🎲 prepareQueue: queueOrder now has \(queueState.queueOrder.count) songs")
-
-        try await musicService.setQueue(songs: queueState.queueOrder)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "prepare-queue",
+            rollbackPolicy: .full
+        )
+        switch outcome {
+        case .applied:
+            recordOperation("prepare-queue-success", detail: queueState.algorithm.rawValue)
+        case .stale:
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
+        }
     }
 
     // MARK: - Playback Control
 
     func play(algorithm: ShuffleAlgorithm? = nil) async throws {
-        print("▶️ play() called: isEmpty=\(queueState.isEmpty), hasQueue=\(queueState.hasQueue), isQueueStale=\(queueState.isQueueStale), songCount=\(queueState.songCount)")
-        guard !queueState.isEmpty else {
-            print("▶️ play() early return: queue is empty")
+        let reduction = try reduce(.play(algorithm: algorithm))
+        guard !reduction.wasNoOp else {
+            recordOperation("play-skip", detail: "empty-pool")
             return
         }
 
-        // Clear played history for fresh playback
-        queueState = queueState.clearingPlayedHistory()
-        playbackObserver.clearLastObservedSongId()
-
-        print("▶️ play() preparing queue...")
-        try await prepareQueue(algorithm: algorithm)
-        // Emit loading with the actual first song from shuffled queue
-        if let firstSong = queueState.currentSong {
-            playbackState = .loading(firstSong)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "play",
+            rollbackPolicy: .full,
+            afterApply: { self.playbackObserver.clearLastObservedSongId() }
+        )
+        switch outcome {
+        case .applied:
+            recordOperation("play-success")
+        case .stale:
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
         }
-        print("▶️ play() queue prepared, order has \(queueState.queueOrder.count) songs")
-
-        try await musicService.play()
-        print("▶️ play() complete")
     }
 
     func pause() async {
-        await musicService.pause()
+        guard let reduction = try? reduce(.pause) else { return }
+        do {
+            let outcome = try await applyReductionWithTransport(
+                reduction,
+                source: "pause",
+                rollbackPolicy: .none
+            )
+            if case .stale = outcome {
+                return
+            }
+        } catch {
+            _ = reportTransportFailure(action: "Couldn't pause playback", error: error)
+        }
+        recordOperation("pause")
     }
 
     func skipToNext() async throws {
-        try await musicService.skipToNext()
+        let reduction = try reduce(.skipToNext)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "skip-next",
+            rollbackPolicy: .none
+        )
+        if case .stale = outcome {
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
+        }
+        recordOperation("skip-next")
     }
 
     func skipToPrevious() async throws {
-        try await musicService.skipToPrevious()
+        let reduction = try reduce(.skipToPrevious)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "skip-previous",
+            rollbackPolicy: .none
+        )
+        if case .stale = outcome {
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
+        }
+        recordOperation("skip-previous")
     }
 
     func restartOrSkipToPrevious() async throws {
-        try await musicService.restartOrSkipToPrevious()
+        let reduction = try reduce(.restartOrSkipToPrevious)
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "restart-or-skip-previous",
+            rollbackPolicy: .none
+        )
+        if case .stale = outcome {
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
+        }
+        recordOperation("restart-or-skip-previous")
     }
 
     func togglePlayback(algorithm: ShuffleAlgorithm? = nil) async throws {
-        switch playbackState {
-        case .empty, .stopped:
-            try await play(algorithm: algorithm)
-        case .playing:
-            await pause()
-        case .paused:
-            // If we have songs but no queue (e.g., after clear + re-add), build queue first
-            if !queueState.isEmpty && !queueState.hasQueue {
-                print("▶️ togglePlayback: paused but no queue, calling play() to rebuild")
-                try await play(algorithm: algorithm)
-            } else {
-                try await musicService.play()
-            }
-        case .loading:
-            // Do nothing while loading
-            break
-        case .error:
-            // Try to play again
-            try await play(algorithm: algorithm)
+        let reduction = try reduce(.togglePlayback(algorithm: algorithm))
+        guard !reduction.wasNoOp else {
+            recordOperation("toggle-playback-skip", detail: "no-op")
+            return
+        }
+
+        let outcome = try await applyReductionWithTransport(
+            reduction,
+            source: "toggle-playback",
+            rollbackPolicy: .full
+        )
+        switch outcome {
+        case .applied:
+            recordOperation("toggle-playback")
+        case .stale:
+            throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
         }
     }
 
@@ -496,15 +949,27 @@ final class ShufflePlayer {
             playedIds: playedIds,
             playbackPosition: playbackPosition
         ) else {
+            recordOperation("restore-session-failed")
             return false
         }
 
-        queueState = result.restoredQueueState
-        playbackState = result.restoredPlaybackState
+        do {
+            let reduction = try reduce(
+                .restoreSession(
+                    queueState: result.restoredQueueState,
+                    playbackState: result.restoredPlaybackState
+                )
+            )
+            applyReduction(reduction)
+        } catch {
+            recordOperation("restore-session-failed", detail: "reducer=\(error.localizedDescription)")
+            return false
+        }
         playbackObserver.setLastObservedSongId(result.lastObservedSongId)
         if let seek = result.pendingRestoreSeek {
             playbackObserver.setPendingRestoreSeek(songId: seek.songId, position: seek.position)
         }
+        recordOperation("restore-session-success")
         return true
     }
 

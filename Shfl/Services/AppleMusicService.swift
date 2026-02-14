@@ -456,38 +456,28 @@ final class AppleMusicService: MusicService {
             // Initial state
             self.emitCurrentState()
 
-            // Observe both state AND queue changes
-            // State changes: play/pause/stop status
-            // Queue changes: current song advances
-            async let stateChanges: Void = { @MainActor in
-                for await _ in self.player.state.objectWillChange.values {
-                    self.emitCurrentState()
-                }
-            }()
+            // Observe both state and queue changes from MusicKit.
+            let stateChanges = self.player.state.objectWillChange.map { _ in () }
+            let queueChanges = self.player.queue.objectWillChange.map { _ in () }
+            let mergedChanges = Publishers.Merge(stateChanges, queueChanges)
 
-            async let queueChanges: Void = { @MainActor in
-                for await _ in self.player.queue.objectWillChange.values {
-                    self.emitCurrentState()
-                }
-            }()
-
-            // Keep both running
-            _ = await (stateChanges, queueChanges)
+            for await _ in mergedChanges.values {
+                self.emitCurrentState()
+            }
         }
     }
 
     private func emitCurrentState() {
         let state = mapPlaybackState()
+        let didPublish = playbackStateBroadcaster.publish(state)
         #if DEBUG
-        print("📻 Emitting state: \(state)")
+        if didPublish {
+            print("📻 Emitting state: \(state)")
+        }
         #endif
-        playbackStateBroadcaster.publish(state)
     }
 
     private func mapPlaybackState() -> PlaybackState {
-        #if DEBUG
-        print("📻 Mapping state - playbackStatus: \(player.state.playbackStatus)")
-        #endif
         guard let currentEntry = player.queue.currentEntry else {
             return .empty
         }
@@ -547,7 +537,9 @@ final class PlaybackStateBroadcaster {
             let replayState: PlaybackState
 
             lock.lock()
-            latestState = state
+            if continuations.isEmpty {
+                latestState = state
+            }
             continuations[id] = continuation
             replayState = latestState
             lock.unlock()
@@ -561,10 +553,15 @@ final class PlaybackStateBroadcaster {
         }
     }
 
-    func publish(_ state: PlaybackState) {
+    @discardableResult
+    func publish(_ state: PlaybackState) -> Bool {
         let subscribers: [AsyncStream<PlaybackState>.Continuation]
 
         lock.lock()
+        if state == latestState {
+            lock.unlock()
+            return false
+        }
         latestState = state
         subscribers = Array(continuations.values)
         lock.unlock()
@@ -572,6 +569,7 @@ final class PlaybackStateBroadcaster {
         for continuation in subscribers {
             continuation.yield(state)
         }
+        return true
     }
 
     func finishAll() {
