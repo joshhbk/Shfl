@@ -56,7 +56,17 @@ struct PlayerView: View {
                     hasSongs: player.songCount > 0,
                     isControlsDisabled: player.songCount == 0,
                     progressState: progressState,
-                    actions: actions,
+                    onPlayPause: onPlayPauseTapped,
+                    onSkipForward: onSkipForwardTapped,
+                    onSkipBack: onSkipBackTapped,
+                    onAdd: onAddTapped,
+                    onSettings: onSettingsTapped,
+                    onSeek: { time in
+                        progressState?.handleUserSeek(to: time)
+                        musicService.seek(to: time)
+                    },
+                    onShuffle: onShuffle,
+                    isShuffling: isShuffling,
                     showError: showError,
                     errorMessage: errorMessage,
                     safeAreaInsets: geometry.safeAreaInsets,
@@ -101,9 +111,11 @@ struct PlayerView: View {
         .onChange(of: colorExtractor.extractedColor) { _, newColor in
             tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)
         }
+        // Bi-directional theme sync: ThemeController ↔ AppSettings
+        // Loop prevention relies on ThemeController.setTheme(byId:) and AppSettings.currentThemeId
+        // both guarding against no-op writes, breaking the onChange cycle.
         .onChange(of: themeController.currentTheme) { _, newTheme in
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: newTheme)
-            // Sync theme to AppSettings for persistence and Live Activity
             appSettings?.currentThemeId = newTheme.id
         }
         .onChange(of: appSettings?.currentThemeId) { _, newId in
@@ -112,38 +124,7 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Actions
-
-    private var actions: PlayerActions {
-        PlayerActions(
-            onPlayPause: handlePlayPause,
-            onSkipForward: handleSkipForward,
-            onSkipBack: handleSkipBack,
-            onManage: onManageTapped,
-            onAdd: onAddTapped,
-            onSettings: onSettingsTapped,
-            onSeek: handleSeek,
-            onShuffle: onShuffle,
-            isShuffling: isShuffling
-        )
-    }
-
-    private func handleSeek(_ time: TimeInterval) {
-        progressState?.handleUserSeek(to: time)
-        musicService.seek(to: time)
-    }
-
-    private func handlePlayPause() {
-        onPlayPauseTapped()
-    }
-
-    private func handleSkipForward() {
-        onSkipForwardTapped()
-    }
-
-    private func handleSkipBack() {
-        onSkipBackTapped()
-    }
+    // MARK: - State Handlers
 
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
         if case .error(let error) = newState {

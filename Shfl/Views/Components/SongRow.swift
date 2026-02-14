@@ -64,7 +64,8 @@ struct SongRow: View, Equatable {
             withAnimation(.easeInOut(duration: 0.05).repeatCount(3, autoreverses: true)) {
                 showNope = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            Task {
+                try? await Task.sleep(for: .milliseconds(150))
                 showNope = false
             }
             return
@@ -78,7 +79,8 @@ struct SongRow: View, Equatable {
 
             // Glow flash on add
             showGlow = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
                 showGlow = false
             }
 
@@ -86,7 +88,8 @@ struct SongRow: View, Equatable {
             withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
                 checkmarkBounce = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            Task {
+                try? await Task.sleep(for: .milliseconds(200))
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                     checkmarkBounce = false
                 }

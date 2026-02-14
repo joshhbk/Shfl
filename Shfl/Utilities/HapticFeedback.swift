@@ -9,30 +9,34 @@ enum HapticFeedback {
     case error
     case milestone
 
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+
     func trigger() {
         switch self {
         case .light:
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Self.lightGenerator.impactOccurred()
         case .medium:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            Self.mediumGenerator.impactOccurred()
         case .heavy:
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            Self.heavyGenerator.impactOccurred()
         case .success:
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            Self.notificationGenerator.notificationOccurred(.success)
         case .warning:
-            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            Self.notificationGenerator.notificationOccurred(.warning)
         case .error:
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            Self.notificationGenerator.notificationOccurred(.error)
         case .milestone:
             // Three quick taps for celebration
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.prepare()
-            generator.impactOccurred()
+            Self.mediumGenerator.prepare()
+            Self.mediumGenerator.impactOccurred()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                generator.impactOccurred()
+                Self.mediumGenerator.impactOccurred()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                generator.impactOccurred()
+                Self.mediumGenerator.impactOccurred()
             }
         }
     }

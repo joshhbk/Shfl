@@ -17,6 +17,7 @@ struct SongPickerView: View {
 
     @State private var viewModel: LibraryBrowserViewModel
     @State private var undoManager = SongUndoManager()
+    // Local copy of pool IDs — trades possible staleness for isolation from player observation churn
     @State private var selectedSongIds: Set<String> = []
     @State private var searchText = ""
     @State private var browseMode: BrowseMode = .songs
@@ -369,16 +370,7 @@ struct SongPickerView: View {
 
     // MARK: - Shared Components
 
-    private var skeletonList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(0..<10, id: \.self) { _ in
-                    SkeletonSongRow()
-                    Divider().padding(.leading, 72)
-                }
-            }
-        }
-    }
+    private var skeletonList: some View { SkeletonList() }
 
     private func songList(songs: [Song], isPaginated: Bool) -> some View {
         let isAtCapacity = selectedSongIds.count >= player.capacity

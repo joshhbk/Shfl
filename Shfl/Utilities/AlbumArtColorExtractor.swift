@@ -19,7 +19,9 @@ final class AlbumArtColorExtractor {
 
         // Check cache first
         if let cached = colorCache[songId] {
+            #if DEBUG
             print("[ColorExtractor] Using cached color for songId: \(songId)")
+            #endif
             // No animation here - TintedThemeProvider handles the visual transition
             extractedColor = cached
             return
@@ -28,7 +30,9 @@ final class AlbumArtColorExtractor {
         // Cancel any existing task
         currentTask?.cancel()
 
+        #if DEBUG
         print("[ColorExtractor] Fetching library data for songId: \(songId)")
+        #endif
         currentTask = Task {
             do {
                 // Fetch from library using library ID
@@ -39,33 +43,45 @@ final class AlbumArtColorExtractor {
                 guard !Task.isCancelled, currentSongId == songId else { return }
 
                 guard let song = response.items.first else {
+                    #if DEBUG
                     print("[ColorExtractor] No song found in library for songId: \(songId)")
+                    #endif
                     return
                 }
 
+                #if DEBUG
                 print("[ColorExtractor] Artwork object: \(String(describing: song.artwork))")
+                #endif
 
                 guard let artwork = song.artwork else {
+                    #if DEBUG
                     print("[ColorExtractor] No artwork available for songId: \(songId)")
+                    #endif
                     return
                 }
 
                 let color = Self.pickMostVibrant(from: artwork)
 
                 guard let color else {
+                    #if DEBUG
                     print("[ColorExtractor] No usable colors from artwork for songId: \(songId)")
+                    #endif
                     return
                 }
 
                 colorCache[songId] = color
 
+                #if DEBUG
                 let hsb = ColorBlending.extractHSB(from: color)
                 print("[ColorExtractor] Selected color - hue: \(hsb.hue), sat: \(hsb.saturation), bright: \(hsb.brightness)")
+                #endif
 
                 // No animation here - TintedThemeProvider handles the visual transition
                 extractedColor = color
             } catch {
+                #if DEBUG
                 print("[ColorExtractor] Failed to fetch library data: \(error)")
+                #endif
             }
         }
     }
@@ -110,7 +126,9 @@ final class AlbumArtColorExtractor {
             // dark colors (which can have high HSB saturation but look black)
             // and desaturated colors (grays/whites) equally.
             let score = hsb.saturation * hsb.brightness
+            #if DEBUG
             print("[ColorExtractor]   \(candidate.label): hue=\(String(format: "%.2f", hsb.hue)) sat=\(String(format: "%.2f", hsb.saturation)) bright=\(String(format: "%.2f", hsb.brightness)) score=\(String(format: "%.3f", score))")
+            #endif
             return (candidate.color, score)
         }
 

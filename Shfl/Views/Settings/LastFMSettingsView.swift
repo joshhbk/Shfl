@@ -125,7 +125,7 @@ struct LastFMSettingsView: View {
                         Task { await refreshActivity(showLoading: true) }
                     }
                 case .loaded:
-                    ForEach(Array(recentTracks.prefix(20))) { track in
+                    ForEach(recentTracks) { track in
                         RecentTrackRow(track: track)
                     }
                 }

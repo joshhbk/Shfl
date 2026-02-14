@@ -1,5 +1,32 @@
 import SwiftUI
 
+// MARK: - Shared Modifier
+
+private struct CapacityPulseModifier: ViewModifier {
+    let current: Int
+    let maximum: Int
+    @Binding var pulseOpacity: Double
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: current) { oldValue, newValue in
+                if CapacityProgressBar.shouldCelebrate(previous: oldValue, current: newValue, maximum: maximum) {
+                    HapticFeedback.success.trigger()
+                }
+
+                if newValue > oldValue && newValue > 0 {
+                    HapticFeedback.light.trigger()
+                    withAnimation(.easeIn(duration: 0.1)) {
+                        pulseOpacity = 1
+                    }
+                    withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                        pulseOpacity = 0
+                    }
+                }
+            }
+    }
+}
+
 struct CapacityProgressBar: View {
     let current: Int
     let maximum: Int
@@ -40,22 +67,7 @@ struct CapacityProgressBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color(.systemGroupedBackground))
-        .onChange(of: current) { oldValue, newValue in
-            if Self.shouldCelebrate(previous: oldValue, current: newValue, maximum: maximum) {
-                HapticFeedback.success.trigger()
-            }
-
-            // Pulse on add (not on clear)
-            if newValue > oldValue && newValue > 0 {
-                HapticFeedback.light.trigger()
-                withAnimation(.easeIn(duration: 0.1)) {
-                    pulseOpacity = 1
-                }
-                withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
-                    pulseOpacity = 0
-                }
-            }
-        }
+        .modifier(CapacityPulseModifier(current: current, maximum: maximum, pulseOpacity: $pulseOpacity))
     }
 
     // MARK: - Static Helpers (for testing)
@@ -115,21 +127,7 @@ struct CompactCapacityBar: View {
                 .monospacedDigit()
                 .fixedSize()
         }
-        .onChange(of: current) { oldValue, newValue in
-            if CapacityProgressBar.shouldCelebrate(previous: oldValue, current: newValue, maximum: maximum) {
-                HapticFeedback.success.trigger()
-            }
-
-            if newValue > oldValue && newValue > 0 {
-                HapticFeedback.light.trigger()
-                withAnimation(.easeIn(duration: 0.1)) {
-                    pulseOpacity = 1
-                }
-                withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
-                    pulseOpacity = 0
-                }
-            }
-        }
+        .modifier(CapacityPulseModifier(current: current, maximum: maximum, pulseOpacity: $pulseOpacity))
     }
 }
 

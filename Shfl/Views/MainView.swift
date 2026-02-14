@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MainView: View {
-    let viewModel: AppViewModel
+    @Bindable var viewModel: AppViewModel
     let appSettings: AppSettings
 
     var body: some View {
@@ -39,10 +39,7 @@ struct MainView: View {
                 await viewModel.onShuffleAlgorithmChanged(newAlgorithm)
             }
         }
-        .sheet(isPresented: Binding(
-            get: { viewModel.showingManage },
-            set: { viewModel.showingManage = $0 }
-        )) {
+        .sheet(isPresented: $viewModel.showingManage) {
             ManageView(
                 player: viewModel.player,
                 onAddTapped: { viewModel.openPicker() },
@@ -53,45 +50,14 @@ struct MainView: View {
             )
             .tint(deviceAccentColor)
             .environment(\.appSettings, appSettings)
-            .sheet(isPresented: Binding(
-                get: { viewModel.showingPicker },
-                set: { viewModel.showingPicker = $0 }
-            ), onDismiss: { viewModel.closePicker() }) {
-                SongPickerView(
-                    player: viewModel.player,
-                    musicService: viewModel.musicService,
-                    initialSortOption: appSettings.librarySortOption,
-                    onAddSong: { song in try await viewModel.addSong(song) },
-                    onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
-                    onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
-                    onRemoveAllSongs: { await viewModel.removeAllSongs() },
-                    onDismiss: { viewModel.closePicker() }
-                )
-                .tint(deviceAccentColor)
-                .environment(\.appSettings, appSettings)
+            .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
+                songPickerSheet(onDismiss: { viewModel.closePicker() })
             }
         }
-        .sheet(isPresented: Binding(
-            get: { viewModel.showingPickerDirect },
-            set: { viewModel.showingPickerDirect = $0 }
-        ), onDismiss: { viewModel.closePickerDirect() }) {
-            SongPickerView(
-                player: viewModel.player,
-                musicService: viewModel.musicService,
-                initialSortOption: appSettings.librarySortOption,
-                onAddSong: { song in try await viewModel.addSong(song) },
-                onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
-                onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
-                onRemoveAllSongs: { await viewModel.removeAllSongs() },
-                onDismiss: { viewModel.closePickerDirect() }
-            )
-            .tint(deviceAccentColor)
-            .environment(\.appSettings, appSettings)
+        .sheet(isPresented: $viewModel.showingPickerDirect, onDismiss: { viewModel.closePickerDirect() }) {
+            songPickerSheet(onDismiss: { viewModel.closePickerDirect() })
         }
-        .sheet(isPresented: Binding(
-            get: { viewModel.showingSettings },
-            set: { viewModel.showingSettings = $0 }
-        )) {
+        .sheet(isPresented: $viewModel.showingSettings) {
             SettingsView()
                 .tint(deviceAccentColor)
                 .environment(\.appSettings, appSettings)
@@ -113,6 +79,22 @@ struct MainView: View {
                 Text(error)
             }
         }
+    }
+
+    @ViewBuilder
+    private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
+        SongPickerView(
+            player: viewModel.player,
+            musicService: viewModel.musicService,
+            initialSortOption: appSettings.librarySortOption,
+            onAddSong: { song in try await viewModel.addSong(song) },
+            onAddSongsWithQueueRebuild: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
+            onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
+            onRemoveAllSongs: { await viewModel.removeAllSongs() },
+            onDismiss: onDismiss
+        )
+        .tint(deviceAccentColor)
+        .environment(\.appSettings, appSettings)
     }
 
     private var deviceAccentColor: Color {
