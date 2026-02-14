@@ -87,12 +87,18 @@ final class PlaybackStateObserver {
     /// Returns a description of what mutations to apply.
     /// Note: mutates `lastObservedSongId` and `pendingRestoreSeek` as side effects.
     func resolve(_ newState: PlaybackState, queueState: QueueState) -> PlaybackStateResolution {
-        // MusicKit can emit .stopped while a queue/current entry still exists after restore.
+        // MusicKit can emit `.stopped` while a queue/current entry still exists after restore.
         // Preserve the visible "current song loaded but not playing" state in that case.
         let normalizedState: PlaybackState
         if case .stopped = newState,
            let current = queueState.currentSong,
            suppressHistoryUpdates {
+            normalizedState = .paused(current)
+        } else if case .empty = newState,
+                  queueState.hasQueue,
+                  lastObservedSongId != nil,
+                  let current = queueState.currentSong {
+            // Treat transient empty emissions as paused when we still have an active queue context.
             normalizedState = .paused(current)
         } else {
             normalizedState = newState

@@ -27,7 +27,7 @@ final class QueueEngineTests: XCTestCase {
         )
     }
 
-    func testPlaybackResolutionPlayingToStoppedMarksQueueNeedsBuild() throws {
+    func testPlaybackResolutionPlayingToStoppedDoesNotForceQueueRebuild() throws {
         let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let queueState = QueueState(songPool: [song], queueOrder: [song], currentIndex: 0)
         let state = QueueEngineState(
@@ -46,9 +46,34 @@ final class QueueEngineTests: XCTestCase {
         )
 
         let reduction = try QueueEngineReducer.reduce(state: state, intent: .playbackResolution(resolution))
+        XCTAssertFalse(
+            reduction.nextState.queueNeedsBuild,
+            "Stop transitions should not force queue rebuild without explicit corruption/error signals"
+        )
+    }
+
+    func testPlaybackResolutionErrorMarksQueueNeedsBuild() throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let queueState = QueueState(songPool: [song], queueOrder: [song], currentIndex: 0)
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .playing(song),
+            revision: 10,
+            queueNeedsBuild: false
+        )
+        let resolution = PlaybackStateResolution(
+            resolvedState: .error(NSError(domain: "test", code: 55)),
+            resolvedSongId: song.id,
+            shouldUpdateCurrentSong: true,
+            songIdToMarkPlayed: nil,
+            shouldClearHistory: true,
+            pendingSeekConsumed: nil
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .playbackResolution(resolution))
         XCTAssertTrue(
             reduction.nextState.queueNeedsBuild,
-            "Terminal playing->stopped transitions should require a fresh queue build"
+            "Explicit playback errors should force queue rebuild on next play"
         )
     }
 

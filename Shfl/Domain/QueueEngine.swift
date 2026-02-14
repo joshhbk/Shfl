@@ -329,21 +329,12 @@ enum QueueEngineReducer {
             }
             if resolution.shouldClearHistory {
                 nextQueueState = nextQueueState.clearingPlayedHistory()
-                if !nextQueueState.isEmpty {
-                    let isTransientStopDuringStartup: Bool
-                    switch (state.playbackState, resolution.resolvedState) {
-                    case (.loading, .stopped):
-                        // `setQueue` can emit `.stopped` before the queued `.play` command resolves.
-                        // Keep the freshly built queue valid for this transient transport state.
-                        isTransientStopDuringStartup = true
-                    default:
-                        isTransientStopDuringStartup = false
-                    }
-
-                    if !isTransientStopDuringStartup {
-                        // A terminal stop/empty/error transition should replay from a fresh queue build.
-                        nextQueueNeedsBuild = true
-                    }
+                if !nextQueueState.isEmpty,
+                   case .error = resolution.resolvedState {
+                    // Only force rebuild for explicit playback errors.
+                    // Stop/empty transitions can be transient transport artifacts and should not
+                    // reshuffle away the current listening context on pause/resume.
+                    nextQueueNeedsBuild = true
                 }
             }
             nextPlaybackState = resolution.resolvedState
