@@ -57,7 +57,7 @@ enum TransportCommand: Sendable {
 
 enum QueueIntent: Sendable {
     case addSong(Song)
-    case addSongs([Song])
+    case seedSongs([Song])
     case addSongsWithRebuild([Song], algorithm: ShuffleAlgorithm?)
     case removeSong(id: String)
     case removeAllSongs
@@ -70,6 +70,8 @@ enum QueueIntent: Sendable {
     case togglePlayback(algorithm: ShuffleAlgorithm?)
     case reshuffleAlgorithm(ShuffleAlgorithm)
     case resyncActiveAddTransport
+    case recoverFromStaleTransport
+    case recoverFromInvariantViolation
     case setQueueNeedsBuild(Bool)
     case playbackResolution(PlaybackStateResolution)
     case restoreSession(queueState: QueueState, playbackState: PlaybackState)
@@ -174,7 +176,7 @@ enum QueueEngineReducer {
                 algorithm: nextQueueState.algorithm
             )
 
-        case .addSongs(let songs):
+        case .seedSongs(let songs):
             guard let updatedPoolState = state.queueState.addingSongs(songs) else {
                 throw QueueEngineError.capacityReached
             }
@@ -332,6 +334,21 @@ enum QueueEngineReducer {
                 algorithm: state.queueState.algorithm
             )
             nextQueueNeedsBuild = false
+
+        case .recoverFromStaleTransport:
+            nextQueueNeedsBuild = true
+            if case .loading = state.playbackState {
+                if let current = state.queueState.currentSong {
+                    nextPlaybackState = .paused(current)
+                } else if state.queueState.isEmpty {
+                    nextPlaybackState = .empty
+                } else {
+                    nextPlaybackState = .stopped
+                }
+            }
+
+        case .recoverFromInvariantViolation:
+            nextQueueNeedsBuild = true
 
         case .setQueueNeedsBuild(let value):
             nextQueueNeedsBuild = value

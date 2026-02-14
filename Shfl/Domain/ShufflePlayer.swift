@@ -185,6 +185,7 @@ final class ShufflePlayer {
         400_000_000,
         1_000_000_000
     ]
+    private static let activeAddRetryMaxPasses = 5
 
     private struct DomainInvariantSnapshot {
         let poolIds: [String]
@@ -199,6 +200,7 @@ final class ShufflePlayer {
     }
 
     /// Serializes transport command batches without building an unbounded linked task chain.
+    @MainActor
     private final class TransportCommandExecutor {
         typealias CommandRunner = (TransportCommand) async throws -> Void
 
@@ -251,16 +253,7 @@ final class ShufflePlayer {
             return false
         }
 
-        applyQueueNeedsBuildMutation(true)
-        if case .loading = playbackState {
-            if let current = queueState.currentSong {
-                playbackState = .paused(current)
-            } else if queueState.isEmpty {
-                playbackState = .empty
-            } else {
-                playbackState = .stopped
-            }
-        }
+        applyRecoveryIntent(.recoverFromStaleTransport)
         if showNotice {
             operationNotice = "Queue changed while syncing. Rebuilding queue."
         }
@@ -302,12 +295,7 @@ final class ShufflePlayer {
 
     private func scheduleActiveAddResyncRetry(source: String, failureKind: ActiveAddSyncFailureKind) {
         applyQueueNeedsBuildMutation(true)
-        switch activeAddResyncState {
-        case .idle:
-            activeAddResyncState = .draining(pendingPass: true)
-        case .draining:
-            activeAddResyncState = .draining(pendingPass: true)
-        }
+        activeAddResyncState = .draining(pendingPass: true)
         recordOperation(
             .activeAddSyncRetryScheduled,
             detail: "source=\(source), reason=\(failureKind.rawValue)"
@@ -325,10 +313,12 @@ final class ShufflePlayer {
             activeAddResyncState = .idle
         }
 
-        while true {
+        var passCount = 0
+        while passCount < Self.activeAddRetryMaxPasses {
             guard !Task.isCancelled else { break }
             guard case .draining(let pendingPass) = activeAddResyncState, pendingPass else { break }
             activeAddResyncState = .draining(pendingPass: false)
+            passCount += 1
 
             let attemptCount = Self.activeAddRetryDelaysNanoseconds.count + 1
             var didSync = false
@@ -389,6 +379,14 @@ final class ShufflePlayer {
             if !didSync {
                 recordOperation(.activeAddSyncRetryExhausted)
             }
+        }
+
+        if case .draining(let pendingPass) = activeAddResyncState,
+           pendingPass && !Task.isCancelled {
+            recordOperation(
+                .activeAddSyncRetryExhausted,
+                detail: "pass-cap=\(Self.activeAddRetryMaxPasses)"
+            )
         }
     }
 
@@ -498,7 +496,9 @@ final class ShufflePlayer {
         guard !isHealthy else { return }
 
         // Any invariant break should push the system into an explicit rebuild path.
-        queueNeedsBuild = true
+        if !queueNeedsBuild {
+            applyRecoveryIntent(.recoverFromInvariantViolation)
+        }
 
 #if DEBUG
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
@@ -547,6 +547,18 @@ final class ShufflePlayer {
 
     private func reduce(_ intent: QueueIntent) throws -> QueueEngineReduction {
         try QueueEngineReducer.reduce(state: engineState, intent: intent)
+    }
+
+    private func applyRecoveryIntent(_ intent: QueueIntent) {
+        do {
+            let reduction = try reduce(intent)
+            guard !reduction.wasNoOp else { return }
+            applyReduction(reduction)
+        } catch {
+#if DEBUG
+            assertionFailure("Failed to apply recovery intent: \(error)")
+#endif
+        }
     }
 
     private func applyQueueNeedsBuildMutation(_ value: Bool) {
@@ -904,9 +916,10 @@ final class ShufflePlayer {
         }
     }
 
-    func addSongs(_ newSongs: [Song]) throws {
+    /// Seeds songs into the pool only; active transport synchronization is deferred to explicit queue rebuild/play.
+    func seedSongs(_ newSongs: [Song]) throws {
         do {
-            let reduction = try reduce(.addSongs(newSongs))
+            let reduction = try reduce(.seedSongs(newSongs))
             guard !reduction.wasNoOp else { return }
             applyReduction(reduction)
             recordOperation(.addSongsSuccess, detail: "batch=\(newSongs.count)")

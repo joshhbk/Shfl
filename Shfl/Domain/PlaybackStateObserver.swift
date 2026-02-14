@@ -96,6 +96,7 @@ final class PlaybackStateObserver {
             normalizedState = .paused(current)
         } else if case .empty = newState,
                   queueState.hasQueue,
+                  musicService.transportQueueEntryCount > 0,
                   lastObservedSongId != nil,
                   let current = queueState.currentSong {
             // Treat transient empty emissions as paused when we still have an active queue context.
