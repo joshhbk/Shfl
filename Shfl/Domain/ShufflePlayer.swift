@@ -13,7 +13,7 @@ final class ShufflePlayer {
     }
     @ObservationIgnored private var cachedTransportSnapshot = TransportSnapshot(entryCount: 0, currentSongId: nil)
     @ObservationIgnored private var activeAddResyncTask: Task<Void, Never>?
-    @ObservationIgnored private var activeAddResyncRequested = false
+    @ObservationIgnored private var activeAddResyncState: ActiveAddResyncState = .idle
 
     /// Single source of truth for queue state
     private(set) var queueState: QueueState = .empty
@@ -33,6 +33,11 @@ final class ShufflePlayer {
 
     /// Non-blocking operation notice for queue/transport sync failures.
     private(set) var operationNotice: String?
+
+    private enum ActiveAddResyncState {
+        case idle
+        case draining(pendingPass: Bool)
+    }
 
     // MARK: - Computed Properties (for compatibility)
 
@@ -83,7 +88,7 @@ final class ShufflePlayer {
         self.musicService = musicService
         self.playbackObserver = PlaybackStateObserver(musicService: musicService)
         startObserving()
-        recordOperation("player-init")
+        recordOperation(.playerInit)
     }
 
     deinit {
@@ -109,7 +114,7 @@ final class ShufflePlayer {
                 assertionFailure("playbackResolution emitted transport commands")
 #endif
                 recordOperation(
-                    "playback-resolution-illegal-transport",
+                    .playbackResolutionIllegalTransport,
                     detail: "count=\(reduction.transportCommands.count)"
                 )
             }
@@ -120,20 +125,20 @@ final class ShufflePlayer {
                 assertionFailure("Unexpected playbackResolution reducer failure: \(error)")
             }
 #endif
-            recordOperation("playback-resolution-reducer-failed", detail: error.localizedDescription)
+            recordOperation(.playbackResolutionReducerFailed, detail: error.localizedDescription)
         }
         if let seek = resolution.pendingSeekConsumed {
             musicService.seek(to: seek.position)
         }
         recordOperation(
-            "playback-resolution",
+            .playbackResolution,
             detail: "state=\(playbackStateLabel(resolution.resolvedState)), song=\(resolution.resolvedSongId ?? "nil")"
         )
     }
 
     func clearOperationNotice() {
         operationNotice = nil
-        recordOperation("clear-operation-notice")
+        recordOperation(.clearOperationNotice)
     }
 
     /// Debug-only escape hatch to return queue and diagnostics to a clean baseline.
@@ -145,7 +150,7 @@ final class ShufflePlayer {
         operationNotice = nil
         playbackObserver.clearLastObservedSongId()
         playbackObserver.clearPendingRestoreSeek()
-        recordOperation("hard-reset-queue")
+        recordOperation(.hardResetQueue)
     }
 
     private func reportTransportFailure(action: String, error: Error) -> String {
@@ -155,7 +160,7 @@ final class ShufflePlayer {
         operationNotice = message
         print("⚠️ \(action): \(error)")
         recordOperation(
-            "transport-failure",
+            .transportFailure,
             detail: "\(action): \(error.localizedDescription)",
             refreshTransport: true
         )
@@ -246,7 +251,7 @@ final class ShufflePlayer {
             return false
         }
 
-        queueNeedsBuild = true
+        applyQueueNeedsBuildMutation(true)
         if case .loading = playbackState {
             if let current = queueState.currentSong {
                 playbackState = .paused(current)
@@ -260,7 +265,7 @@ final class ShufflePlayer {
             operationNotice = "Queue changed while syncing. Rebuilding queue."
         }
         recordOperation(
-            "transport-command-stale",
+            .transportCommandStale,
             detail: "source=\(source), commandRevision=\(commandRevision), queueRevision=\(queueRevision)"
         )
         return true
@@ -290,14 +295,19 @@ final class ShufflePlayer {
     }
 
     private func cancelActiveAddResyncRetry() {
-        activeAddResyncRequested = false
+        activeAddResyncState = .idle
         activeAddResyncTask?.cancel()
         activeAddResyncTask = nil
     }
 
     private func scheduleActiveAddResyncRetry(source: String, failureKind: ActiveAddSyncFailureKind) {
-        queueNeedsBuild = true
-        activeAddResyncRequested = true
+        applyQueueNeedsBuildMutation(true)
+        switch activeAddResyncState {
+        case .idle:
+            activeAddResyncState = .draining(pendingPass: true)
+        case .draining:
+            activeAddResyncState = .draining(pendingPass: true)
+        }
         recordOperation(
             .activeAddSyncRetryScheduled,
             detail: "source=\(source), reason=\(failureKind.rawValue)"
@@ -310,16 +320,20 @@ final class ShufflePlayer {
     }
 
     private func drainActiveAddResyncRetries() async {
-        defer { activeAddResyncTask = nil }
+        defer {
+            activeAddResyncTask = nil
+            activeAddResyncState = .idle
+        }
 
-        while activeAddResyncRequested {
+        while true {
             guard !Task.isCancelled else { break }
-            activeAddResyncRequested = false
+            guard case .draining(let pendingPass) = activeAddResyncState, pendingPass else { break }
+            activeAddResyncState = .draining(pendingPass: false)
 
             let attemptCount = Self.activeAddRetryDelaysNanoseconds.count + 1
             var didSync = false
 
-            for attempt in 1...attemptCount {
+            attempts: for attempt in 1...attemptCount {
                 guard !Task.isCancelled else { break }
                 recordOperation(.activeAddSyncRetryAttempt, detail: "attempt=\(attempt)")
                 do {
@@ -338,24 +352,19 @@ final class ShufflePlayer {
                         staleRollbackPolicy: .preservePoolAndDeferQueueBuild,
                         showStaleNotice: false
                     )
-                    var shouldBreakAttemptLoop = false
                     switch outcome {
                     case .applied:
                         recordOperation(.activeAddSyncRetrySuccess, detail: "attempt=\(attempt)")
                         didSync = true
-                        shouldBreakAttemptLoop = true
+                        break attempts
                     case .stale:
                         if attempt == attemptCount {
-                            shouldBreakAttemptLoop = true
-                            break
+                            break attempts
                         }
                         let delay = Self.activeAddRetryDelaysNanoseconds[attempt - 1]
                         try? await Task.sleep(nanoseconds: delay)
-                        guard !Task.isCancelled else { break }
+                        guard !Task.isCancelled else { break attempts }
                         continue
-                    }
-                    if shouldBreakAttemptLoop {
-                        break
                     }
                 } catch {
                     if !Self.isTransientAddSyncError(error) {
@@ -363,16 +372,16 @@ final class ShufflePlayer {
                             .activeAddSyncNonTransientFailed,
                             detail: "attempt=\(attempt), error=\(error.localizedDescription)"
                         )
-                        break
+                        break attempts
                     }
 
                     if attempt == attemptCount {
-                        break
+                        break attempts
                     }
 
                     let delay = Self.activeAddRetryDelaysNanoseconds[attempt - 1]
                     try? await Task.sleep(nanoseconds: delay)
-                    guard !Task.isCancelled else { break }
+                    guard !Task.isCancelled else { break attempts }
                 }
             }
 
@@ -501,7 +510,7 @@ final class ShufflePlayer {
         operationNotice = "Queue sync issue detected. Rebuilding queue."
 #endif
         recordOperation(
-            "invariant-violation",
+            .invariantViolation,
             detail: "context=\(context), pool=\(queueState.songPool.count), queue=\(queueState.queueOrder.count)"
         )
     }
@@ -538,6 +547,19 @@ final class ShufflePlayer {
 
     private func reduce(_ intent: QueueIntent) throws -> QueueEngineReduction {
         try QueueEngineReducer.reduce(state: engineState, intent: intent)
+    }
+
+    private func applyQueueNeedsBuildMutation(_ value: Bool) {
+        do {
+            let reduction = try reduce(.setQueueNeedsBuild(value))
+            guard !reduction.wasNoOp else { return }
+            applyReduction(reduction)
+        } catch {
+#if DEBUG
+            assertionFailure("Failed to reduce queueNeedsBuild mutation: \(error)")
+#endif
+            queueNeedsBuild = value
+        }
     }
 
     private func playbackStateLabel(_ state: PlaybackState) -> String {
@@ -675,7 +697,7 @@ final class ShufflePlayer {
         )
     }
 
-    private func recordOperation(_ operation: String, detail: String? = nil, refreshTransport: Bool = false) {
+    private func recordOperation(_ operation: QueueOperationID, detail: String? = nil, refreshTransport: Bool = false) {
         if refreshTransport {
             _ = refreshTransportSnapshot()
         }
@@ -684,7 +706,7 @@ final class ShufflePlayer {
         let record = QueueOperationRecord(
             id: UUID(),
             timestamp: Date(),
-            operation: operation,
+            operation: operation.rawValue,
             detail: detail,
             playbackState: playbackStateLabel(playbackState),
             poolCount: queueState.songPool.count,
@@ -699,13 +721,9 @@ final class ShufflePlayer {
         operationJournalVersion &+= 1
     }
 
-    private func recordOperation(_ operation: QueueOperationID, detail: String? = nil, refreshTransport: Bool = false) {
-        recordOperation(operation.rawValue, detail: detail, refreshTransport: refreshTransport)
-    }
-
     func exportQueueDiagnosticsSnapshot(trigger: String = "manual-export", detail: String? = nil) -> String {
         let invariant = evaluateQueueInvariants()
-        recordOperation("snapshot-export", detail: [trigger, detail].compactMap { $0 }.joined(separator: " | "))
+        recordOperation(.snapshotExport, detail: [trigger, detail].compactMap { $0 }.joined(separator: " | "))
         let snapshot = QueueDiagnosticsSnapshot(
             exportedAt: Date(),
             trigger: trigger,
@@ -729,7 +747,7 @@ final class ShufflePlayer {
             let data = try encoder.encode(snapshot)
             return String(decoding: data, as: UTF8.self)
         } catch {
-            recordOperation("snapshot-export-failed", detail: error.localizedDescription)
+            recordOperation(.snapshotExportFailed, detail: error.localizedDescription)
             return "{\"error\":\"snapshot-export-failed\"}"
         }
     }
@@ -741,7 +759,7 @@ final class ShufflePlayer {
         do {
             let reduction = try reduce(.reshuffleAlgorithm(algorithm))
             guard !reduction.wasNoOp else {
-                recordOperation("reshuffle-algorithm-skip", detail: "no-op")
+                recordOperation(.reshuffleAlgorithmSkip, detail: "no-op")
                 return
             }
 
@@ -754,19 +772,19 @@ final class ShufflePlayer {
                 switch outcome {
                 case .applied:
                     if playbackState.isActive {
-                        recordOperation("reshuffle-algorithm-success", detail: algorithm.rawValue)
+                        recordOperation(.reshuffleAlgorithmSuccess, detail: algorithm.rawValue)
                     } else {
-                        recordOperation("reshuffle-algorithm-invalidated", detail: algorithm.rawValue)
+                        recordOperation(.reshuffleAlgorithmInvalidated, detail: algorithm.rawValue)
                     }
                 case .stale:
                     return
                 }
             } catch {
                 _ = reportTransportFailure(action: "Couldn't reshuffle the active queue", error: error)
-                recordOperation("reshuffle-algorithm-failed", detail: error.localizedDescription)
+                recordOperation(.reshuffleAlgorithmFailed, detail: error.localizedDescription)
             }
         } catch {
-            recordOperation("reshuffle-algorithm-failed", detail: error.localizedDescription)
+            recordOperation(.reshuffleAlgorithmFailed, detail: error.localizedDescription)
         }
     }
 
@@ -800,7 +818,7 @@ final class ShufflePlayer {
                 scheduleActiveAddResyncRetry(source: source, failureKind: .transient)
                 failureReason = "transient"
             } else {
-                queueNeedsBuild = true
+                applyQueueNeedsBuildMutation(true)
                 recordOperation(
                     .activeAddSyncNonTransientFailed,
                     detail: "source=\(source), error=\(error.localizedDescription)"
@@ -813,38 +831,42 @@ final class ShufflePlayer {
 
     private func applyNonActiveAddReduction(
         _ reduction: QueueEngineReduction,
-        source: String,
-        actionDescription: String,
-        successOperation: QueueOperationID,
-        deferredOperation: QueueOperationID,
-        failureOperation: String,
+        context: NonActiveAddReductionContext,
         successDetail: String,
         failureDetail: String
     ) async throws {
         do {
             let outcome = try await applyReductionWithTransport(
                 reduction,
-                source: source,
+                source: context.source,
                 rollbackPolicy: .preservePoolAndDeferQueueBuild
             )
             switch outcome {
             case .applied:
-                recordOperation(successOperation, detail: successDetail)
+                recordOperation(context.successOperation, detail: successDetail)
             case .stale:
-                recordOperation(deferredOperation, detail: successDetail)
+                recordOperation(context.deferredOperation, detail: successDetail)
             }
         } catch {
-            let message = reportTransportFailure(action: actionDescription, error: error)
-            recordOperation(failureOperation, detail: failureDetail)
+            let message = reportTransportFailure(action: context.actionDescription, error: error)
+            recordOperation(context.failureOperation, detail: failureDetail)
             throw ShufflePlayerError.playbackFailed(message)
         }
+    }
+
+    private struct NonActiveAddReductionContext {
+        let source: String
+        let actionDescription: String
+        let successOperation: QueueOperationID
+        let deferredOperation: QueueOperationID
+        let failureOperation: QueueOperationID
     }
 
     func addSong(_ song: Song) async throws {
         do {
             let reduction = try reduce(.addSong(song))
             guard !reduction.wasNoOp else {
-                recordOperation("add-song-skip", detail: "duplicate id=\(song.id)")
+                recordOperation(.addSongSkip, detail: "duplicate id=\(song.id)")
                 return
             }
 
@@ -852,11 +874,13 @@ final class ShufflePlayer {
             if !isActiveSync {
                 try await applyNonActiveAddReduction(
                     reduction,
-                    source: "add-song",
-                    actionDescription: "Couldn't add the song to the active queue",
-                    successOperation: .addSongSuccess,
-                    deferredOperation: .addSongDeferredRebuild,
-                    failureOperation: "add-song-failed",
+                    context: NonActiveAddReductionContext(
+                        source: "add-song",
+                        actionDescription: "Couldn't add the song to the active queue",
+                        successOperation: .addSongSuccess,
+                        deferredOperation: .addSongDeferredRebuild,
+                        failureOperation: .addSongFailed
+                    ),
                     successDetail: "id=\(song.id)",
                     failureDetail: "transport-sync-failed id=\(song.id)"
                 )
@@ -871,11 +895,11 @@ final class ShufflePlayer {
                 successDetail: "id=\(song.id)"
             )
         } catch QueueEngineError.capacityReached {
-            recordOperation("add-song-failed", detail: "capacity-reached id=\(song.id)")
+            recordOperation(.addSongFailed, detail: "capacity-reached id=\(song.id)")
             throw ShufflePlayerError.capacityReached
         } catch {
             let message = reportTransportFailure(action: "Couldn't add the song to the active queue", error: error)
-            recordOperation("add-song-failed", detail: "unexpected id=\(song.id)")
+            recordOperation(.addSongFailed, detail: "unexpected id=\(song.id)")
             throw ShufflePlayerError.playbackFailed(message)
         }
     }
@@ -885,12 +909,12 @@ final class ShufflePlayer {
             let reduction = try reduce(.addSongs(newSongs))
             guard !reduction.wasNoOp else { return }
             applyReduction(reduction)
-            recordOperation("add-songs-success", detail: "batch=\(newSongs.count)")
+            recordOperation(.addSongsSuccess, detail: "batch=\(newSongs.count)")
         } catch QueueEngineError.capacityReached {
-            recordOperation("add-songs-failed", detail: "capacity-reached batch=\(newSongs.count)")
+            recordOperation(.addSongsFailed, detail: "capacity-reached batch=\(newSongs.count)")
             throw ShufflePlayerError.capacityReached
         } catch {
-            recordOperation("add-songs-failed", detail: "unexpected batch=\(newSongs.count)")
+            recordOperation(.addSongsFailed, detail: "unexpected batch=\(newSongs.count)")
             throw ShufflePlayerError.playbackFailed(error.localizedDescription)
         }
     }
@@ -905,11 +929,13 @@ final class ShufflePlayer {
             if !isActiveSync {
                 try await applyNonActiveAddReduction(
                     reduction,
-                    source: "add-songs-rebuild",
-                    actionDescription: "Couldn't sync newly added songs to the active queue",
-                    successOperation: .addSongsRebuildSuccess,
-                    deferredOperation: .addSongsRebuildDeferred,
-                    failureOperation: "add-songs-rebuild-failed",
+                    context: NonActiveAddReductionContext(
+                        source: "add-songs-rebuild",
+                        actionDescription: "Couldn't sync newly added songs to the active queue",
+                        successOperation: .addSongsRebuildSuccess,
+                        deferredOperation: .addSongsRebuildDeferred,
+                        failureOperation: .addSongsRebuildFailed
+                    ),
                     successDetail: "batch=\(newSongs.count)",
                     failureDetail: "transport-sync-failed"
                 )
@@ -924,11 +950,11 @@ final class ShufflePlayer {
                 successDetail: "batch=\(newSongs.count)"
             )
         } catch QueueEngineError.capacityReached {
-            recordOperation("add-songs-rebuild-failed", detail: "capacity-reached batch=\(newSongs.count)")
+            recordOperation(.addSongsRebuildFailed, detail: "capacity-reached batch=\(newSongs.count)")
             throw ShufflePlayerError.capacityReached
         } catch {
             let message = reportTransportFailure(action: "Couldn't sync newly added songs to the active queue", error: error)
-            recordOperation("add-songs-rebuild-failed", detail: "unexpected")
+            recordOperation(.addSongsRebuildFailed, detail: "unexpected")
             throw ShufflePlayerError.playbackFailed(message)
         }
     }
@@ -945,14 +971,14 @@ final class ShufflePlayer {
                     rollbackPolicy: .full
                 )
                 guard case .applied = outcome else { return }
-                recordOperation("remove-song-success", detail: "id=\(id)")
+                recordOperation(.removeSongSuccess, detail: "id=\(id)")
             } catch {
                 _ = reportTransportFailure(action: "Couldn't remove the song from the active queue", error: error)
-                recordOperation("remove-song-failed", detail: "id=\(id)")
+                recordOperation(.removeSongFailed, detail: "id=\(id)")
             }
         } catch {
             _ = reportTransportFailure(action: "Couldn't remove the song from the active queue", error: error)
-            recordOperation("remove-song-failed", detail: "id=\(id), unexpected")
+            recordOperation(.removeSongFailed, detail: "id=\(id), unexpected")
         }
     }
 
@@ -972,22 +998,22 @@ final class ShufflePlayer {
                 )
                 switch outcome {
                 case .applied:
-                    recordOperation("remove-all-songs")
+                    recordOperation(.removeAllSongs)
                 case .stale:
                     await musicService.pause()
-                    queueNeedsBuild = false
+                    applyQueueNeedsBuildMutation(false)
                     _ = refreshTransportSnapshot()
                     operationNotice = "Queue changed while clearing. Playback paused and queue cleared."
-                    recordOperation("remove-all-songs-stale-force-pause", refreshTransport: true)
+                    recordOperation(.removeAllSongsStaleForcePause, refreshTransport: true)
                     return
                 }
             } catch {
                 _ = reportTransportFailure(action: "Couldn't clear the active queue", error: error)
-                recordOperation("remove-all-songs-failed", detail: error.localizedDescription)
+                recordOperation(.removeAllSongsFailed, detail: error.localizedDescription)
             }
         } catch {
             _ = reportTransportFailure(action: "Couldn't clear the active queue", error: error)
-            recordOperation("remove-all-songs-failed", detail: error.localizedDescription)
+            recordOperation(.removeAllSongsFailed, detail: error.localizedDescription)
         }
     }
 
@@ -1000,7 +1026,7 @@ final class ShufflePlayer {
     func prepareQueue(algorithm: ShuffleAlgorithm? = nil) async throws {
         let reduction = try reduce(.prepareQueue(algorithm: algorithm))
         guard !reduction.wasNoOp else {
-            recordOperation("prepare-queue-skip", detail: "empty-pool")
+            recordOperation(.prepareQueueSkip, detail: "empty-pool")
             return
         }
 
@@ -1011,7 +1037,7 @@ final class ShufflePlayer {
         )
         switch outcome {
         case .applied:
-            recordOperation("prepare-queue-success", detail: queueState.algorithm.rawValue)
+            recordOperation(.prepareQueueSuccess, detail: queueState.algorithm.rawValue)
         case .stale:
             throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
         }
@@ -1022,7 +1048,7 @@ final class ShufflePlayer {
     func play(algorithm: ShuffleAlgorithm? = nil) async throws {
         let reduction = try reduce(.play(algorithm: algorithm))
         guard !reduction.wasNoOp else {
-            recordOperation("play-skip", detail: "empty-pool")
+            recordOperation(.playSkip, detail: "empty-pool")
             return
         }
 
@@ -1034,7 +1060,7 @@ final class ShufflePlayer {
         )
         switch outcome {
         case .applied:
-            recordOperation("play-success")
+            recordOperation(.playSuccess)
         case .stale:
             throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
         }
@@ -1054,7 +1080,7 @@ final class ShufflePlayer {
         } catch {
             _ = reportTransportFailure(action: "Couldn't pause playback", error: error)
         }
-        recordOperation("pause")
+        recordOperation(.pause)
     }
 
     func skipToNext() async throws {
@@ -1067,7 +1093,7 @@ final class ShufflePlayer {
         if case .stale = outcome {
             throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
         }
-        recordOperation("skip-next")
+        recordOperation(.skipNext)
     }
 
     func skipToPrevious() async throws {
@@ -1080,7 +1106,7 @@ final class ShufflePlayer {
         if case .stale = outcome {
             throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try skipping again.")
         }
-        recordOperation("skip-previous")
+        recordOperation(.skipPrevious)
     }
 
     func restartOrSkipToPrevious() async throws {
@@ -1093,13 +1119,13 @@ final class ShufflePlayer {
         if case .stale = outcome {
             throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Try again.")
         }
-        recordOperation("restart-or-skip-previous")
+        recordOperation(.restartOrSkipPrevious)
     }
 
     func togglePlayback(algorithm: ShuffleAlgorithm? = nil) async throws {
         let reduction = try reduce(.togglePlayback(algorithm: algorithm))
         guard !reduction.wasNoOp else {
-            recordOperation("toggle-playback-skip", detail: "no-op")
+            recordOperation(.togglePlaybackSkip, detail: "no-op")
             return
         }
 
@@ -1110,7 +1136,7 @@ final class ShufflePlayer {
         )
         switch outcome {
         case .applied:
-            recordOperation("toggle-playback")
+            recordOperation(.togglePlayback)
         case .stale:
             throw ShufflePlayerError.playbackFailed("Queue changed while syncing. Tap play again.")
         }
@@ -1145,7 +1171,7 @@ final class ShufflePlayer {
             playedIds: playedIds,
             playbackPosition: playbackPosition
         ) else {
-            recordOperation("restore-session-failed")
+            recordOperation(.restoreSessionFailed)
             return false
         }
 
@@ -1158,14 +1184,14 @@ final class ShufflePlayer {
             )
             applyReduction(reduction)
         } catch {
-            recordOperation("restore-session-failed", detail: "reducer=\(error.localizedDescription)")
+            recordOperation(.restoreSessionFailed, detail: "reducer=\(error.localizedDescription)")
             return false
         }
         playbackObserver.setLastObservedSongId(result.lastObservedSongId)
         if let seek = result.pendingRestoreSeek {
             playbackObserver.setPendingRestoreSeek(songId: seek.songId, position: seek.position)
         }
-        recordOperation("restore-session-success")
+        recordOperation(.restoreSessionSuccess)
         return true
     }
 
