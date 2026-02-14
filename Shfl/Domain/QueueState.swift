@@ -251,30 +251,6 @@ struct QueueState: Equatable, Sendable {
         .empty
     }
 
-    /// Remove a song from queueOrder only (keep in pool). Used for rollback when MusicKit insert fails.
-    func removingFromQueueOnly(id: String) -> QueueState {
-        QueueState(
-            songPool: songPool,
-            queueOrder: queueOrder.filter { $0.id != id },
-            playedIds: playedIds,
-            currentIndex: currentIndex,
-            algorithm: algorithm
-        )
-    }
-
-    // MARK: - Queue Mutations
-
-    /// Append a song to the end of the queue order (for adding during playback).
-    func appendingToQueue(_ song: Song) -> QueueState {
-        QueueState(
-            songPool: songPool,
-            queueOrder: queueOrder + [song],
-            playedIds: playedIds,
-            currentIndex: currentIndex,
-            algorithm: algorithm
-        )
-    }
-
     /// Align current index to an observed song ID while preserving queue order/history.
     func settingCurrentSong(id: String) -> QueueState {
         guard let newIndex = queueOrder.firstIndex(where: { $0.id == id }) else { return self }

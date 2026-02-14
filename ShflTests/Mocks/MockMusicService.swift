@@ -9,19 +9,15 @@ actor MockMusicService: MusicService {
     var shouldThrowOnSkip: Error?
     var librarySongs: [Song] = []
     var setQueueCallCount: Int = 0
-    var insertIntoQueueCallCount: Int = 0
     var replaceQueueCallCount: Int = 0
     var playCallCount: Int = 0
     var pauseCallCount: Int = 0
     nonisolated(unsafe) var seekCallCount: Int = 0
     nonisolated(unsafe) var lastSeekTime: TimeInterval = 0
     var lastQueuedSongs: [Song] = []
-    var lastInsertedSongs: [Song] = []
-    var shouldThrowOnInsert: Error?
     var shouldThrowOnReplace: Error?
     var shouldThrowOnFetch: Error?
     var setQueueDelayNanoseconds: UInt64 = 0
-    var insertIntoQueueDelayNanoseconds: UInt64 = 0
     var replaceQueueDelayNanoseconds: UInt64 = 0
 
     /// Configurable duration for testing. Access via currentSongDuration.
@@ -181,21 +177,6 @@ actor MockMusicService: MusicService {
         }
     }
 
-    func insertIntoQueue(songs: [Song]) async throws {
-        if insertIntoQueueDelayNanoseconds > 0 {
-            try await Task.sleep(nanoseconds: insertIntoQueueDelayNanoseconds)
-        }
-        if let error = shouldThrowOnInsert {
-            throw error
-        }
-        insertIntoQueueCallCount += 1
-        lastInsertedSongs = songs
-        // Append to existing queue without disrupting playback
-        queuedSongs.append(contentsOf: songs)
-        lastQueuedSongs = queuedSongs
-        mockTransportQueueEntryCount = queuedSongs.count
-    }
-
     func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {
         if replaceQueueDelayNanoseconds > 0 {
             try await Task.sleep(nanoseconds: replaceQueueDelayNanoseconds)
@@ -284,20 +265,12 @@ actor MockMusicService: MusicService {
         updateState(state)
     }
 
-    func setShouldThrowOnInsert(_ error: Error?) {
-        shouldThrowOnInsert = error
-    }
-
     func setShouldThrowOnPlay(_ error: Error?) {
         shouldThrowOnPlay = error
     }
 
     func setShouldThrowOnReplace(_ error: Error?) {
         shouldThrowOnReplace = error
-    }
-
-    func setInsertIntoQueueDelay(nanoseconds: UInt64) {
-        insertIntoQueueDelayNanoseconds = nanoseconds
     }
 
     func setSetQueueDelay(nanoseconds: UInt64) {
@@ -310,17 +283,14 @@ actor MockMusicService: MusicService {
 
     func resetQueueTracking() {
         setQueueCallCount = 0
-        insertIntoQueueCallCount = 0
         replaceQueueCallCount = 0
         playCallCount = 0
         pauseCallCount = 0
         seekCallCount = 0
         lastSeekTime = 0
         lastQueuedSongs = []
-        lastInsertedSongs = []
         shouldThrowOnReplace = nil
         setQueueDelayNanoseconds = 0
-        insertIntoQueueDelayNanoseconds = 0
         replaceQueueDelayNanoseconds = 0
     }
 }

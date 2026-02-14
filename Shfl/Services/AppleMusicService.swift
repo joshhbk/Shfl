@@ -313,41 +313,6 @@ final class AppleMusicService: MusicService {
         print("🎵 setQueue() completed with \(orderedItems.count) items, starting at id=\(orderedItems.first?.id.rawValue ?? "nil")")
     }
 
-    func insertIntoQueue(songs: [Song]) async throws {
-        guard !songs.isEmpty else { return }
-        print("🎵 insertIntoQueue() called with \(songs.count) songs: \(songs.map(\.id))")
-
-        let ids = songs.map { MusicItemID($0.id) }
-
-        var request = MusicLibraryRequest<MusicKit.Song>()
-        request.filter(matching: \.id, memberOf: ids)
-        let response = try await request.response()
-
-        guard !response.items.isEmpty else {
-            print("🎵 No songs found to insert - requested IDs: \(songs.map { $0.id })")
-            return
-        }
-
-        // Reorder to match our desired order
-        let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
-        let orderedItems = songs.compactMap { itemsById[$0.id] }
-
-        // Log any missing songs
-        let missingSongs = songs.filter { itemsById[$0.id] == nil }
-        if !missingSongs.isEmpty {
-            print("⚠️ WARNING: \(missingSongs.count) songs NOT found for insert:")
-            for song in missingSongs {
-                print("⚠️   - missing song ID: \(song.id)")
-            }
-        }
-
-        // Insert all songs at once to avoid flooding MusicKit with individual requests
-        // MusicKit's insert() accepts MusicItemCollection
-        print("🎵 Inserting \(orderedItems.count) items at queue tail...")
-        try await player.queue.insert(MusicItemCollection(orderedItems), position: .tail)
-        print("🎵 insertIntoQueue() completed - inserted \(orderedItems.count) items")
-    }
-
     func replaceQueue(queue songs: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {
         print("🎵 replaceQueue() called with queue=\(songs.count), startAtSongId=\(startAtSongId ?? "nil")")
 

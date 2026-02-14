@@ -9,7 +9,6 @@ struct QueueEngineState: Equatable, Sendable {
 
 enum TransportCommand: Sendable {
     case setQueue(songs: [Song], revision: Int)
-    case insertIntoQueue(songs: [Song], revision: Int)
     case replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy, revision: Int)
     case play(revision: Int)
     case pause(revision: Int)
@@ -20,8 +19,6 @@ enum TransportCommand: Sendable {
     var revision: Int {
         switch self {
         case .setQueue(_, let revision):
-            return revision
-        case .insertIntoQueue(_, let revision):
             return revision
         case .replaceQueue(_, _, _, let revision):
             return revision
@@ -42,8 +39,6 @@ enum TransportCommand: Sendable {
         switch self {
         case .setQueue(let songs, _):
             return .setQueue(songs: songs, revision: revision)
-        case .insertIntoQueue(let songs, _):
-            return .insertIntoQueue(songs: songs, revision: revision)
         case .replaceQueue(let queue, let startAtSongId, let policy, _):
             return .replaceQueue(queue: queue, startAtSongId: startAtSongId, policy: policy, revision: revision)
         case .play:
@@ -62,7 +57,7 @@ enum TransportCommand: Sendable {
 
 enum QueueIntent: Sendable {
     case addSong(Song)
-    case addSongs([Song])
+    case seedSongs([Song])
     case addSongsWithRebuild([Song], algorithm: ShuffleAlgorithm?)
     case removeSong(id: String)
     case removeAllSongs
@@ -74,6 +69,10 @@ enum QueueIntent: Sendable {
     case restartOrSkipToPrevious
     case togglePlayback(algorithm: ShuffleAlgorithm?)
     case reshuffleAlgorithm(ShuffleAlgorithm)
+    case resyncActiveAddTransport
+    case recoverFromStaleTransport
+    case recoverFromInvariantViolation
+    case setQueueNeedsBuild(Bool)
     case playbackResolution(PlaybackStateResolution)
     case restoreSession(queueState: QueueState, playbackState: PlaybackState)
 }
@@ -86,9 +85,71 @@ struct QueueEngineReduction: Sendable {
     let nextState: QueueEngineState
     let transportCommands: [TransportCommand]
     let wasNoOp: Bool
+
+    var requiresActiveTransportSync: Bool {
+        nextState.playbackState.isActive && !transportCommands.isEmpty
+    }
 }
 
 enum QueueEngineReducer {
+    private static func appendReplaceQueueCommand(
+        state: QueueEngineState,
+        queueState: QueueState,
+        commands: inout [TransportCommand]
+    ) {
+        let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
+        commands.append(
+            .replaceQueue(
+                queue: queueState.queueOrder,
+                startAtSongId: queueState.currentSongId,
+                policy: policy,
+                revision: 0
+            )
+        )
+    }
+
+    private static func rebuildUpcomingAndAppendReplaceCommand(
+        state: QueueEngineState,
+        queueState: inout QueueState,
+        commands: inout [TransportCommand],
+        algorithm: ShuffleAlgorithm
+    ) {
+        let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
+        queueState = queueState.reshuffledUpcoming(
+            with: algorithm,
+            preferredCurrentSongId: preferredCurrentSongId
+        )
+        appendReplaceQueueCommand(state: state, queueState: queueState, commands: &commands)
+    }
+
+    private static func applyActiveAddRebuildPolicy(
+        state: QueueEngineState,
+        queueState: inout QueueState,
+        queueNeedsBuild: inout Bool,
+        commands: inout [TransportCommand],
+        algorithm: ShuffleAlgorithm
+    ) {
+        if state.playbackState.isActive && state.queueState.hasQueue {
+            // During active playback, always keep a single canonical queue by rebuilding upcoming in-place.
+            rebuildUpcomingAndAppendReplaceCommand(
+                state: state,
+                queueState: &queueState,
+                commands: &commands,
+                algorithm: algorithm
+            )
+            queueNeedsBuild = false
+            return
+        }
+
+        if state.playbackState.isActive {
+            // Active playback can briefly exist before queue build is complete; defer until queue exists.
+            queueNeedsBuild = true
+        } else if state.queueState.hasQueue {
+            // Queue exists but has not yet incorporated new pool mutations.
+            queueNeedsBuild = true
+        }
+    }
+
     static func reduce(
         state: QueueEngineState,
         intent: QueueIntent
@@ -111,31 +172,15 @@ enum QueueEngineReducer {
 
             nextQueueState = updatedPoolState
 
-            if state.playbackState.isActive {
-                // During active playback, always keep a single canonical queue by rebuilding upcoming in-place.
-                let algorithm = nextQueueState.algorithm
-                let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
-                nextQueueState = nextQueueState.reshuffledUpcoming(
-                    with: algorithm,
-                    preferredCurrentSongId: preferredCurrentSongId
-                )
+            applyActiveAddRebuildPolicy(
+                state: state,
+                queueState: &nextQueueState,
+                queueNeedsBuild: &nextQueueNeedsBuild,
+                commands: &commands,
+                algorithm: nextQueueState.algorithm
+            )
 
-                let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
-                commands.append(
-                    .replaceQueue(
-                        queue: nextQueueState.queueOrder,
-                        startAtSongId: nextQueueState.currentSongId,
-                        policy: policy,
-                        revision: 0
-                    )
-                )
-                nextQueueNeedsBuild = false
-            } else if state.queueState.hasQueue {
-                // Keep the existing queue for now; rebuild on next play.
-                nextQueueNeedsBuild = true
-            }
-
-        case .addSongs(let songs):
+        case .seedSongs(let songs):
             guard let updatedPoolState = state.queueState.addingSongs(songs) else {
                 throw QueueEngineError.capacityReached
             }
@@ -150,28 +195,13 @@ enum QueueEngineReducer {
             }
             nextQueueState = updatedPoolState
 
-            if state.playbackState.isActive {
-                let effectiveAlgorithm = algorithm ?? nextQueueState.algorithm
-                let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
-                nextQueueState = nextQueueState.reshuffledUpcoming(
-                    with: effectiveAlgorithm,
-                    preferredCurrentSongId: preferredCurrentSongId
-                )
-
-                let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
-                commands.append(
-                    .replaceQueue(
-                        queue: nextQueueState.queueOrder,
-                        startAtSongId: nextQueueState.currentSongId,
-                        policy: policy,
-                        revision: 0
-                    )
-                )
-                nextQueueNeedsBuild = false
-            } else if state.queueState.hasQueue {
-                // Queue is now stale relative to pool while inactive.
-                nextQueueNeedsBuild = true
-            }
+            applyActiveAddRebuildPolicy(
+                state: state,
+                queueState: &nextQueueState,
+                queueNeedsBuild: &nextQueueNeedsBuild,
+                commands: &commands,
+                algorithm: algorithm ?? nextQueueState.algorithm
+            )
 
         case .removeSong(let id):
             let isRemovingCurrentSong = state.playbackState.currentSongId == id
@@ -297,7 +327,39 @@ enum QueueEngineReducer {
                 )
             )
 
+        case .resyncActiveAddTransport:
+            guard state.playbackState.isActive && state.queueState.hasQueue else {
+                return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
+            }
+            rebuildUpcomingAndAppendReplaceCommand(
+                state: state,
+                queueState: &nextQueueState,
+                commands: &commands,
+                algorithm: state.queueState.algorithm
+            )
+            nextQueueNeedsBuild = false
+
+        case .recoverFromStaleTransport:
+            nextQueueNeedsBuild = true
+            if case .loading = state.playbackState {
+                if let current = state.queueState.currentSong {
+                    nextPlaybackState = .paused(current)
+                } else if state.queueState.isEmpty {
+                    nextPlaybackState = .empty
+                } else {
+                    nextPlaybackState = .stopped
+                }
+            }
+
+        case .recoverFromInvariantViolation:
+            nextQueueNeedsBuild = true
+
+        case .setQueueNeedsBuild(let value):
+            nextQueueNeedsBuild = value
+
         case .playbackResolution(let resolution):
+            // Observer-level normalization already handles transient stop/empty transport blips.
+            // Reducer-level rebuild decisions here should react only to durable error states.
             if resolution.shouldUpdateCurrentSong, let songId = resolution.resolvedSongId {
                 nextQueueState = nextQueueState.settingCurrentSong(id: songId)
             }
@@ -306,21 +368,12 @@ enum QueueEngineReducer {
             }
             if resolution.shouldClearHistory {
                 nextQueueState = nextQueueState.clearingPlayedHistory()
-                if !nextQueueState.isEmpty {
-                    let isTransientStopDuringStartup: Bool
-                    switch (state.playbackState, resolution.resolvedState) {
-                    case (.loading, .stopped):
-                        // `setQueue` can emit `.stopped` before the queued `.play` command resolves.
-                        // Keep the freshly built queue valid for this transient transport state.
-                        isTransientStopDuringStartup = true
-                    default:
-                        isTransientStopDuringStartup = false
-                    }
-
-                    if !isTransientStopDuringStartup {
-                        // A terminal stop/empty/error transition should replay from a fresh queue build.
-                        nextQueueNeedsBuild = true
-                    }
+                if !nextQueueState.isEmpty,
+                   case .error = resolution.resolvedState {
+                    // Only force rebuild for explicit playback errors.
+                    // Stop/empty transitions can be transient transport artifacts and should not
+                    // reshuffle away the current listening context on pause/resume.
+                    nextQueueNeedsBuild = true
                 }
             }
             nextPlaybackState = resolution.resolvedState

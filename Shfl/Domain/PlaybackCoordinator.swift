@@ -39,7 +39,7 @@ final class PlaybackCoordinator {
 
     func seedSongs(_ songs: [Song]) async throws {
         try await enqueue { [self] in
-            try self.player.addSongs(songs)
+            try self.player.seedSongs(songs)
         }
     }
 

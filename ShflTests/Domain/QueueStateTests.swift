@@ -372,22 +372,6 @@ final class QueueStateTests: XCTestCase {
         XCTAssertTrue(shuffled.hasRestorableState)
     }
 
-    // MARK: - Queue-Only Removal (Rollback)
-
-    func testRemovingFromQueueOnlyKeepsPool() {
-        let songs = (1...3).map { makeSong(id: "\($0)") }
-        let state = QueueState.empty.addingSongs(songs)!.shuffled()
-
-        let newState = state.removingFromQueueOnly(id: "2")
-
-        // Song should still be in pool
-        XCTAssertTrue(newState.containsSong(id: "2"), "Song should remain in pool")
-        // But not in queue
-        XCTAssertFalse(newState.queueOrder.contains { $0.id == "2" }, "Song should be removed from queue")
-        // Other queue items preserved
-        XCTAssertEqual(newState.queueOrder.count, 2)
-    }
-
     // MARK: - Queue Invalidation
 
     func testInvalidatingQueueKeepsPool() {
