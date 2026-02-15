@@ -341,6 +341,13 @@ final class ShufflePlayer {
             while !Task.isCancelled {
                 guard let self, case .armed = self.boundarySwapState else { return }
 
+                // Only poll when actively playing. Paused state doesn't advance
+                // playback time, so polling would spin uselessly.
+                guard self.playbackState.isPlaying else {
+                    try? await Task.sleep(nanoseconds: Self.boundarySwapPollIntervalNanoseconds)
+                    continue
+                }
+
                 let duration = self.musicService.currentSongDuration
                 let currentTime = self.musicService.currentPlaybackTime
                 let remaining = duration - currentTime
@@ -561,6 +568,11 @@ final class ShufflePlayer {
                 switch outcome {
                 case .applied:
                     recordOperation(.activeAddSyncRetrySuccess, detail: "attempt=\(attempt)")
+                    // Disarm boundary swap — the retry already synced the transport.
+                    if case .armed = boundarySwapState {
+                        cancelBoundarySwapPolling()
+                        boundarySwapState = .idle
+                    }
                     didSync = true
                     break attempts
                 case .stale:
@@ -1097,7 +1109,7 @@ final class ShufflePlayer {
                     successDetail: "id=\(song.id)",
                     failureDetail: "transport-sync-failed id=\(song.id)"
                 )
-                if queueNeedsBuild && playbackState.isActive {
+                if queueNeedsBuild && playbackState.isPlaying {
                     armBoundarySwap()
                 }
                 return
@@ -1155,7 +1167,7 @@ final class ShufflePlayer {
                     successDetail: "batch=\(newSongs.count)",
                     failureDetail: "transport-sync-failed"
                 )
-                if queueNeedsBuild && playbackState.isActive {
+                if queueNeedsBuild && playbackState.isPlaying {
                     armBoundarySwap()
                 }
                 return

@@ -249,7 +249,7 @@ final class QueueEngineTests: XCTestCase {
         XCTAssertEqual(revision, 9)
     }
 
-    func testSyncDeferredTransportNoOpsWhenInactiveOrMissingQueue() throws {
+    func testSyncDeferredTransportNoOpsWhenInactiveOrMissingQueueOrNotNeeded() throws {
         let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let inactiveState = QueueEngineState(
             queueState: QueueState(songPool: [song], queueOrder: [song], currentIndex: 0),
@@ -268,6 +268,16 @@ final class QueueEngineTests: XCTestCase {
         )
         let noQueueReduction = try QueueEngineReducer.reduce(state: noQueueState, intent: .syncDeferredTransport)
         XCTAssertTrue(noQueueReduction.wasNoOp)
+
+        // No-ops when queueNeedsBuild is false (nothing to sync)
+        let alreadySyncedState = QueueEngineState(
+            queueState: QueueState(songPool: [song], queueOrder: [song], currentIndex: 0),
+            playbackState: .playing(song),
+            revision: 5,
+            queueNeedsBuild: false
+        )
+        let alreadySyncedReduction = try QueueEngineReducer.reduce(state: alreadySyncedState, intent: .syncDeferredTransport)
+        XCTAssertTrue(alreadySyncedReduction.wasNoOp, "syncDeferredTransport should no-op when queueNeedsBuild is false")
     }
 
     func testResyncActiveAddTransportNoOpsWhenInactiveOrMissingQueue() throws {

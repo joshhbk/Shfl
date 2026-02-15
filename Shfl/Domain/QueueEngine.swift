@@ -343,7 +343,7 @@ enum QueueEngineReducer {
             nextQueueNeedsBuild = false
 
         case .syncDeferredTransport:
-            guard state.playbackState.isActive && state.queueState.hasQueue else {
+            guard state.queueNeedsBuild && state.playbackState.isActive && state.queueState.hasQueue else {
                 return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
             }
             appendReplaceQueueCommand(state: state, queueState: state.queueState, commands: &commands)
