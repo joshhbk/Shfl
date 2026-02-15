@@ -2,14 +2,7 @@ import SwiftUI
 
 struct LastFMSettingsView: View {
     @Environment(\.lastFMTransport) private var transport
-
-    @State private var isConnected = false
-    @State private var username: String?
-    @State private var isConnecting = false
-    @State private var isRefreshing = false
-    @State private var errorMessage: String?
-    @State private var recentTracks: [LastFMRecentTrack] = []
-    @State private var recentTracksState: RecentTracksState = .idle
+    @State private var viewModel = LastFMSettingsViewModel()
 
     var body: some View {
         List {
@@ -20,38 +13,39 @@ struct LastFMSettingsView: View {
         }
         .navigationTitle("Last.fm")
         .refreshable {
-            await refreshActivity(showLoading: recentTracks.isEmpty)
+            await viewModel.refreshActivity(showLoading: !viewModel.recentTracksState.hasLoadedTracks)
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await refreshActivity(showLoading: recentTracks.isEmpty) }
+                    Task { await viewModel.refreshActivity(showLoading: !viewModel.recentTracksState.hasLoadedTracks) }
                 } label: {
-                    if isRefreshing {
+                    if viewModel.isRefreshing {
                         ProgressView()
                     } else {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
-                .disabled(!isConnected || isConnecting || isRefreshing)
+                .disabled(!viewModel.connectionState.isConnected || viewModel.connectionState.isConnecting || viewModel.isRefreshing)
                 .accessibilityLabel("Refresh Last.fm activity")
             }
         }
         .task {
-            await syncConnectionStatusOnly()
-            await refreshActivity(showLoading: true)
+            viewModel.transport = transport
+            await viewModel.syncConnectionStatusOnly()
+            await viewModel.refreshActivity(showLoading: true)
         }
     }
 
     private var statusSection: some View {
         Section("Status") {
             HStack(spacing: 12) {
-                Image(systemName: isConnected ? "checkmark.circle.fill" : "xmark.circle")
-                    .foregroundStyle(isConnected ? .green : .secondary)
+                Image(systemName: viewModel.connectionState.isConnected ? "checkmark.circle.fill" : "xmark.circle")
+                    .foregroundStyle(viewModel.connectionState.isConnected ? .green : .secondary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(isConnected ? "Connected" : "Not connected")
+                    Text(viewModel.connectionState.isConnected ? "Connected" : "Not connected")
                         .font(.body.weight(.semibold))
-                    Text(username ?? "Connect Last.fm to enable scrobbling")
+                    Text(viewModel.connectionState.username ?? "Connect Last.fm to enable scrobbling")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -63,29 +57,32 @@ struct LastFMSettingsView: View {
 
     private var actionsSection: some View {
         Section("Actions") {
-            if isConnected {
+            switch viewModel.connectionState {
+            case .connected:
                 Button(role: .destructive) {
-                    Task { await disconnect() }
+                    Task { await viewModel.disconnect() }
                 } label: {
                     Label("Disconnect", systemImage: "link.badge.minus")
                 }
-                .disabled(isConnecting || isRefreshing)
-            } else {
-                Button {
-                    Task { await connect() }
-                } label: {
+                .disabled(viewModel.isRefreshing)
+            case .connecting:
+                Button {} label: {
                     HStack {
                         Label("Connect to Last.fm", systemImage: "link.badge.plus")
                         Spacer()
-                        if isConnecting {
-                            ProgressView()
-                        }
+                        ProgressView()
                     }
                 }
-                .disabled(isConnecting)
+                .disabled(true)
+            case .disconnected:
+                Button {
+                    Task { await viewModel.connect() }
+                } label: {
+                    Label("Connect to Last.fm", systemImage: "link.badge.plus")
+                }
             }
 
-            if let errorMessage {
+            if let errorMessage = viewModel.errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
             }
@@ -95,13 +92,13 @@ struct LastFMSettingsView: View {
     @ViewBuilder
     private var recentTracksSection: some View {
         Section("Recent Tracks") {
-            if !isConnected {
+            if !viewModel.connectionState.isConnected {
                 emptyHintRow(
                     title: "Connect Last.fm to see recent tracks",
                     subtitle: "You can verify real-time scrobbling activity here after connecting."
                 )
             } else {
-                switch recentTracksState {
+                switch viewModel.recentTracksState {
                 case .idle, .loading:
                     HStack(spacing: 12) {
                         ProgressView()
@@ -114,18 +111,18 @@ struct LastFMSettingsView: View {
                         subtitle: "Play music for at least half the track duration to scrobble."
                     )
                     Button("Retry") {
-                        Task { await refreshActivity(showLoading: true) }
+                        Task { await viewModel.refreshActivity(showLoading: true) }
                     }
                 case .error:
                     emptyHintRow(
-                        title: "Couldn’t load recent tracks",
+                        title: "Couldn't load recent tracks",
                         subtitle: "Check your connection and try again."
                     )
                     Button("Retry") {
-                        Task { await refreshActivity(showLoading: true) }
+                        Task { await viewModel.refreshActivity(showLoading: true) }
                     }
-                case .loaded:
-                    ForEach(recentTracks) { track in
+                case .loaded(let tracks):
+                    ForEach(tracks) { track in
                         RecentTrackRow(track: track)
                     }
                 }
@@ -151,92 +148,6 @@ struct LastFMSettingsView: View {
         }
         .padding(.vertical, 4)
     }
-
-    private func syncConnectionStatusOnly() async {
-        guard let transport else { return }
-        if let session = await transport.storedSession() {
-            isConnected = true
-            username = session.username
-        } else {
-            isConnected = false
-            username = nil
-            recentTracks = []
-            recentTracksState = .idle
-        }
-    }
-
-    private func refreshActivity(showLoading: Bool) async {
-        guard let transport else { return }
-        guard !isRefreshing else { return }
-
-        isRefreshing = true
-        if showLoading {
-            recentTracksState = .loading
-        }
-
-        await syncConnectionStatusOnly()
-
-        guard isConnected else {
-            isRefreshing = false
-            return
-        }
-
-        do {
-            let tracks = try await transport.fetchRecentTracks(limit: 20)
-            recentTracks = tracks
-            recentTracksState = tracks.isEmpty ? .empty : .loaded
-            errorMessage = nil
-        } catch {
-            recentTracksState = .error
-            errorMessage = "Couldn’t refresh Last.fm activity. Try again in a moment."
-        }
-
-        isRefreshing = false
-    }
-
-    @MainActor
-    private func connect() async {
-        guard let transport else { return }
-        isConnecting = true
-        errorMessage = nil
-
-        do {
-            let session = try await transport.authenticate()
-            isConnected = true
-            username = session.username
-            await refreshActivity(showLoading: true)
-        } catch LastFMAuthError.cancelled {
-            // User cancelled intentionally.
-        } catch let error as LastFMAuthError {
-            errorMessage = error.localizedDescription
-        } catch {
-            errorMessage = "Failed to connect. Please try again."
-        }
-
-        isConnecting = false
-    }
-
-    private func disconnect() async {
-        guard let transport else { return }
-        do {
-            try await transport.disconnect()
-            isConnected = false
-            username = nil
-            recentTracks = []
-            recentTracksState = .idle
-            errorMessage = nil
-        } catch {
-            errorMessage = "Failed to disconnect."
-        }
-    }
-}
-
-private enum RecentTracksState: Equatable {
-    case idle
-    case loading
-    case loaded
-    case empty
-    case error
 }
 
 private struct RecentTrackRow: View {
