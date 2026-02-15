@@ -332,6 +332,12 @@ final class ShufflePlayer {
 
     private func armBoundarySwap() {
         boundarySwapState = .armed
+        // Preload artwork for the next song so it's cached before the swap fires.
+        // Pool songs have artworkURL: nil and may never have been displayed in a view.
+        let nextIndex = queueState.currentIndex + 1
+        if nextIndex < queueState.queueOrder.count {
+            ArtworkCache.shared.requestArtwork(for: queueState.queueOrder[nextIndex].id)
+        }
         startBoundarySwapPolling()
     }
 
