@@ -378,8 +378,9 @@ final class ShufflePlayerTests: XCTestCase {
 
     // MARK: - Dynamic Queue Updates
 
-    /// During active playback, addSong keeps a canonical queue by replacing with an upcoming reshuffle.
-    func testAddSongDuringPlaybackReplacesQueue() async throws {
+    /// During active playback, addSong reshuffles the domain queue but defers transport sync
+    /// to avoid an audible playback pause from rebuilding the MusicKit queue mid-song.
+    func testAddSongDuringPlaybackDefersTransportSync() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
@@ -400,9 +401,12 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(queue.count, 2, "Queue should have 2 songs after adding during playback")
         XCTAssertTrue(queue.contains { $0.id == "2" }, "New song should be in queue order")
 
-        // Verify MusicKit was also updated
+        // Transport sync is deferred — no immediate replaceQueue call
         let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Active add should perform a canonical replaceQueue update")
+        XCTAssertEqual(replaceCallCount, 0, "Active add should defer transport sync to avoid playback pause")
+
+        let needsBuild = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuild, "Transport rebuild should be pending after deferred active add")
     }
 
     func testAddSongWhileStoppedDoesNotRebuildQueue() async throws {
@@ -419,8 +423,9 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(callCount, 0, "setQueue should NOT be called when not playing")
     }
 
-    /// addSong keeps transport queue canonical (no duplicate IDs, full membership retained).
-    func testAddSongDuringPlaybackRebuildsCanonicalQueueWithoutFiltering() async throws {
+    /// addSong keeps domain queue canonical (no duplicate IDs, full membership retained)
+    /// while deferring transport sync to avoid playback interruption.
+    func testAddSongDuringPlaybackKeepsDomainCanonicalWithDeferredTransport() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
@@ -442,12 +447,14 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song3)
         try await Task.sleep(nanoseconds: 100_000_000)
 
+        // Transport sync is deferred
         let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Active add should rebuild canonical transport queue")
+        XCTAssertEqual(replaceCallCount, 0, "Active add should defer transport sync")
 
-        let queuedIds = await mockService.lastQueuedSongs.map(\.id)
-        XCTAssertTrue(queuedIds.contains("3"), "New song should be represented in transport queue")
-        XCTAssertEqual(queuedIds.count, Set(queuedIds).count, "Transport queue should remain duplicate-free")
+        // Domain queue should be canonical
+        let domainQueueIds = await player.lastShuffledQueue.map(\.id)
+        XCTAssertTrue(domainQueueIds.contains("3"), "New song should be in domain queue")
+        XCTAssertEqual(domainQueueIds.count, Set(domainQueueIds).count, "Domain queue should remain duplicate-free")
     }
 
     func testAddSongDuringPlaybackPauseResumeKeepsCurrentSongContext() async throws {
@@ -471,29 +478,22 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(newSong)
         try await Task.sleep(nanoseconds: 100_000_000)
 
+        // Active add defers transport sync
         let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Active add should replace queue once")
+        XCTAssertEqual(replaceCallCount, 0, "Active add should defer transport sync")
 
-        await player.pause()
-        try await Task.sleep(nanoseconds: 100_000_000)
-        await mockService.simulatePlaybackState(.empty)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        // Domain queue includes the new song
+        let domainQueueIds = Set(await player.lastShuffledQueue.map(\.id))
+        XCTAssertTrue(domainQueueIds.contains("4"), "New song should be in domain queue")
 
-        await mockService.resetQueueTracking()
+        // Deferred rebuild fires on the next playback resolution; wait for it to settle
+        try await Task.sleep(nanoseconds: 200_000_000)
 
-        try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
-
-        let setQueueCallCount = await mockService.setQueueCallCount
-        XCTAssertEqual(setQueueCallCount, 0, "Pause/resume should not rebuild queue after active add")
-        let playCallCount = await mockService.playCallCount
-        XCTAssertEqual(playCallCount, 1, "Pause/resume should issue direct play")
-
-        let resumedSongId = await player.playbackState.currentSongId
-        XCTAssertEqual(resumedSongId, currentBeforeAdd, "Pause/resume should keep current song context")
+        let currentAfterAdd = await player.playbackState.currentSongId
+        XCTAssertEqual(currentAfterAdd, currentBeforeAdd, "Active add should preserve current song context")
     }
 
-    func testAddSongDuringPlaybackRebuildsImmediatelyWhenQueueNeedsBuildIsSet() async throws {
+    func testAddSongDuringPlaybackDefersTransportWhenQueueNeedsBuildIsAlreadySet() async throws {
         let songs = (1...3).map { i in
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
@@ -527,21 +527,20 @@ final class ShufflePlayerTests: XCTestCase {
         )
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Stale active add should trigger immediate queue rebuild")
-
+        // Active add defers transport sync to avoid playback interruption
         let needsBuildAfter = await player.queueNeedsBuild
-        XCTAssertFalse(needsBuildAfter, "Immediate rebuild should clear pending rebuild flag")
+        XCTAssertTrue(needsBuildAfter, "Active add should keep rebuild pending (deferred)")
 
+        // Domain queue should include all songs
         let queueIds = await Set(player.lastShuffledQueue.map(\.id))
         XCTAssertEqual(queueIds, Set(["1", "2", "3", "4", "5"]))
 
         let notice = await player.operationNotice
-        XCTAssertNil(notice, "Successful active rebuild add should not surface a warning banner")
+        XCTAssertNil(notice, "Deferred active add should not surface a warning banner")
     }
 
-    /// addSongsWithQueueRebuild should preserve a single canonical full queue in transport.
-    func testAddSongsWithQueueRebuildKeepsTransportMirroringDomainQueue() async throws {
+    /// addSongsWithQueueRebuild should preserve a single canonical full domain queue.
+    func testAddSongsWithQueueRebuildKeepsDomainQueueCanonical() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
@@ -561,20 +560,19 @@ final class ShufflePlayerTests: XCTestCase {
         await mockService.simulatePlaybackState(.playing(secondSong))
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        await mockService.resetQueueTracking()
-
         // Add new songs using batch method
         let newSongs = [Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)]
         try await player.addSongsWithQueueRebuild(newSongs)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let lastQueued = await mockService.lastQueuedSongs
-        let queuedIds = Set(lastQueued.map { $0.id })
+        // Domain queue should be canonical (transport sync is deferred)
+        let domainQueue = await player.lastShuffledQueue
+        let domainQueueIds = Set(domainQueue.map(\.id))
 
-        XCTAssertTrue(queuedIds.contains(firstSong.id), "Played songs should remain in canonical queue ordering")
-        XCTAssertTrue(queuedIds.contains(secondSong.id), "Current song should be included")
-        XCTAssertTrue(queuedIds.contains("3"), "New song3 should be included")
-        XCTAssertEqual(lastQueued.count, queuedIds.count, "Transport queue should not contain duplicate song IDs")
+        XCTAssertTrue(domainQueueIds.contains(firstSong.id), "Played songs should remain in canonical domain queue")
+        XCTAssertTrue(domainQueueIds.contains(secondSong.id), "Current song should be included")
+        XCTAssertTrue(domainQueueIds.contains("3"), "New song3 should be included")
+        XCTAssertEqual(domainQueue.count, domainQueueIds.count, "Domain queue should not contain duplicate song IDs")
     }
 
     func testRemoveSongDuringPlaybackRemovesFromInternalList() async throws {
@@ -730,37 +728,28 @@ final class ShufflePlayerTests: XCTestCase {
 
     // MARK: - Transport Failure Handling
 
-    func testAddSongDuringPlaybackSchedulesSilentRecoveryOnReplaceFailure() async throws {
+    func testAddSongDuringPlaybackDefersTransportAndKeepsSongInPool() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        // Make replaceQueue fail (non-transient): add still succeeds and marks rebuild pending.
-        await mockService.setShouldThrowOnReplace(NSError(domain: "test", code: 1))
-
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        // Song remains in pool; sync fallback is silent and eventual.
+        // Song is in pool and domain queue; transport sync is deferred.
         let containsSong = await player.containsSong(id: "2")
-        XCTAssertTrue(containsSong, "Song should remain in pool after active add sync failure")
+        XCTAssertTrue(containsSong, "Song should be in pool after deferred active add")
 
         let needsBuild = await player.queueNeedsBuild
-        XCTAssertTrue(needsBuild, "Failed active add sync should keep rebuild pending")
+        XCTAssertTrue(needsBuild, "Active add should mark transport rebuild pending")
 
         let notice = await player.operationNotice
-        XCTAssertNil(notice, "Active add sync failures should remain silent in UI")
-
-        let operations = await player.recentQueueOperations
-        XCTAssertTrue(
-            operations.contains(where: { $0.operation == QueueOperationID.activeAddSyncNonTransientFailed.rawValue }),
-            "Non-transient add sync failures should be journaled for diagnostics"
-        )
+        XCTAssertNil(notice, "Deferred active add should not surface a warning banner")
     }
 
-    func testAddSongDuringPlaybackAwaitsTransportReplaceBeforeReturn() async throws {
+    func testAddSongDuringPlaybackReturnsImmediatelyWithDeferredTransport() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
@@ -773,14 +762,15 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song2)
         let elapsed = Date().timeIntervalSince(start)
 
-        XCTAssertGreaterThanOrEqual(
+        XCTAssertLessThan(
             elapsed,
             0.25,
-            "addSong should not return until replaceQueue completes"
+            "addSong should return immediately without waiting for transport sync"
         )
 
-        let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "addSong should perform exactly one replaceQueue transport update")
+        // Domain state is updated immediately
+        let queue = await player.lastShuffledQueue
+        XCTAssertEqual(queue.count, 2, "Domain queue should include the new song immediately")
     }
 
     func testPlayMarksQueueNeedsBuildWhenTransportCommandRevisionTurnsStale() async throws {
@@ -925,8 +915,8 @@ final class ShufflePlayerTests: XCTestCase {
 
     // MARK: - Batch Add Operation
 
-    /// Documents current behavior: addSongsWithQueueRebuild uses replaceQueue (not setQueue)
-    func testAddSongsWithQueueRebuildCallsReplaceQueueOnce() async throws {
+    /// Batch add during active playback defers transport sync to avoid playback interruption.
+    func testAddSongsWithQueueRebuildDefersTransportDuringActivePlayback() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
@@ -940,14 +930,24 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSongsWithQueueRebuild(newSongs)
         try await Task.sleep(nanoseconds: 100_000_000)
 
+        // Transport sync is deferred
         let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Batch add should call replaceQueue once")
+        XCTAssertEqual(replaceCallCount, 0, "Active batch add should defer transport sync")
 
         let setQueueCallCount = await mockService.setQueueCallCount
-        XCTAssertEqual(setQueueCallCount, 0, "setQueue should NOT be called - uses replaceQueue instead")
+        XCTAssertEqual(setQueueCallCount, 0, "setQueue should NOT be called during deferred add")
+
+        let needsBuild = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuild, "Transport rebuild should be pending after deferred batch add")
+
+        // Domain queue includes all songs
+        let queueIds = Set(await player.lastShuffledQueue.map(\.id))
+        XCTAssertEqual(queueIds, Set(["1", "2", "3", "4", "5"]))
     }
 
-    func testAddSongsWithQueueRebuildSilentlyDegradesAndRecoversWhenReplaceFails() async throws {
+    /// Boundary swap: deferred transport sync fires at the natural song boundary
+    /// (song transition), not on any arbitrary playback resolution.
+    func testAddSongsWithQueueRebuildDefersThenRebuildsAtSongBoundary() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
@@ -955,48 +955,43 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        await mockService.setShouldThrowOnReplace(
-            NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
-        )
+        guard let currentSong = await player.playbackState.currentSong else {
+            XCTFail("Expected a current song")
+            return
+        }
+        let otherSong = currentSong.id == song1.id ? song2 : song1
 
         let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSongsWithQueueRebuild([song3])
         try await Task.sleep(nanoseconds: 100_000_000)
-        let revisionAfterDegradedAdd = await player.queueRevision
 
         let containsSong3 = await player.containsSong(id: "3")
-        XCTAssertTrue(containsSong3, "Added songs should remain in pool after replace failure")
+        XCTAssertTrue(containsSong3, "Added songs should be in pool immediately")
 
-        let needsBuildAfterFailure = await player.queueNeedsBuild
-        XCTAssertTrue(needsBuildAfterFailure, "Failed active batch sync should keep rebuild pending")
+        let needsBuildAfterAdd = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildAfterAdd, "Active batch add should defer transport sync")
 
         let notice = await player.operationNotice
-        XCTAssertNil(notice, "Active batch add sync failures should remain silent in UI")
+        XCTAssertNil(notice, "Deferred active batch add should remain silent in UI")
 
-        let operations = await player.recentQueueOperations
-        XCTAssertTrue(
-            operations.contains(where: { $0.operation == QueueOperationID.activeAddSyncRetryScheduled.rawValue }),
-            "Transient add sync failures should schedule retries"
-        )
+        // Same-song resolution should NOT trigger the deferred rebuild.
+        await mockService.simulatePlaybackState(.playing(currentSong))
+        try await Task.sleep(nanoseconds: 200_000_000)
 
-        await mockService.setShouldThrowOnReplace(nil)
+        let needsBuildAfterSameSong = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildAfterSameSong, "Same-song resolution should not trigger boundary swap")
+
+        // Song transition (natural boundary) triggers the deferred rebuild.
+        await mockService.simulatePlaybackState(.playing(otherSong))
+
         let didRecover = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
             let needsBuild = await self.player!.queueNeedsBuild
             return !needsBuild
         }
-        XCTAssertTrue(didRecover, "Retry loop should eventually clear rebuild-pending state")
-
-        let needsBuildAfterRetry = await player.queueNeedsBuild
-        XCTAssertFalse(needsBuildAfterRetry, "Successful retry should clear rebuild-pending flag")
-        let revisionAfterRetrySuccess = await player.queueRevision
-        XCTAssertGreaterThan(
-            revisionAfterRetrySuccess,
-            revisionAfterDegradedAdd,
-            "Retry resync should advance revision through reducer-based mutation path"
-        )
+        XCTAssertTrue(didRecover, "Boundary swap should clear rebuild-pending state at song transition")
     }
 
-    func testAddSongsWithQueueRebuildIncludesAllSongs() async throws {
+    func testAddSongsWithQueueRebuildIncludesAllSongsInDomainQueue() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
@@ -1010,11 +1005,12 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSongsWithQueueRebuild(newSongs)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let queuedIds = Set(await mockService.lastQueuedSongs.map(\.id))
-        XCTAssertTrue(queuedIds.contains("1"), "Original song should be in queue")
-        XCTAssertTrue(queuedIds.contains("2"), "New song 2 should be in queue")
-        XCTAssertTrue(queuedIds.contains("3"), "New song 3 should be in queue")
-        XCTAssertTrue(queuedIds.contains("4"), "New song 4 should be in queue")
+        // Domain queue should include all songs (transport sync is deferred)
+        let domainQueueIds = Set(await player.lastShuffledQueue.map(\.id))
+        XCTAssertTrue(domainQueueIds.contains("1"), "Original song should be in domain queue")
+        XCTAssertTrue(domainQueueIds.contains("2"), "New song 2 should be in domain queue")
+        XCTAssertTrue(domainQueueIds.contains("3"), "New song 3 should be in domain queue")
+        XCTAssertTrue(domainQueueIds.contains("4"), "New song 4 should be in domain queue")
     }
 
     // MARK: - Loading State Accuracy

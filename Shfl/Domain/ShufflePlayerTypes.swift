@@ -97,6 +97,8 @@ enum QueueOperationID: String, Sendable {
     case activeAddSyncRetrySuccess = "active-add-sync-retry-success"
     case activeAddSyncRetryExhausted = "active-add-sync-retry-exhausted"
     case activeAddSyncNonTransientFailed = "active-add-sync-nontransient-failed"
+    case boundarySyncStarted = "boundary-sync-started"
+    case deferredTransportRebuilt = "deferred-transport-rebuilt"
 }
 
 struct QueueOperationJournal: Equatable, Sendable {

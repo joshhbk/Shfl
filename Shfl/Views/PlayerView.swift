@@ -194,6 +194,7 @@ private final class PreviewMockMusicService: MusicService {
     func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {}
     func play() async throws {}
     func pause() async {}
+    func pauseImmediately() {}
     func skipToNext() async throws {}
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
