@@ -34,6 +34,11 @@ final class ArtworkCache {
         cache[songId]
     }
 
+    /// Returns a sized artwork URL for the given entity, or nil if not cached.
+    func artworkURL(for id: String, width: Int = 1200, height: Int = 1200) -> URL? {
+        cache[id]?.url(width: width, height: height)
+    }
+
     /// Inserts preloaded artwork and publishes an update to listeners for this id.
     /// Useful for deterministic tests and future preload paths.
     func setArtwork(_ artwork: Artwork, for id: String) {

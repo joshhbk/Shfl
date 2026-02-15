@@ -211,6 +211,65 @@ final class QueueEngineTests: XCTestCase {
         XCTAssertEqual(revision, 13)
     }
 
+    func testSyncDeferredTransportMirrorsDomainOrderWithoutReshuffle() throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+
+        // Domain queue order is [song2, song1, song3] — syncDeferredTransport should mirror this exactly.
+        let queueState = QueueState(songPool: [song1, song2, song3], queueOrder: [song2, song1, song3], currentIndex: 0)
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .playing(song2),
+            revision: 8,
+            queueNeedsBuild: true
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .syncDeferredTransport)
+        XCTAssertFalse(reduction.wasNoOp)
+        XCTAssertEqual(reduction.nextState.revision, 9)
+        XCTAssertFalse(reduction.nextState.queueNeedsBuild, "syncDeferredTransport should clear pending rebuild")
+
+        // Queue order in domain should be unchanged (no reshuffle).
+        XCTAssertEqual(
+            reduction.nextState.queueState.queueOrder.map(\.id),
+            [song2.id, song1.id, song3.id],
+            "syncDeferredTransport must mirror existing domain order without reshuffling"
+        )
+
+        guard case .replaceQueue(let queue, let startAtSongId, _, let revision) = reduction.transportCommands.first else {
+            return XCTFail("Expected replaceQueue command for syncDeferredTransport")
+        }
+        XCTAssertEqual(
+            queue.map(\.id),
+            [song2.id, song1.id, song3.id],
+            "Transport command should mirror domain order exactly"
+        )
+        XCTAssertEqual(startAtSongId, song2.id)
+        XCTAssertEqual(revision, 9)
+    }
+
+    func testSyncDeferredTransportNoOpsWhenInactiveOrMissingQueue() throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let inactiveState = QueueEngineState(
+            queueState: QueueState(songPool: [song], queueOrder: [song], currentIndex: 0),
+            playbackState: .stopped,
+            revision: 3,
+            queueNeedsBuild: true
+        )
+        let inactiveReduction = try QueueEngineReducer.reduce(state: inactiveState, intent: .syncDeferredTransport)
+        XCTAssertTrue(inactiveReduction.wasNoOp)
+
+        let noQueueState = QueueEngineState(
+            queueState: QueueState(songPool: [song], queueOrder: [], currentIndex: 0),
+            playbackState: .paused(song),
+            revision: 3,
+            queueNeedsBuild: true
+        )
+        let noQueueReduction = try QueueEngineReducer.reduce(state: noQueueState, intent: .syncDeferredTransport)
+        XCTAssertTrue(noQueueReduction.wasNoOp)
+    }
+
     func testResyncActiveAddTransportNoOpsWhenInactiveOrMissingQueue() throws {
         let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let inactiveState = QueueEngineState(

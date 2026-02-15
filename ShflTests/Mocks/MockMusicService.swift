@@ -218,6 +218,13 @@ actor MockMusicService: MusicService {
         }
     }
 
+    func pauseImmediately() {
+        pauseCallCount += 1
+        if case .playing(let song) = currentState {
+            updateState(.paused(song))
+        }
+    }
+
     func skipToNext() async throws {
         if let error = shouldThrowOnSkip {
             throw error

@@ -381,6 +381,10 @@ final class AppleMusicService: MusicService {
         print("⏸️ pause() completed")
     }
 
+    func pauseImmediately() {
+        player.pause()
+    }
+
     func skipToNext() async throws {
         print("⏭️ skipToNext() called")
         try await player.skipToNextEntry()

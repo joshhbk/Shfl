@@ -945,7 +945,9 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(queueIds, Set(["1", "2", "3", "4", "5"]))
     }
 
-    func testAddSongsWithQueueRebuildDefersThenRebuildsOnNextResolution() async throws {
+    /// Boundary swap: deferred transport sync fires at the natural song boundary
+    /// (song transition), not on any arbitrary playback resolution.
+    func testAddSongsWithQueueRebuildDefersThenRebuildsAtSongBoundary() async throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
@@ -957,6 +959,7 @@ final class ShufflePlayerTests: XCTestCase {
             XCTFail("Expected a current song")
             return
         }
+        let otherSong = currentSong.id == song1.id ? song2 : song1
 
         let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSongsWithQueueRebuild([song3])
@@ -971,14 +974,21 @@ final class ShufflePlayerTests: XCTestCase {
         let notice = await player.operationNotice
         XCTAssertNil(notice, "Deferred active batch add should remain silent in UI")
 
-        // Trigger a playback resolution to fire the deferred transport rebuild.
+        // Same-song resolution should NOT trigger the deferred rebuild.
         await mockService.simulatePlaybackState(.playing(currentSong))
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        let needsBuildAfterSameSong = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildAfterSameSong, "Same-song resolution should not trigger boundary swap")
+
+        // Song transition (natural boundary) triggers the deferred rebuild.
+        await mockService.simulatePlaybackState(.playing(otherSong))
 
         let didRecover = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
             let needsBuild = await self.player!.queueNeedsBuild
             return !needsBuild
         }
-        XCTAssertTrue(didRecover, "Deferred rebuild should clear rebuild-pending state on next resolution")
+        XCTAssertTrue(didRecover, "Boundary swap should clear rebuild-pending state at song transition")
     }
 
     func testAddSongsWithQueueRebuildIncludesAllSongsInDomainQueue() async throws {

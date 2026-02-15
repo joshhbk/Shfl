@@ -89,6 +89,9 @@ protocol MusicService: Sendable {
     /// Pause playback
     func pause() async
 
+    /// Pause playback synchronously (no await). Used when immediate audio stop is critical.
+    func pauseImmediately()
+
     /// Skip to next song
     func skipToNext() async throws
 

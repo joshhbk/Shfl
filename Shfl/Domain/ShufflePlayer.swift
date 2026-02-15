@@ -12,6 +12,8 @@ final class ShufflePlayer {
     @ObservationIgnored private var cachedTransportSnapshot = TransportSnapshot(entryCount: 0, currentSongId: nil)
     @ObservationIgnored private var activeAddResyncTask: Task<Void, Never>?
     @ObservationIgnored private var activeAddResyncState: ActiveAddResyncState = .idle
+    @ObservationIgnored private var boundarySwapState: BoundarySwapState = .idle
+    @ObservationIgnored private var boundarySwapPollingTask: Task<Void, Never>?
 
     /// Single source of truth for queue state
     private(set) var queueState: QueueState = .empty
@@ -37,6 +39,22 @@ final class ShufflePlayer {
     private enum ActiveAddResyncState {
         case idle
         case draining(pendingPass: Bool)
+    }
+
+    /// Coordinates deferred transport sync when songs are added during active playback.
+    /// Instead of rebuilding the MusicKit queue mid-song (causing audible interruption),
+    /// the swap is deferred to the natural song boundary where a brief silence is expected.
+    private enum BoundarySwapState {
+        /// No deferred transport sync needed.
+        case idle
+        /// Songs were added during active playback. Waiting for the current song to finish.
+        case armed
+        /// Armed, but the user just skipped. The next observer transition is from the skip,
+        /// not a natural song boundary — process it normally then return to .armed.
+        case pendingSkip
+        /// Currently executing the boundary swap (pause → replace → play).
+        /// Observer emissions are suppressed.
+        case swapping
     }
 
     // MARK: - Computed Properties
@@ -106,6 +124,25 @@ final class ShufflePlayer {
     }
 
     private func applyResolution(_ resolution: PlaybackStateResolution) {
+        // Suppress all observer emissions while a boundary swap is in progress.
+        if case .swapping = boundarySwapState { return }
+
+        // Boundary swap: detect natural song transition while armed.
+        // Check BEFORE applying the normal resolution so domain state still points
+        // to the previous song for next-song lookup.
+        if case .armed = boundarySwapState,
+           resolution.songIdToMarkPlayed != nil {
+            performBoundarySwap(resolution: resolution)
+            return
+        }
+
+        // Skip handling: the skip's observer transition is processed normally,
+        // then we return to armed for the next natural boundary.
+        if case .pendingSkip = boundarySwapState,
+           resolution.songIdToMarkPlayed != nil {
+            armBoundarySwap()
+        }
+
         do {
             let reduction = try reduce(.playbackResolution(resolution))
             if !reduction.transportCommands.isEmpty {
@@ -133,14 +170,6 @@ final class ShufflePlayer {
             .playbackResolution,
             detail: "state=\(playbackStateLabel(resolution.resolvedState)), song=\(resolution.resolvedSongId ?? "nil")"
         )
-
-        // When the domain queue is fully reshuffled but the transport is stale
-        // (active-add deferral), rebuild the transport at the next opportunity.
-        // The !isQueueStale guard avoids auto-rebuilding when the queue genuinely
-        // needs a full reshuffle (e.g. songs added while stopped).
-        if queueNeedsBuild && playbackState.isActive && !queueState.isQueueStale {
-            scheduleDeferredTransportRebuild()
-        }
     }
 
     func clearOperationNotice() {
@@ -151,6 +180,7 @@ final class ShufflePlayer {
     /// Debug-only escape hatch to return queue and diagnostics to a clean baseline.
     func hardResetQueueForDebug() async {
         cancelActiveAddResyncRetry()
+        cancelBoundarySwapPolling()
         await removeAllSongs()
         queueOperationJournal = QueueOperationJournal()
         operationJournalVersion &+= 1
@@ -294,39 +324,162 @@ final class ShufflePlayer {
         return isLikelyOfflineError(error)
     }
 
-    private func scheduleDeferredTransportRebuild() {
-        Task { @MainActor [weak self] in
-            await self?.executeDeferredTransportRebuild()
+    // MARK: - Boundary Swap
+
+    /// Pause preemptively before end-of-song to avoid any playback of the wrong next song.
+    private static let boundarySwapLeadTimeSeconds: TimeInterval = 0.5
+    private static let boundarySwapPollIntervalNanoseconds: UInt64 = 100_000_000 // 100ms
+
+    private func armBoundarySwap() {
+        boundarySwapState = .armed
+        startBoundarySwapPolling()
+    }
+
+    private func startBoundarySwapPolling() {
+        boundarySwapPollingTask?.cancel()
+        boundarySwapPollingTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self, case .armed = self.boundarySwapState else { return }
+
+                let duration = self.musicService.currentSongDuration
+                let currentTime = self.musicService.currentPlaybackTime
+                let remaining = duration - currentTime
+
+                if duration > 0 && currentTime > 0 && remaining <= Self.boundarySwapLeadTimeSeconds {
+                    self.triggerPreemptiveBoundarySwap()
+                    return
+                }
+
+                try? await Task.sleep(nanoseconds: Self.boundarySwapPollIntervalNanoseconds)
+            }
         }
     }
 
-    private func executeDeferredTransportRebuild() async {
-        guard queueNeedsBuild && playbackState.isActive else { return }
+    private func cancelBoundarySwapPolling() {
+        boundarySwapPollingTask?.cancel()
+        boundarySwapPollingTask = nil
+    }
+
+    /// Preemptive path: polling detected the song is about to end.
+    private func triggerPreemptiveBoundarySwap() {
+        guard case .armed = boundarySwapState else { return }
+
+        let nextIndex = queueState.currentIndex + 1
+        guard nextIndex < queueState.queueOrder.count else {
+            // End of queue — let playback finish naturally.
+            boundarySwapState = .idle
+            return
+        }
+
+        startBoundarySwapSequence(
+            nextSong: queueState.queueOrder[nextIndex],
+            songIdToMarkPlayed: queueState.currentSongId,
+            detail: "preemptive"
+        )
+    }
+
+    /// Reactive path: observer detected a song transition while armed.
+    private func performBoundarySwap(resolution: PlaybackStateResolution) {
+        let nextIndex = queueState.currentIndex + 1
+        guard nextIndex < queueState.queueOrder.count else {
+            // End of queue — no next song to swap to. Apply original resolution normally.
+            boundarySwapState = .idle
+            applyResolution(resolution)
+            return
+        }
+
+        startBoundarySwapSequence(
+            nextSong: queueState.queueOrder[nextIndex],
+            songIdToMarkPlayed: resolution.songIdToMarkPlayed,
+            detail: "reactive"
+        )
+    }
+
+    /// Shared core: apply corrected resolution, pause immediately, launch async queue rebuild.
+    private func startBoundarySwapSequence(nextSong: Song, songIdToMarkPlayed: String?, detail: String) {
+        cancelBoundarySwapPolling()
+
+        // Enrich pool song with cached artwork URL so the UI doesn't flash a placeholder.
+        // Pool songs have artworkURL: nil; normal transitions get it from MusicKit's playback state.
+        let enrichedSong: Song
+        if nextSong.artworkURL == nil,
+           let cachedURL = ArtworkCache.shared.artworkURL(for: nextSong.id) {
+            enrichedSong = Song(
+                id: nextSong.id,
+                title: nextSong.title,
+                artist: nextSong.artist,
+                albumTitle: nextSong.albumTitle,
+                artworkURL: cachedURL,
+                playCount: nextSong.playCount,
+                lastPlayedDate: nextSong.lastPlayedDate
+            )
+        } else {
+            enrichedSong = nextSong
+        }
+
+        let correctedResolution = PlaybackStateResolution(
+            resolvedState: .playing(enrichedSong),
+            resolvedSongId: enrichedSong.id,
+            shouldUpdateCurrentSong: true,
+            songIdToMarkPlayed: songIdToMarkPlayed,
+            shouldClearHistory: false,
+            pendingSeekConsumed: nil
+        )
+        do {
+            let reduction = try reduce(.playbackResolution(correctedResolution))
+            applyReduction(reduction)
+        } catch {
+            recordOperation(.playbackResolutionReducerFailed, detail: "\(detail)-boundary-swap: \(error.localizedDescription)")
+            boundarySwapState = .idle
+            return
+        }
+
+        recordOperation(.boundarySyncStarted, detail: "\(detail), nextSong=\(nextSong.id)")
+        boundarySwapState = .swapping
+
+        // Stop audio immediately — MusicKit's pause() is synchronous under the hood.
+        musicService.pauseImmediately()
+
+        Task { @MainActor [weak self] in
+            await self?.executeBoundarySwap(nextSongId: nextSong.id)
+        }
+    }
+
+    private func executeBoundarySwap(nextSongId: String) async {
+        defer {
+            if queueNeedsBuild {
+                armBoundarySwap()
+            } else {
+                boundarySwapState = .idle
+            }
+        }
 
         do {
-            let reduction = try reduce(.resyncActiveAddTransport)
+            let reduction = try reduce(.syncDeferredTransport)
             guard !reduction.wasNoOp else { return }
 
             let outcome = try await applyReductionWithTransport(
                 reduction,
-                source: "deferred-add-rebuild",
+                source: "boundary-swap",
                 rollbackPolicy: .preservePoolAndDeferQueueBuild,
                 staleRollbackPolicy: .preservePoolAndDeferQueueBuild,
                 showStaleNotice: false
             )
             switch outcome {
             case .applied:
-                recordOperation(.deferredTransportRebuilt)
+                playbackObserver.setLastObservedSongId(nextSongId)
+                musicService.seek(to: 0)
+                recordOperation(.deferredTransportRebuilt, detail: "boundary-swap")
             case .stale:
-                scheduleActiveAddResyncRetry(source: "deferred-add-rebuild", failureKind: .stale)
+                scheduleActiveAddResyncRetry(source: "boundary-swap", failureKind: .stale)
             }
         } catch {
             if Self.isTransientAddSyncError(error) {
-                scheduleActiveAddResyncRetry(source: "deferred-add-rebuild", failureKind: .transient)
+                scheduleActiveAddResyncRetry(source: "boundary-swap", failureKind: .transient)
             } else {
                 recordOperation(
                     .activeAddSyncNonTransientFailed,
-                    detail: "source=deferred-add-rebuild, error=\(error.localizedDescription)"
+                    detail: "source=boundary-swap, error=\(error.localizedDescription)"
                 )
             }
         }
@@ -816,6 +969,7 @@ final class ShufflePlayer {
 
     /// Called when shuffle algorithm changes. Views should call this via onChange(of: appSettings.shuffleAlgorithm).
     func reshuffleWithNewAlgorithm(_ algorithm: ShuffleAlgorithm) async {
+        if case .swapping = boundarySwapState {} else { boundarySwapState = .idle }
         do {
             let reduction = try reduce(.reshuffleAlgorithm(algorithm))
             guard !reduction.wasNoOp else {
@@ -943,6 +1097,9 @@ final class ShufflePlayer {
                     successDetail: "id=\(song.id)",
                     failureDetail: "transport-sync-failed id=\(song.id)"
                 )
+                if queueNeedsBuild && playbackState.isActive {
+                    armBoundarySwap()
+                }
                 return
             }
 
@@ -998,6 +1155,9 @@ final class ShufflePlayer {
                     successDetail: "batch=\(newSongs.count)",
                     failureDetail: "transport-sync-failed"
                 )
+                if queueNeedsBuild && playbackState.isActive {
+                    armBoundarySwap()
+                }
                 return
             }
 
@@ -1019,6 +1179,7 @@ final class ShufflePlayer {
     }
 
     func removeSong(id: String) async {
+        if case .swapping = boundarySwapState {} else { boundarySwapState = .idle }
         do {
             let reduction = try reduce(.removeSong(id: id))
             guard !reduction.wasNoOp else { return }
@@ -1042,6 +1203,7 @@ final class ShufflePlayer {
     }
 
     func removeAllSongs() async {
+        if case .swapping = boundarySwapState {} else { boundarySwapState = .idle }
         cancelActiveAddResyncRetry()
         do {
             let reduction = try reduce(.removeAllSongs)
@@ -1105,6 +1267,7 @@ final class ShufflePlayer {
     // MARK: - Playback Control
 
     func play(algorithm: ShuffleAlgorithm? = nil) async throws {
+        if case .swapping = boundarySwapState {} else { boundarySwapState = .idle }
         let reduction = try reduce(.play(algorithm: algorithm))
         guard !reduction.wasNoOp else {
             recordOperation(.playSkip, detail: "empty-pool")
@@ -1126,6 +1289,7 @@ final class ShufflePlayer {
     }
 
     func pause() async {
+        if case .swapping = boundarySwapState {} else { boundarySwapState = .idle }
         guard let reduction = try? reduce(.pause) else { return }
         do {
             let outcome = try await applyReductionWithTransport(
@@ -1143,6 +1307,7 @@ final class ShufflePlayer {
     }
 
     func skipToNext() async throws {
+        if case .armed = boundarySwapState { boundarySwapState = .pendingSkip }
         let reduction = try reduce(.skipToNext)
         let outcome = try await applyReductionWithTransport(
             reduction,
@@ -1156,6 +1321,7 @@ final class ShufflePlayer {
     }
 
     func skipToPrevious() async throws {
+        if case .armed = boundarySwapState { boundarySwapState = .pendingSkip }
         let reduction = try reduce(.skipToPrevious)
         let outcome = try await applyReductionWithTransport(
             reduction,
@@ -1169,6 +1335,7 @@ final class ShufflePlayer {
     }
 
     func restartOrSkipToPrevious() async throws {
+        if case .armed = boundarySwapState { boundarySwapState = .pendingSkip }
         let reduction = try reduce(.restartOrSkipToPrevious)
         let outcome = try await applyReductionWithTransport(
             reduction,
@@ -1182,6 +1349,7 @@ final class ShufflePlayer {
     }
 
     func togglePlayback(algorithm: ShuffleAlgorithm? = nil) async throws {
+        if case .swapping = boundarySwapState {} else { boundarySwapState = .idle }
         let reduction = try reduce(.togglePlayback(algorithm: algorithm))
         guard !reduction.wasNoOp else {
             recordOperation(.togglePlaybackSkip, detail: "no-op")

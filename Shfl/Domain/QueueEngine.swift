@@ -70,6 +70,7 @@ enum QueueIntent: Sendable {
     case togglePlayback(algorithm: ShuffleAlgorithm?)
     case reshuffleAlgorithm(ShuffleAlgorithm)
     case resyncActiveAddTransport
+    case syncDeferredTransport
     case recoverFromStaleTransport
     case recoverFromInvariantViolation
     case setQueueNeedsBuild(Bool)
@@ -339,6 +340,13 @@ enum QueueEngineReducer {
                 commands: &commands,
                 algorithm: state.queueState.algorithm
             )
+            nextQueueNeedsBuild = false
+
+        case .syncDeferredTransport:
+            guard state.playbackState.isActive && state.queueState.hasQueue else {
+                return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
+            }
+            appendReplaceQueueCommand(state: state, queueState: state.queueState, commands: &commands)
             nextQueueNeedsBuild = false
 
         case .recoverFromStaleTransport:
