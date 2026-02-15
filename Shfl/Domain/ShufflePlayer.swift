@@ -133,6 +133,14 @@ final class ShufflePlayer {
             .playbackResolution,
             detail: "state=\(playbackStateLabel(resolution.resolvedState)), song=\(resolution.resolvedSongId ?? "nil")"
         )
+
+        // When the domain queue is fully reshuffled but the transport is stale
+        // (active-add deferral), rebuild the transport at the next opportunity.
+        // The !isQueueStale guard avoids auto-rebuilding when the queue genuinely
+        // needs a full reshuffle (e.g. songs added while stopped).
+        if queueNeedsBuild && playbackState.isActive && !queueState.isQueueStale {
+            scheduleDeferredTransportRebuild()
+        }
     }
 
     func clearOperationNotice() {
@@ -284,6 +292,44 @@ final class ShufflePlayer {
             return true
         }
         return isLikelyOfflineError(error)
+    }
+
+    private func scheduleDeferredTransportRebuild() {
+        Task { @MainActor [weak self] in
+            await self?.executeDeferredTransportRebuild()
+        }
+    }
+
+    private func executeDeferredTransportRebuild() async {
+        guard queueNeedsBuild && playbackState.isActive else { return }
+
+        do {
+            let reduction = try reduce(.resyncActiveAddTransport)
+            guard !reduction.wasNoOp else { return }
+
+            let outcome = try await applyReductionWithTransport(
+                reduction,
+                source: "deferred-add-rebuild",
+                rollbackPolicy: .preservePoolAndDeferQueueBuild,
+                staleRollbackPolicy: .preservePoolAndDeferQueueBuild,
+                showStaleNotice: false
+            )
+            switch outcome {
+            case .applied:
+                recordOperation(.deferredTransportRebuilt)
+            case .stale:
+                scheduleActiveAddResyncRetry(source: "deferred-add-rebuild", failureKind: .stale)
+            }
+        } catch {
+            if Self.isTransientAddSyncError(error) {
+                scheduleActiveAddResyncRetry(source: "deferred-add-rebuild", failureKind: .transient)
+            } else {
+                recordOperation(
+                    .activeAddSyncNonTransientFailed,
+                    detail: "source=deferred-add-rebuild, error=\(error.localizedDescription)"
+                )
+            }
+        }
     }
 
     private func cancelActiveAddResyncRetry() {

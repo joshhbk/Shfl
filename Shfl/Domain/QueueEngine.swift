@@ -130,14 +130,16 @@ enum QueueEngineReducer {
         algorithm: ShuffleAlgorithm
     ) {
         if state.playbackState.isActive && state.queueState.hasQueue {
-            // During active playback, always keep a single canonical queue by rebuilding upcoming in-place.
-            rebuildUpcomingAndAppendReplaceCommand(
-                state: state,
-                queueState: &queueState,
-                commands: &commands,
-                algorithm: algorithm
+            // Reshuffle the domain queue so the new song is correctly placed in upcoming,
+            // but defer the transport sync to the next natural boundary (song transition,
+            // pause, or resume) to avoid an audible playback interruption from rebuilding
+            // the MusicKit queue mid-song.
+            let preferredCurrentSongId = state.playbackState.currentSongId ?? state.queueState.currentSongId
+            queueState = queueState.reshuffledUpcoming(
+                with: algorithm,
+                preferredCurrentSongId: preferredCurrentSongId
             )
-            queueNeedsBuild = false
+            queueNeedsBuild = true
             return
         }
 

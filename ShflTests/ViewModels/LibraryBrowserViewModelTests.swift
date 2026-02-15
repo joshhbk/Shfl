@@ -199,7 +199,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.autofillState, .completed(count: 1))
     }
 
-    func test_autofill_whilePlaying_rebuildsActiveQueue() async throws {
+    func test_autofill_whilePlaying_defersTransportAndUpdatesDomainQueue() async throws {
         let allSongs = (1...5).map {
             Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
@@ -221,10 +221,12 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.autofillState, .completed(count: 3))
         XCTAssertEqual(player.songCount, 5)
 
+        // Transport sync is deferred to avoid playback interruption
         let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 1, "Autofill while active should rebuild the transport queue")
+        XCTAssertEqual(replaceCallCount, 0, "Autofill while active should defer transport sync")
 
-        let queuedIds = Set(await mockService.lastQueuedSongs.map(\.id))
-        XCTAssertEqual(queuedIds, Set(allSongs.map(\.id)))
+        // Domain queue should include all songs
+        let domainQueueIds = Set(player.lastShuffledQueue.map(\.id))
+        XCTAssertEqual(domainQueueIds, Set(allSongs.map(\.id)))
     }
 }
