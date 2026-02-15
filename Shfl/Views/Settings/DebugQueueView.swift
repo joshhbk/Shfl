@@ -239,7 +239,7 @@ private struct DebugQueueContent: View {
                 Text("No queue yet. Add songs and press play.")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(Array(queue.enumerated()), id: \.offset) { index, song in
+                ForEach(Array(queue.enumerated()), id: \.element.id) { index, song in
                     ShuffledSongRow(
                         song: song,
                         position: index + 1,

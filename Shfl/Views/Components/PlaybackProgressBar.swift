@@ -128,7 +128,7 @@ struct PlaybackProgressBar: View {
             }
             .frame(height: 12)
             .animation(.easeInOut(duration: 0.15), value: isInteracting)
-            .onChange(of: currentTime) {
+            .onChange(of: currentTime) { _, _ in
                 // Clear seek target once playback catches up
                 if let target = seekTarget, abs(currentTime - target) < 0.5 {
                     seekTarget = nil

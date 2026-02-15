@@ -15,27 +15,24 @@ struct ShuffleBodyView<Content: View>: View {
     private let cornerRadius: CGFloat = 20
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Body
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(theme.bodyGradientTop)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        ZStack {
+            // Body
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(theme.bodyGradientTop)
 
-                // Subtle edge highlight
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [.white.opacity(0.3), .clear, .black.opacity(0.1)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
+            // Subtle edge highlight
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.3), .clear, .black.opacity(0.1)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
 
-                // Content (click wheel)
-                content
-            }
+            // Content (click wheel)
+            content
         }
         .frame(height: height)
         .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8)

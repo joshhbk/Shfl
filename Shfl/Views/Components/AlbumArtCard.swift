@@ -31,7 +31,7 @@ struct AlbumArtCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
         )
         // Layered shadows for depth
         .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)

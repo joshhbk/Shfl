@@ -6,7 +6,14 @@ struct ClassicPlayerLayout: View {
     let hasSongs: Bool
     let isControlsDisabled: Bool
     let progressState: PlayerProgressState?
-    let actions: PlayerActions
+    let onPlayPause: () -> Void
+    let onSkipForward: () -> Void
+    let onSkipBack: () -> Void
+    let onAdd: () -> Void
+    let onSettings: () -> Void
+    let onSeek: (TimeInterval) -> Void
+    let onShuffle: () -> Void
+    let isShuffling: Bool
     let showError: Bool
     let errorMessage: String
     let safeAreaInsets: EdgeInsets
@@ -39,8 +46,8 @@ struct ClassicPlayerLayout: View {
             }
 
             PlayerTopBar(
-                onAddTapped: actions.onAdd,
-                onSettingsTapped: actions.onSettings,
+                onAddTapped: onAdd,
+                onSettingsTapped: onSettings,
                 topPadding: showError ? 16 : safeAreaInsets.top + 16
             )
 
@@ -61,10 +68,10 @@ struct ClassicPlayerLayout: View {
                 playbackState: playbackState,
                 hasSongs: hasSongs,
                 progressState: progressState,
-                onSeek: actions.onSeek,
-                onAddSongs: actions.onAdd,
-                onShuffle: actions.onShuffle,
-                isShuffling: actions.isShuffling
+                onSeek: onSeek,
+                onAddSongs: onAdd,
+                onShuffle: onShuffle,
+                isShuffling: isShuffling
             )
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 32)
@@ -73,9 +80,9 @@ struct ClassicPlayerLayout: View {
             // Click wheel - floating with shadow
             ClickWheelView(
                 isPlaying: playbackState.isPlaying,
-                onPlayPause: actions.onPlayPause,
-                onSkipForward: actions.onSkipForward,
-                onSkipBack: actions.onSkipBack,
+                onPlayPause: onPlayPause,
+                onSkipForward: onSkipForward,
+                onSkipBack: onSkipBack,
                 onVolumeUp: { VolumeController.increaseVolume() },
                 onVolumeDown: { VolumeController.decreaseVolume() },
                 scale: 0.75

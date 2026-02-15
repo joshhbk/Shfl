@@ -70,16 +70,7 @@ struct PlaylistListView: View {
         }
     }
 
-    private var skeletonList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(0..<10, id: \.self) { _ in
-                    SkeletonSongRow()
-                    Divider().padding(.leading, 72)
-                }
-            }
-        }
-    }
+    private var skeletonList: some View { SkeletonList() }
 }
 
 private struct PlaylistRow: View {

@@ -9,6 +9,9 @@ struct SongRow: View, Equatable {
     @State private var showNope = false
     @State private var showGlow = false
     @State private var checkmarkBounce = false
+    @State private var nopeTask: Task<Void, Never>?
+    @State private var glowTask: Task<Void, Never>?
+    @State private var bounceTask: Task<Void, Never>?
 
     // Equatable - ignore closure, compare only data that affects rendering
     static func == (lhs: SongRow, rhs: SongRow) -> Bool {
@@ -64,7 +67,10 @@ struct SongRow: View, Equatable {
             withAnimation(.easeInOut(duration: 0.05).repeatCount(3, autoreverses: true)) {
                 showNope = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            nopeTask?.cancel()
+            nopeTask = Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
                 showNope = false
             }
             return
@@ -78,7 +84,10 @@ struct SongRow: View, Equatable {
 
             // Glow flash on add
             showGlow = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            glowTask?.cancel()
+            glowTask = Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled else { return }
                 showGlow = false
             }
 
@@ -86,7 +95,10 @@ struct SongRow: View, Equatable {
             withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
                 checkmarkBounce = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            bounceTask?.cancel()
+            bounceTask = Task {
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled else { return }
                 withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
                     checkmarkBounce = false
                 }
