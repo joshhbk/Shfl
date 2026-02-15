@@ -12,6 +12,7 @@ enum HapticFeedback {
     private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
     private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
     private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private static let milestoneGenerator = UIImpactFeedbackGenerator(style: .medium)
     private static let notificationGenerator = UINotificationFeedbackGenerator()
 
     func trigger() {
@@ -29,14 +30,15 @@ enum HapticFeedback {
         case .error:
             Self.notificationGenerator.notificationOccurred(.error)
         case .milestone:
-            // Three quick taps for celebration
-            Self.mediumGenerator.prepare()
-            Self.mediumGenerator.impactOccurred()
+            // Three quick taps for celebration — dedicated generator to avoid
+            // interference if .medium fires during the pulse window
+            Self.milestoneGenerator.prepare()
+            Self.milestoneGenerator.impactOccurred()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                Self.mediumGenerator.impactOccurred()
+                Self.milestoneGenerator.impactOccurred()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                Self.mediumGenerator.impactOccurred()
+                Self.milestoneGenerator.impactOccurred()
             }
         }
     }
