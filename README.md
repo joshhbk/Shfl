@@ -60,4 +60,4 @@ xcodebuild test \
 
 ## License
 
-Private. All rights reserved.
+[MIT](LICENSE)
