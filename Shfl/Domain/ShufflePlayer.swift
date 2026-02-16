@@ -41,13 +41,13 @@ final class ShufflePlayer {
         case draining(pendingPass: Bool)
     }
 
-    /// Coordinates deferred transport sync when songs are added during active playback.
+    /// Coordinates deferred transport sync when active playback needs a queue rebuild.
     /// Instead of rebuilding the MusicKit queue mid-song (causing audible interruption),
     /// the swap is deferred to the natural song boundary where a brief silence is expected.
     private enum BoundarySwapState {
         /// No deferred transport sync needed.
         case idle
-        /// Songs were added during active playback. Waiting for the current song to finish.
+        /// A queue mutation was deferred during active playback. Waiting for song boundary.
         case armed
         /// Armed, but the user just skipped. The next observer transition is from the skip,
         /// not a natural song boundary — process it normally then return to .armed.
@@ -995,25 +995,22 @@ final class ShufflePlayer {
                 return
             }
 
-            do {
-                let outcome = try await applyReductionWithTransport(
-                    reduction,
-                    source: "reshuffle-algorithm",
-                    rollbackPolicy: .full
-                )
-                switch outcome {
-                case .applied:
-                    if playbackState.isActive {
-                        recordOperation(.reshuffleAlgorithmSuccess, detail: algorithm.rawValue)
-                    } else {
-                        recordOperation(.reshuffleAlgorithmInvalidated, detail: algorithm.rawValue)
-                    }
-                case .stale:
-                    return
+            let outcome = try await applyReductionWithTransport(
+                reduction,
+                source: "reshuffle-algorithm",
+                rollbackPolicy: .full
+            )
+            guard case .applied = outcome else { return }
+
+            if playbackState.isActive {
+                if queueNeedsBuild {
+                    rearmBoundarySwapIfNeeded(after: reduction)
+                    recordOperation(.reshuffleAlgorithmDeferred, detail: algorithm.rawValue)
+                } else {
+                    recordOperation(.reshuffleAlgorithmSuccess, detail: algorithm.rawValue)
                 }
-            } catch {
-                _ = reportTransportFailure(action: "Couldn't reshuffle the active queue", error: error)
-                recordOperation(.reshuffleAlgorithmFailed, detail: error.localizedDescription)
+            } else {
+                recordOperation(.reshuffleAlgorithmInvalidated, detail: algorithm.rawValue)
             }
         } catch {
             recordOperation(.reshuffleAlgorithmFailed, detail: error.localizedDescription)
@@ -1086,6 +1083,23 @@ final class ShufflePlayer {
         }
     }
 
+    private func reductionContainsQueueSyncCommand(_ reduction: QueueEngineReduction) -> Bool {
+        reduction.transportCommands.contains { command in
+            switch command {
+            case .setQueue, .replaceQueue:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    private func rearmBoundarySwapIfNeeded(after reduction: QueueEngineReduction) {
+        guard queueNeedsBuild, playbackState.isPlaying else { return }
+        guard !reductionContainsQueueSyncCommand(reduction) else { return }
+        armBoundarySwap()
+    }
+
     private struct NonActiveAddReductionContext {
         let source: String
         let actionDescription: String
@@ -1115,9 +1129,7 @@ final class ShufflePlayer {
                     successDetail: "id=\(song.id)",
                     failureDetail: "transport-sync-failed id=\(song.id)"
                 )
-                if queueNeedsBuild && playbackState.isPlaying {
-                    armBoundarySwap()
-                }
+                rearmBoundarySwapIfNeeded(after: reduction)
                 return
             }
 
@@ -1173,9 +1185,7 @@ final class ShufflePlayer {
                     successDetail: "batch=\(newSongs.count)",
                     failureDetail: "transport-sync-failed"
                 )
-                if queueNeedsBuild && playbackState.isPlaying {
-                    armBoundarySwap()
-                }
+                rearmBoundarySwapIfNeeded(after: reduction)
                 return
             }
 
@@ -1209,6 +1219,7 @@ final class ShufflePlayer {
                     rollbackPolicy: .full
                 )
                 guard case .applied = outcome else { return }
+                rearmBoundarySwapIfNeeded(after: reduction)
                 recordOperation(.removeSongSuccess, detail: "id=\(id)")
             } catch {
                 _ = reportTransportFailure(action: "Couldn't remove the song from the active queue", error: error)

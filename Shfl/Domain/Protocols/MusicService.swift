@@ -31,7 +31,7 @@ struct PlaylistPage: Sendable {
     let hasMore: Bool
 }
 
-enum QueueApplyPolicy: Sendable {
+enum QueueApplyPolicy: Sendable, Equatable {
     /// Ensure queue mutation ends in a playing state.
     case forcePlaying
     /// Ensure queue mutation ends in paused state.
