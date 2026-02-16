@@ -61,6 +61,7 @@ enum QueueOperationID: String, Sendable {
     case snapshotExport = "snapshot-export"
     case snapshotExportFailed = "snapshot-export-failed"
     case reshuffleAlgorithmSkip = "reshuffle-algorithm-skip"
+    case reshuffleAlgorithmDeferred = "reshuffle-algorithm-deferred"
     case reshuffleAlgorithmSuccess = "reshuffle-algorithm-success"
     case reshuffleAlgorithmInvalidated = "reshuffle-algorithm-invalidated"
     case reshuffleAlgorithmFailed = "reshuffle-algorithm-failed"

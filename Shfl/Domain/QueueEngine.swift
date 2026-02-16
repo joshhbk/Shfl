@@ -224,6 +224,8 @@ enum QueueEngineReducer {
                             revision: 0
                         )
                     )
+                    // A successful active remove replaceQueue already synced transport to domain.
+                    nextQueueNeedsBuild = nextQueueState.isQueueStale
                 } else if nextQueueState.isEmpty {
                     commands.append(.pause(revision: 0))
                     nextPlaybackState = .empty
@@ -232,6 +234,8 @@ enum QueueEngineReducer {
 
             if !nextQueueState.hasQueue && !nextQueueState.isEmpty {
                 nextQueueNeedsBuild = true
+            } else if nextQueueState.isEmpty {
+                nextQueueNeedsBuild = false
             }
 
         case .removeAllSongs:
@@ -287,8 +291,16 @@ enum QueueEngineReducer {
             case .playing:
                 return try reduce(state: state, intent: .pause)
             case .paused:
-                if !state.queueState.isEmpty && (!state.queueState.hasQueue || state.queueNeedsBuild) {
+                if !state.queueState.isEmpty && !state.queueState.hasQueue {
                     return try reduce(state: state, intent: .play(algorithm: algorithm))
+                }
+                if state.queueNeedsBuild {
+                    if state.queueState.hasQueue && !state.queueState.isQueueStale {
+                        appendReplaceQueueCommand(state: state, queueState: state.queueState, commands: &commands)
+                        nextQueueNeedsBuild = false
+                    } else {
+                        return try reduce(state: state, intent: .play(algorithm: algorithm))
+                    }
                 }
                 commands.append(.play(revision: 0))
             case .loading:
@@ -313,22 +325,11 @@ enum QueueEngineReducer {
                 return QueueEngineReduction(nextState: state, transportCommands: [], wasNoOp: true)
             }
 
-            nextQueueState = state.queueState.settingCurrentSong(id: currentSongId)
-            nextQueueState = nextQueueState.reshuffledUpcoming(
+            nextQueueState = state.queueState.reshuffledFullQueueAnchoringCurrentSong(
                 with: algorithm,
                 preferredCurrentSongId: currentSongId
             )
-            nextQueueNeedsBuild = false
-
-            let policy: QueueApplyPolicy = state.playbackState.isPlaying ? .forcePlaying : .forcePaused
-            commands.append(
-                .replaceQueue(
-                    queue: nextQueueState.queueOrder,
-                    startAtSongId: currentSongId,
-                    policy: policy,
-                    revision: 0
-                )
-            )
+            nextQueueNeedsBuild = true
 
         case .resyncActiveAddTransport:
             guard state.playbackState.isActive && state.queueState.hasQueue else {

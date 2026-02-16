@@ -183,6 +183,126 @@ final class QueueEngineTests: XCTestCase {
         )
     }
 
+    func testReshuffleAlgorithmDuringActivePlaybackDefersTransportAndAnchorsCurrentSong() throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist A", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist B", albumTitle: "Album", artworkURL: nil)
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist C", albumTitle: "Album", artworkURL: nil)
+        let song4 = Song(id: "4", title: "Song 4", artist: "Artist D", albumTitle: "Album", artworkURL: nil)
+        let queueState = QueueState(
+            songPool: [song1, song2, song3, song4],
+            queueOrder: [song3, song1, song4, song2],
+            currentIndex: 2,
+            algorithm: .noRepeat
+        )
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .playing(song4),
+            revision: 11,
+            queueNeedsBuild: false
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .reshuffleAlgorithm(.artistSpacing))
+        XCTAssertFalse(reduction.wasNoOp)
+        XCTAssertTrue(reduction.transportCommands.isEmpty, "Active algorithm changes should defer transport sync")
+        XCTAssertTrue(reduction.nextState.queueNeedsBuild, "Deferred algorithm changes should mark queue rebuild pending")
+        XCTAssertEqual(reduction.nextState.queueState.currentIndex, 0, "Current song should be anchored at queue head")
+        XCTAssertEqual(reduction.nextState.queueState.currentSongId, song4.id)
+        XCTAssertEqual(reduction.nextState.queueState.queueOrder.first?.id, song4.id)
+        XCTAssertEqual(
+            Set(reduction.nextState.queueState.queueOrder.map(\.id)),
+            Set([song1.id, song2.id, song3.id, song4.id]),
+            "Full reshuffle should preserve full pool membership"
+        )
+        XCTAssertEqual(reduction.nextState.queueState.algorithm, .artistSpacing)
+    }
+
+    func testTogglePlaybackFromPausedUsesDeferredCanonicalQueueBeforePlay() throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let queueState = QueueState(songPool: [song1, song2, song3], queueOrder: [song2, song1, song3], currentIndex: 0)
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .paused(song2),
+            revision: 22,
+            queueNeedsBuild: true
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .togglePlayback(algorithm: nil))
+        XCTAssertFalse(reduction.wasNoOp)
+        XCTAssertFalse(reduction.nextState.queueNeedsBuild, "Canonical deferred queue should be synced before resume")
+        XCTAssertEqual(reduction.transportCommands.count, 2, "Paused resume should replace queue then play")
+
+        guard case .replaceQueue(let queue, let startAtSongId, let policy, let replaceRevision) = reduction.transportCommands[0] else {
+            return XCTFail("Expected replaceQueue before play when resuming deferred canonical queue")
+        }
+        XCTAssertEqual(queue.map(\.id), [song2.id, song1.id, song3.id])
+        XCTAssertEqual(startAtSongId, song2.id)
+        XCTAssertEqual(policy, .forcePaused)
+        XCTAssertEqual(replaceRevision, 23)
+
+        guard case .play(let playRevision) = reduction.transportCommands[1] else {
+            return XCTFail("Expected play after deferred queue sync")
+        }
+        XCTAssertEqual(playRevision, 23)
+    }
+
+    func testTogglePlaybackFromPausedFallsBackToPlayWhenDeferredQueueIsStale() throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+
+        // Queue is stale (song3 missing), so paused resume should route through play() rebuild path.
+        let queueState = QueueState(songPool: [song1, song2, song3], queueOrder: [song2, song1], currentIndex: 0)
+        let state = QueueEngineState(
+            queueState: queueState,
+            playbackState: .paused(song2),
+            revision: 30,
+            queueNeedsBuild: true
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .togglePlayback(algorithm: nil))
+        XCTAssertFalse(reduction.wasNoOp)
+        XCTAssertFalse(reduction.nextState.queueNeedsBuild, "Play rebuild should clear pending build after setQueue")
+        XCTAssertEqual(reduction.transportCommands.count, 2)
+        guard case .setQueue(let songs, let setRevision) = reduction.transportCommands[0] else {
+            return XCTFail("Expected play() fallback to rebuild via setQueue")
+        }
+        XCTAssertEqual(songs.count, 3)
+        XCTAssertEqual(setRevision, 31)
+
+        guard case .play(let playRevision) = reduction.transportCommands[1] else {
+            return XCTFail("Expected play command after setQueue rebuild")
+        }
+        XCTAssertEqual(playRevision, 31)
+    }
+
+    func testRemoveUpcomingSongClearsPendingBuildWhenReplaceQueueSyncsCanonicalQueue() throws {
+        let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let state = QueueEngineState(
+            queueState: QueueState(songPool: [song1, song2, song3], queueOrder: [song2, song1, song3], currentIndex: 0),
+            playbackState: .playing(song2),
+            revision: 40,
+            queueNeedsBuild: true
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .removeSong(id: song1.id))
+        XCTAssertFalse(reduction.wasNoOp)
+        XCTAssertFalse(
+            reduction.nextState.queueNeedsBuild,
+            "Remove replaceQueue sync should clear pending build when resulting queue is canonical"
+        )
+
+        guard case .replaceQueue(let queue, let startAtSongId, _, let revision) = reduction.transportCommands.first else {
+            return XCTFail("Expected replaceQueue command when removing upcoming song during active playback")
+        }
+        XCTAssertEqual(queue.map(\.id), [song2.id, song3.id])
+        XCTAssertEqual(startAtSongId, song2.id)
+        XCTAssertEqual(revision, 41)
+    }
+
     func testResyncActiveAddTransportRebuildsUpcomingAndBumpsRevision() throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)

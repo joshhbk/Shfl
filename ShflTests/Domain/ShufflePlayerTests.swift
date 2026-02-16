@@ -1271,7 +1271,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(queue.count, 5, "Queue should be rebuilt with all songs")
     }
 
-    func testReshuffleWithNewAlgorithmUpdatesQueue() async throws {
+    func testReshuffleWithNewAlgorithmDefersTransportUntilBoundary() async throws {
         UserDefaults.standard.set("noRepeat", forKey: "shuffleAlgorithm")
 
         let songs = (1...5).map { i in
@@ -1283,6 +1283,15 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
+        guard let currentSong = await player.playbackState.currentSong else {
+            XCTFail("Expected active current song before algorithm change")
+            return
+        }
+        guard let transitionSong = songs.first(where: { $0.id != currentSong.id }) else {
+            XCTFail("Expected at least one non-current song")
+            return
+        }
+
         await mockService.resetQueueTracking()
 
         // Change algorithm to artistSpacing
@@ -1292,9 +1301,20 @@ final class ShufflePlayerTests: XCTestCase {
         let usedAlgorithm = await player.lastUsedAlgorithm
         XCTAssertEqual(usedAlgorithm, .artistSpacing, "Algorithm should be updated")
 
-        // Queue should be rebuilt (replaceQueue was called internally)
-        let queuedSongs = await mockService.lastQueuedSongs
-        XCTAssertFalse(queuedSongs.isEmpty, "Queue should be rebuilt with new algorithm")
+        let needsBuildBeforeBoundary = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildBeforeBoundary, "Active algorithm change should defer transport rebuild")
+        let replaceCallsBeforeBoundary = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallsBeforeBoundary, 0, "Algorithm change should not rebuild transport mid-song")
+
+        await mockService.simulatePlaybackState(.playing(transitionSong))
+
+        let didSyncAtBoundary = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let needsBuild = await self.player!.queueNeedsBuild
+            return !needsBuild
+        }
+        XCTAssertTrue(didSyncAtBoundary, "Deferred algorithm rebuild should apply at song boundary")
+        let replaceCallsAfterBoundary = await mockService.replaceQueueCallCount
+        XCTAssertGreaterThanOrEqual(replaceCallsAfterBoundary, 1, "Boundary swap should eventually sync transport")
     }
 
     func testReproAddSongsThenAlgorithmChangeThenPausePlayStaysInSync() async throws {
@@ -1358,6 +1378,41 @@ final class ShufflePlayerTests: XCTestCase {
         }
     }
 
+    func testPausedAlgorithmChangeResumesUsingPrecomputedQueue() async throws {
+        let songs = (1...5).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist \(i)", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        await player.pause()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+        await player.reshuffleWithNewAlgorithm(.artistSpacing)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let precomputedQueueIds = await player.lastShuffledQueue.map(\.id)
+        let needsBuildBeforeResume = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildBeforeResume, "Paused algorithm change should stage deferred queue sync")
+
+        try await player.togglePlayback()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let setQueueCalls = await mockService.setQueueCallCount
+        XCTAssertEqual(setQueueCalls, 0, "Paused resume should use the precomputed queue instead of fresh setQueue reshuffle")
+        let replaceCalls = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCalls, 1, "Paused resume should sync deferred queue via replaceQueue")
+        let resumedQueueIds = await mockService.lastQueuedSongs.map(\.id)
+        XCTAssertEqual(
+            resumedQueueIds,
+            precomputedQueueIds,
+            "Resume should apply the precomputed algorithm queue order"
+        )
+    }
+
     func testReshufflePreservesCurrentSong() async throws {
         let songs = (1...5).map { i in
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1374,14 +1429,27 @@ final class ShufflePlayerTests: XCTestCase {
         await player.reshuffleWithNewAlgorithm(.pureRandom)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        // Current song should still be current after reshuffle.
-        let queuedSongs = await mockService.lastQueuedSongs
         let currentSongIdAfterReshuffle = await player.playbackState.currentSongId
         XCTAssertEqual(
             currentSongIdAfterReshuffle,
             currentSongId,
             "Current song should be preserved across reshuffle"
         )
+        let domainQueueFirst = await player.lastShuffledQueue.first?.id
+        XCTAssertEqual(domainQueueFirst, currentSongId, "Deferred reshuffle should anchor current song at queue index 0")
+
+        guard let transitionSong = songs.first(where: { $0.id != currentSongId }) else {
+            XCTFail("Expected transition candidate")
+            return
+        }
+        await mockService.simulatePlaybackState(.playing(transitionSong))
+        let didSyncAtBoundary = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let needsBuild = await self.player!.queueNeedsBuild
+            return !needsBuild
+        }
+        XCTAssertTrue(didSyncAtBoundary, "Boundary transition should sync deferred reshuffle")
+
+        let queuedSongs = await mockService.lastQueuedSongs
         XCTAssertEqual(
             queuedSongs.filter { $0.id == currentSongId }.count,
             1,
@@ -1416,10 +1484,197 @@ final class ShufflePlayerTests: XCTestCase {
         await player.reshuffleWithNewAlgorithm(.noRepeat)
         try await Task.sleep(nanoseconds: 100_000_000)
 
+        // Deferred while active: no immediate transport replace.
+        let replaceCallsBeforeBoundary = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallsBeforeBoundary, 0)
+
+        guard let currentAfterReshuffle = await player.playbackState.currentSongId,
+              let transitionCandidate = [song1, song2, song3].first(where: { $0.id != currentAfterReshuffle }) else {
+            XCTFail("Expected post-reshuffle transition candidate")
+            return
+        }
+        await mockService.simulatePlaybackState(.playing(transitionCandidate))
+        let didSyncAtBoundary = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let needsBuild = await self.player!.queueNeedsBuild
+            return !needsBuild
+        }
+        XCTAssertTrue(didSyncAtBoundary, "Boundary transition should apply deferred reshuffle")
+
         let queuedSongs = await mockService.lastQueuedSongs
         let queuedIds = Set(queuedSongs.map(\.id))
         XCTAssertEqual(queuedIds, Set(["1", "2", "3"]), "Reshuffle should preserve full pool membership in queue")
         XCTAssertEqual(queuedSongs.count, queuedIds.count, "Reshuffle should not introduce duplicate queue IDs")
+    }
+
+    func testAlgorithmChangeDuringSwappingRearmsAndAppliesOnNextBoundary() async throws {
+        let songs = (1...3).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist \(i)", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let activeSong = await player.playbackState.currentSong else {
+            XCTFail("Expected active song")
+            return
+        }
+        guard let firstTransition = songs.first(where: { $0.id != activeSong.id }) else {
+            XCTFail("Expected transition song")
+            return
+        }
+
+        let extra = Song(id: "4", title: "Song 4", artist: "Artist 4", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(extra)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.resetQueueTracking()
+        await mockService.setReplaceQueueDelay(nanoseconds: 350_000_000)
+
+        await mockService.simulatePlaybackState(.playing(firstTransition))
+        let startedSwap = await waitForCondition(timeoutNanoseconds: 1_500_000_000) { [self] in
+            let pauseCount = await self.mockService!.pauseCallCount
+            return pauseCount > 0
+        }
+        XCTAssertTrue(startedSwap, "Boundary swap should start before testing .swapping algorithm change")
+
+        await player.reshuffleWithNewAlgorithm(.artistSpacing)
+        try await Task.sleep(nanoseconds: 500_000_000)
+
+        let needsBuildAfterFirstSwap = await player.queueNeedsBuild
+        XCTAssertTrue(
+            needsBuildAfterFirstSwap,
+            "Algorithm change during .swapping should remain pending after in-flight swap completes"
+        )
+
+        let replaceCallsAfterFirstSwap = await mockService.replaceQueueCallCount
+        XCTAssertGreaterThanOrEqual(replaceCallsAfterFirstSwap, 1, "First in-flight boundary swap should still execute")
+
+        let queueAfterAlgorithm = await player.lastShuffledQueue
+        guard let currentAfterFirstSwap = await player.playbackState.currentSongId,
+              let secondTransition = queueAfterAlgorithm.first(where: { $0.id != currentAfterFirstSwap }) else {
+            XCTFail("Expected second transition song")
+            return
+        }
+        await mockService.simulatePlaybackState(.playing(secondTransition))
+
+        let didApplySecondBoundary = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let needsBuild = await self.player!.queueNeedsBuild
+            return !needsBuild
+        }
+        XCTAssertTrue(didApplySecondBoundary, "Deferred reshuffle should apply on the next boundary after .swapping")
+
+        let usedAlgorithm = await player.lastUsedAlgorithm
+        XCTAssertEqual(usedAlgorithm, .artistSpacing)
+    }
+
+    func testAlgorithmChangeDuringSwappingDoesNotOverwritesSwappingState() async throws {
+        let songs = (1...4).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist \(i)", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let activeSong = await player.playbackState.currentSong else {
+            XCTFail("Expected active song")
+            return
+        }
+        guard let firstTransition = songs.first(where: { $0.id != activeSong.id }) else {
+            XCTFail("Expected first transition song")
+            return
+        }
+
+        let extra = Song(id: "5", title: "Song 5", artist: "Artist 5", albumTitle: "Album", artworkURL: nil)
+        try await player.addSong(extra)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        await mockService.setReplaceQueueDelay(nanoseconds: 400_000_000)
+        await mockService.simulatePlaybackState(.playing(firstTransition))
+        let startedSwap = await waitForCondition(timeoutNanoseconds: 2_000_000_000) { [self] in
+            let pauseCount = await self.mockService!.pauseCallCount
+            return pauseCount > 0
+        }
+        XCTAssertTrue(startedSwap, "Boundary swap should start before injecting an extra transition")
+
+        let pauseCallsBeforeAlgorithm = await mockService.pauseCallCount
+        await player.reshuffleWithNewAlgorithm(.artistSpacing)
+        await Task.yield()
+
+        let secondTransition = await player.lastShuffledQueue.first(where: { $0.id != firstTransition.id && $0.id != activeSong.id })
+        guard let secondTransition else {
+            XCTFail("Expected follow-up transition song")
+            return
+        }
+
+        await mockService.simulatePlaybackState(.playing(secondTransition))
+        try await Task.sleep(nanoseconds: 150_000_000)
+        let pauseCallsAfterSecondTransition = await mockService.pauseCallCount
+        XCTAssertEqual(
+            pauseCallsAfterSecondTransition,
+            pauseCallsBeforeAlgorithm,
+            "Algorithm change during swapping should not drop out of .swapping and trigger a second boundary sequence"
+        )
+
+        let didFinishSwap = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let needsBuild = await self.player!.queueNeedsBuild
+            return !needsBuild
+        }
+        XCTAssertTrue(didFinishSwap, "Deferred swap should still complete after guarding re-arm")
+
+        let replaceCallsAfterSwap = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallsAfterSwap, 1, "Only the in-flight boundary swap should execute during this scenario")
+    }
+
+    func testRemoveAfterDeferredAlgorithmSyncDoesNotTriggerRedundantBoundarySwap() async throws {
+        let songs = (1...4).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist \(i)", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+        try await player.play()
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        guard let currentBeforeRemove = await player.playbackState.currentSongId else {
+            XCTFail("Expected active current song")
+            return
+        }
+
+        await mockService.resetQueueTracking()
+        await player.reshuffleWithNewAlgorithm(.artistSpacing)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let needsBuildBeforeRemove = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildBeforeRemove, "Algorithm change should stage deferred boundary sync")
+
+        let removableId = await player.lastShuffledQueue.first(where: { $0.id != currentBeforeRemove })?.id
+        guard let removableId else {
+            XCTFail("Expected removable upcoming song")
+            return
+        }
+
+        await player.removeSong(id: removableId)
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let replaceCallsAfterRemove = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallsAfterRemove, 1, "Remove should perform a single active replaceQueue sync")
+        let needsBuildAfterRemove = await player.queueNeedsBuild
+        XCTAssertFalse(needsBuildAfterRemove, "Remove replaceQueue sync should clear pending deferred rebuild")
+
+        guard let currentAfterRemove = await player.playbackState.currentSongId,
+              let transitionSong = await player.lastShuffledQueue.first(where: { $0.id != currentAfterRemove }) else {
+            XCTFail("Expected follow-up transition song")
+            return
+        }
+        await mockService.simulatePlaybackState(.playing(transitionSong))
+        try await Task.sleep(nanoseconds: 250_000_000)
+
+        let replaceCallsAfterTransition = await mockService.replaceQueueCallCount
+        XCTAssertEqual(replaceCallsAfterTransition, 1, "No redundant boundary swap should run after remove already synced transport")
     }
 
     func testDuplicateMetadataSongsUseIDFirstMapping() async throws {
@@ -1751,7 +2006,9 @@ final class ShufflePlayerTests: XCTestCase {
 
         let song6 = Song(id: "6", title: "Song 6", artist: "Artist 6", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song6)
-        await player.removeSong(id: "2")
+        let currentSongId = await player.playbackState.currentSongId
+        let songToRemove = currentSongId == "2" ? "1" : "2"
+        await player.removeSong(id: songToRemove)
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
         try await Task.sleep(nanoseconds: 200_000_000)
 
@@ -1934,7 +2191,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(records.first?.operation, "hard-reset-queue")
     }
 
-    func testReplaceQueueFailureKeepsStateRecoverable() async throws {
+    func testDeferredReshuffleBoundaryFailureKeepsStateRecoverable() async throws {
         let songs = (1...4).map { i in
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
@@ -1944,26 +2201,35 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let queueBeforeFailure = await player.lastShuffledQueue.map(\.id)
-
-        await mockService.setShouldThrowOnReplace(NSError(domain: "test", code: 99))
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        let queueAfterFailure = await player.lastShuffledQueue.map(\.id)
-        XCTAssertEqual(
-            queueAfterFailure,
-            queueBeforeFailure,
-            "Reshuffle failure should roll back to the previous queue state"
-        )
+        guard let currentSongId = await player.playbackState.currentSongId,
+              let firstTransition = await player.lastShuffledQueue.first(where: { $0.id != currentSongId }) else {
+            XCTFail("Expected boundary transition candidate")
+            return
+        }
 
-        let notice = await player.operationNotice
-        XCTAssertNotNil(notice, "Reshuffle failure should publish a non-blocking notice")
+        await mockService.setShouldThrowOnReplace(NSError(domain: "test", code: 99))
+        await mockService.simulatePlaybackState(.playing(firstTransition))
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        let needsBuildAfterFailure = await player.queueNeedsBuild
+        XCTAssertTrue(needsBuildAfterFailure, "Failed boundary replace should keep deferred rebuild pending")
 
         // State should remain usable despite failed queue mutation.
         await mockService.setShouldThrowOnReplace(nil)
-        try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        guard let currentAfterFailure = await player.playbackState.currentSongId,
+              let recoveryTransition = await player.lastShuffledQueue.first(where: { $0.id != currentAfterFailure }) else {
+            XCTFail("Expected recovery transition candidate")
+            return
+        }
+        await mockService.simulatePlaybackState(.playing(recoveryTransition))
+        let recovered = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let needsBuild = await self.player!.queueNeedsBuild
+            return !needsBuild
+        }
+        XCTAssertTrue(recovered, "Subsequent boundary should recover deferred reshuffle after transient failure")
 
         let state = await player.playbackState
         XCTAssertTrue(state.isActive, "Player should remain recoverable after queue mutation failure")

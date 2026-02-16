@@ -214,6 +214,32 @@ struct QueueState: Equatable, Sendable {
         )
     }
 
+    /// Build a full replacement queue while anchoring the current song at the front.
+    /// This differs from `reshuffledUpcoming` by reshuffling the entire pool around current.
+    func reshuffledFullQueueAnchoringCurrentSong(
+        with algorithm: ShuffleAlgorithm? = nil,
+        preferredCurrentSongId: String? = nil
+    ) -> QueueState {
+        let effectiveAlgorithm = algorithm ?? self.algorithm
+        let preferredCurrentSongId = preferredCurrentSongId ?? currentSongId
+        let reconciled = reconcilingQueue(preferredCurrentSongId: preferredCurrentSongId)
+        guard let current = reconciled.currentSong else {
+            return reconciled.shuffled(with: effectiveAlgorithm)
+        }
+
+        let poolWithoutCurrent = reconciled.songPool.filter { $0.id != current.id }
+        let shuffledRest = QueueShuffler(algorithm: effectiveAlgorithm).shuffle(poolWithoutCurrent)
+        let newQueue = [current] + shuffledRest
+
+        return QueueState(
+            songPool: reconciled.songPool,
+            queueOrder: newQueue,
+            playedIds: [],
+            currentIndex: 0,
+            algorithm: effectiveAlgorithm
+        )
+    }
+
     /// Mark a song as played.
     func markingAsPlayed(id: String) -> QueueState {
         guard !playedIds.contains(id) else { return self }
