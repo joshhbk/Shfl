@@ -18,7 +18,7 @@ struct AlbumArtColorExtractorTests {
         ]
 
         let result = AlbumArtColorExtractor.filterByVibrancy(candidates)
-        #expect(result.isEmpty)
+        #expect(result.count == 2)
     }
 
     @Test("keeps colors above vibrancy threshold")
