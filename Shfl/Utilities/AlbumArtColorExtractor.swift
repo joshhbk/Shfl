@@ -9,7 +9,9 @@ final class AlbumArtColorExtractor {
 
     @ObservationIgnored private var currentSongId: String?
     @ObservationIgnored private var currentTask: Task<Void, Never>?
-    @ObservationIgnored private var colorCache: [String: Color] = [:]
+    @ObservationIgnored private var candidateCache: [String: [Color]] = [:]
+
+    static let minimumVibrancyThreshold: Double = 0.1
 
     /// Updates the extracted color for the given song by fetching from user's library
     func updateColor(for songId: String) {
@@ -17,13 +19,18 @@ final class AlbumArtColorExtractor {
         guard songId != currentSongId else { return }
         currentSongId = songId
 
-        // Check cache first
-        if let cached = colorCache[songId] {
+        // Check cache first — randomly select from cached candidates
+        if let cached = candidateCache[songId] {
+            let selected = cached.randomElement()
             #if DEBUG
-            print("[ColorExtractor] Using cached color for songId: \(songId)")
+            if let selected {
+                let hsb = ColorBlending.extractHSB(from: selected)
+                print("[ColorExtractor] Randomly selected from \(cached.count) cached candidate(s) for songId: \(songId) — hue: \(String(format: "%.2f", hsb.hue)) sat: \(String(format: "%.2f", hsb.saturation)) bright: \(String(format: "%.2f", hsb.brightness))")
+            } else {
+                print("[ColorExtractor] No viable cached candidates for songId: \(songId), using theme default")
+            }
             #endif
-            // No animation here - TintedThemeProvider handles the visual transition
-            extractedColor = cached
+            extractedColor = selected
             return
         }
 
@@ -46,6 +53,8 @@ final class AlbumArtColorExtractor {
                     #if DEBUG
                     print("[ColorExtractor] No song found in library for songId: \(songId)")
                     #endif
+                    candidateCache[songId] = []
+                    extractedColor = nil
                     return
                 }
 
@@ -57,31 +66,31 @@ final class AlbumArtColorExtractor {
                     #if DEBUG
                     print("[ColorExtractor] No artwork available for songId: \(songId)")
                     #endif
+                    candidateCache[songId] = []
+                    extractedColor = nil
                     return
                 }
 
-                let color = Self.pickMostVibrant(from: artwork)
+                let candidates = Self.vibrantCandidates(from: artwork)
+                candidateCache[songId] = candidates
 
-                guard let color else {
-                    #if DEBUG
-                    print("[ColorExtractor] No usable colors from artwork for songId: \(songId)")
-                    #endif
-                    return
-                }
-
-                colorCache[songId] = color
+                let selected = candidates.randomElement()
 
                 #if DEBUG
-                let hsb = ColorBlending.extractHSB(from: color)
-                print("[ColorExtractor] Selected color - hue: \(hsb.hue), sat: \(hsb.saturation), bright: \(hsb.brightness)")
+                if let selected {
+                    let hsb = ColorBlending.extractHSB(from: selected)
+                    print("[ColorExtractor] Randomly selected from \(candidates.count) candidate(s) for songId: \(songId) — hue: \(String(format: "%.2f", hsb.hue)) sat: \(String(format: "%.2f", hsb.saturation)) bright: \(String(format: "%.2f", hsb.brightness))")
+                } else {
+                    print("[ColorExtractor] No candidates passed vibrancy threshold for songId: \(songId), using theme default")
+                }
                 #endif
 
-                // No animation here - TintedThemeProvider handles the visual transition
-                extractedColor = color
+                extractedColor = selected
             } catch {
                 #if DEBUG
                 print("[ColorExtractor] Failed to fetch library data: \(error)")
                 #endif
+                extractedColor = nil
             }
         }
     }
@@ -96,10 +105,31 @@ final class AlbumArtColorExtractor {
 
     // MARK: - Color selection
 
-    /// Evaluates all available artwork colors and picks the most vibrant one.
+    /// Filters labeled color candidates by vibrancy threshold.
+    /// Score = saturation × brightness. This naturally penalizes dark colors
+    /// (which can have high HSB saturation but look black) and desaturated
+    /// colors (grays/whites) equally.
+    nonisolated static func filterByVibrancy(_ candidates: [(color: Color, label: String)]) -> [Color] {
+        guard !candidates.isEmpty else { return [] }
+
+        let scored = candidates.map { candidate in
+            let hsb = ColorBlending.extractHSB(from: candidate.color)
+            let score = hsb.saturation * hsb.brightness
+            #if DEBUG
+            print("[ColorExtractor]   \(candidate.label): hue=\(String(format: "%.2f", hsb.hue)) sat=\(String(format: "%.2f", hsb.saturation)) bright=\(String(format: "%.2f", hsb.brightness)) score=\(String(format: "%.3f", score))")
+            #endif
+            return (candidate.color, score)
+        }
+
+        return scored
+            .filter { $0.1 >= minimumVibrancyThreshold }
+            .map { $0.0 }
+    }
+
+    /// Evaluates all available artwork colors and returns those above the vibrancy threshold.
     /// MusicKit provides backgroundColor, primaryTextColor, secondaryTextColor,
     /// tertiaryTextColor, and quaternaryTextColor — we score each by vibrancy.
-    private static func pickMostVibrant(from artwork: MusicKit.Artwork) -> Color? {
+    private static func vibrantCandidates(from artwork: MusicKit.Artwork) -> [Color] {
         var candidates: [(color: Color, label: String)] = []
 
         if let c = artwork.backgroundColor {
@@ -118,20 +148,6 @@ final class AlbumArtColorExtractor {
             candidates.append((Color(cgColor: c), "quaternaryText"))
         }
 
-        guard !candidates.isEmpty else { return nil }
-
-        let scored = candidates.map { candidate in
-            let hsb = ColorBlending.extractHSB(from: candidate.color)
-            // Score = saturation * brightness. This naturally penalizes
-            // dark colors (which can have high HSB saturation but look black)
-            // and desaturated colors (grays/whites) equally.
-            let score = hsb.saturation * hsb.brightness
-            #if DEBUG
-            print("[ColorExtractor]   \(candidate.label): hue=\(String(format: "%.2f", hsb.hue)) sat=\(String(format: "%.2f", hsb.saturation)) bright=\(String(format: "%.2f", hsb.brightness)) score=\(String(format: "%.3f", score))")
-            #endif
-            return (candidate.color, score)
-        }
-
-        return scored.max(by: { $0.1 < $1.1 })?.0
+        return filterByVibrancy(candidates)
     }
 }
