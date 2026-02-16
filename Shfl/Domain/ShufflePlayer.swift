@@ -331,6 +331,7 @@ final class ShufflePlayer {
     private static let boundarySwapPollIntervalNanoseconds: UInt64 = 100_000_000 // 100ms
 
     private func armBoundarySwap() {
+        guard boundarySwapState != .swapping else { return }
         boundarySwapState = .armed
         // Preload artwork for the next song so it's cached before the swap fires.
         // Pool songs have artworkURL: nil and may never have been displayed in a view.
