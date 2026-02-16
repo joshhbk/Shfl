@@ -7,15 +7,12 @@ final class TintedThemeProvider {
     /// The computed theme with blended colors, ready for environment injection
     private(set) var computedTheme: ShuffleTheme
 
-    /// The base theme before tinting (for reference)
-    private var baseTheme: ShuffleTheme
-
     /// Tracks whether we have ever had an album color — first tint uses a longer animation
     private var hasHadAlbumColor = false
 
     init() {
         // Start with a default silver theme; will be updated immediately on appear
-        let defaultTheme = ShuffleTheme(
+        self.computedTheme = ShuffleTheme(
             id: "silver",
             name: "Silver",
             bodyGradientTop: Color(red: 0.58, green: 0.58, blue: 0.60),
@@ -24,8 +21,6 @@ final class TintedThemeProvider {
             textStyle: .dark,
             centerButtonIconColor: .black
         )
-        self.baseTheme = defaultTheme
-        self.computedTheme = defaultTheme
     }
 
     /// Update the computed theme by blending album color with the current theme
@@ -34,8 +29,6 @@ final class TintedThemeProvider {
     ///   - albumColor: The dominant color from album artwork, or nil to use pure theme
     ///   - theme: The base theme to tint toward
     func update(albumColor: Color?, theme: ShuffleTheme) {
-        baseTheme = theme
-
         guard let albumColor else {
             // No album color - use pure theme
             hasHadAlbumColor = false
