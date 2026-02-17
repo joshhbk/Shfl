@@ -121,9 +121,12 @@ final class AlbumArtColorExtractor {
             return (candidate.color, score)
         }
 
-        return scored
+        let passing = scored
             .filter { $0.1 >= minimumVibrancyThreshold }
             .map { $0.0 }
+
+        // Vibrant colors preferred, but any album color is acceptable
+        return passing.isEmpty ? scored.map { $0.0 } : passing
     }
 
     /// Evaluates all available artwork colors and returns those above the vibrancy threshold.
