@@ -11,23 +11,29 @@ struct LibraryAutofillSource: AutofillSource {
     }
 
     func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
-        // Fetch enough to account for exclusions - need at least excluded count + desired limit
-        let fetchLimit = min(excluding.count + limit * 3, 500)
-        print("🔍 Autofill.fetchSongs: Fetching \(fetchLimit) songs from library...")
+        switch algorithm {
+        case .recentlyAdded:
+            let fetchLimit = min(excluding.count + limit * 3, 500)
+            let page = try await musicService.fetchLibrarySongs(
+                sortedBy: .recentlyAdded, limit: fetchLimit, offset: 0
+            )
+            let available = page.songs.filter { !excluding.contains($0.id) }
+            return Array(available.shuffled().prefix(limit))
 
-        let page = try await musicService.fetchLibrarySongs(
-            sortedBy: .recentlyAdded,
-            limit: fetchLimit,
-            offset: 0
-        )
-        print("🔍 Autofill.fetchSongs: Got \(page.songs.count) songs from library")
-
-        // Filter out excluded songs
-        let available = page.songs.filter { !excluding.contains($0.id) }
-        print("🔍 Autofill.fetchSongs: \(available.count) available after excluding \(excluding.count)")
-
-        // Both algorithms shuffle - the difference is the source pool
-        // (Currently both use recentlyAdded, but Random could use a different sort later)
-        return Array(available.shuffled().prefix(limit))
+        case .random:
+            var allSongs: [Song] = []
+            var offset = 0
+            let pageSize = 500
+            while true {
+                let page = try await musicService.fetchLibrarySongs(
+                    sortedBy: .alphabetical, limit: pageSize, offset: offset
+                )
+                allSongs.append(contentsOf: page.songs)
+                guard page.hasMore else { break }
+                offset += pageSize
+            }
+            let available = allSongs.filter { !excluding.contains($0.id) }
+            return Array(available.shuffled().prefix(limit))
+        }
     }
 }

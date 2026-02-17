@@ -116,6 +116,23 @@ struct LibraryAutofillSourceTests {
         #expect(resultIds == expectedIds, "Recently added should return songs from pool")
     }
 
+    @Test("Random algorithm paginates across full library")
+    func randomAlgorithmPaginatesFullLibrary() async throws {
+        let mockService = MockMusicService()
+        // Create 750 songs — exceeds the 500-song page size
+        let songs = (1...750).map { makeSong(id: "\($0)") }
+        await mockService.setLibrarySongs(songs)
+
+        let source = LibraryAutofillSource(musicService: mockService, algorithm: .random)
+        let result = try await source.fetchSongs(excluding: [], limit: 750)
+
+        // All 750 songs should be reachable
+        #expect(result.count == 750)
+        let resultIds = Set(result.map { $0.id })
+        let expectedIds = Set(songs.map { $0.id })
+        #expect(resultIds == expectedIds, "Random should include songs beyond the first page")
+    }
+
     @Test("Default algorithm is random")
     func defaultAlgorithmIsRandom() async throws {
         let mockService = MockMusicService()
