@@ -145,7 +145,7 @@ final class LibraryBrowserViewModel {
         }
     }
 
-    private func handleSearchTextChanged() {
+    func handleSearchTextChanged() {
         // Cancel previous debounce
         debounceTask?.cancel()
 
