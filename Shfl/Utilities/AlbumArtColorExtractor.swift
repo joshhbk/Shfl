@@ -11,7 +11,9 @@ final class AlbumArtColorExtractor {
     @ObservationIgnored private var currentTask: Task<Void, Never>?
     @ObservationIgnored private var candidateCache: [String: [Color]] = [:]
 
-    static let minimumVibrancyThreshold: Double = 0.1
+    /// Tracks the last-used color index per unique palette, so songs from the same album
+    /// cycle through colors rather than randomly repeating.
+    @ObservationIgnored private var lastUsedIndex: [Int: Int] = [:]
 
     /// Updates the extracted color for the given song by fetching from user's library
     func updateColor(for songId: String) {
@@ -19,15 +21,15 @@ final class AlbumArtColorExtractor {
         guard songId != currentSongId else { return }
         currentSongId = songId
 
-        // Check cache first — randomly select from cached candidates
+        // Check cache first
         if let cached = candidateCache[songId] {
-            let selected = cached.randomElement()
+            let selected = pickNext(from: cached)
             #if DEBUG
             if let selected {
                 let hsb = ColorBlending.extractHSB(from: selected)
                 print("[ColorExtractor] Randomly selected from \(cached.count) cached candidate(s) for songId: \(songId) — hue: \(String(format: "%.2f", hsb.hue)) sat: \(String(format: "%.2f", hsb.saturation)) bright: \(String(format: "%.2f", hsb.brightness))")
             } else {
-                print("[ColorExtractor] No viable cached candidates for songId: \(songId), using theme default")
+                print("[ColorExtractor] No cached candidates for songId: \(songId), using theme default")
             }
             #endif
             extractedColor = selected
@@ -71,17 +73,17 @@ final class AlbumArtColorExtractor {
                     return
                 }
 
-                let candidates = Self.vibrantCandidates(from: artwork)
+                let candidates = Self.artworkColors(from: artwork)
                 candidateCache[songId] = candidates
 
-                let selected = candidates.randomElement()
+                let selected = pickNext(from: candidates)
 
                 #if DEBUG
                 if let selected {
                     let hsb = ColorBlending.extractHSB(from: selected)
                     print("[ColorExtractor] Randomly selected from \(candidates.count) candidate(s) for songId: \(songId) — hue: \(String(format: "%.2f", hsb.hue)) sat: \(String(format: "%.2f", hsb.saturation)) bright: \(String(format: "%.2f", hsb.brightness))")
                 } else {
-                    print("[ColorExtractor] No candidates passed vibrancy threshold for songId: \(songId), using theme default")
+                    print("[ColorExtractor] No candidates for songId: \(songId), using theme default")
                 }
                 #endif
 
@@ -105,52 +107,48 @@ final class AlbumArtColorExtractor {
 
     // MARK: - Color selection
 
-    /// Filters labeled color candidates by vibrancy threshold.
-    /// Score = saturation × brightness. This naturally penalizes dark colors
-    /// (which can have high HSB saturation but look black) and desaturated
-    /// colors (grays/whites) equally.
-    nonisolated static func filterByVibrancy(_ candidates: [(color: Color, label: String)]) -> [Color] {
-        guard !candidates.isEmpty else { return [] }
+    /// Picks the next color from a candidate list, cycling through all colors before repeating.
+    /// Uses a stable hash of the palette so all songs sharing the same artwork rotate together.
+    private func pickNext(from candidates: [Color]) -> Color? {
+        guard !candidates.isEmpty else { return nil }
+        guard candidates.count > 1 else { return candidates.first }
 
-        let scored = candidates.map { candidate in
-            let hsb = ColorBlending.extractHSB(from: candidate.color)
-            let score = hsb.saturation * hsb.brightness
-            #if DEBUG
-            print("[ColorExtractor]   \(candidate.label): hue=\(String(format: "%.2f", hsb.hue)) sat=\(String(format: "%.2f", hsb.saturation)) bright=\(String(format: "%.2f", hsb.brightness)) score=\(String(format: "%.3f", score))")
-            #endif
-            return (candidate.color, score)
+        let key = paletteKey(for: candidates)
+        let last = lastUsedIndex[key] ?? -1
+        // Pick a random index from everything except the last-used one
+        var available = Array(candidates.indices)
+        if last >= 0 && last < candidates.count {
+            available.removeAll { $0 == last }
         }
-
-        let passing = scored
-            .filter { $0.1 >= minimumVibrancyThreshold }
-            .map { $0.0 }
-
-        // Vibrant colors preferred, but any album color is acceptable
-        return passing.isEmpty ? scored.map { $0.0 } : passing
+        let nextIndex = available.randomElement()!
+        lastUsedIndex[key] = nextIndex
+        return candidates[nextIndex]
     }
 
-    /// Evaluates all available artwork colors and returns those above the vibrancy threshold.
+    /// Generates a stable key for a color palette so same-album songs share rotation state.
+    private func paletteKey(for colors: [Color]) -> Int {
+        var hasher = Hasher()
+        for color in colors {
+            let hsb = ColorBlending.extractHSB(from: color)
+            hasher.combine(Int(hsb.hue * 1000))
+            hasher.combine(Int(hsb.saturation * 1000))
+            hasher.combine(Int(hsb.brightness * 1000))
+        }
+        return hasher.finalize()
+    }
+
+    /// Collects all available artwork colors from MusicKit.
     /// MusicKit provides backgroundColor, primaryTextColor, secondaryTextColor,
-    /// tertiaryTextColor, and quaternaryTextColor — we score each by vibrancy.
-    private static func vibrantCandidates(from artwork: MusicKit.Artwork) -> [Color] {
-        var candidates: [(color: Color, label: String)] = []
+    /// tertiaryTextColor, and quaternaryTextColor — any of them can be randomly selected.
+    private static func artworkColors(from artwork: MusicKit.Artwork) -> [Color] {
+        var colors: [Color] = []
 
-        if let c = artwork.backgroundColor {
-            candidates.append((Color(cgColor: c), "background"))
-        }
-        if let c = artwork.primaryTextColor {
-            candidates.append((Color(cgColor: c), "primaryText"))
-        }
-        if let c = artwork.secondaryTextColor {
-            candidates.append((Color(cgColor: c), "secondaryText"))
-        }
-        if let c = artwork.tertiaryTextColor {
-            candidates.append((Color(cgColor: c), "tertiaryText"))
-        }
-        if let c = artwork.quaternaryTextColor {
-            candidates.append((Color(cgColor: c), "quaternaryText"))
-        }
+        if let c = artwork.backgroundColor { colors.append(Color(cgColor: c)) }
+        if let c = artwork.primaryTextColor { colors.append(Color(cgColor: c)) }
+        if let c = artwork.secondaryTextColor { colors.append(Color(cgColor: c)) }
+        if let c = artwork.tertiaryTextColor { colors.append(Color(cgColor: c)) }
+        if let c = artwork.quaternaryTextColor { colors.append(Color(cgColor: c)) }
 
-        return filterByVibrancy(candidates)
+        return colors
     }
 }
