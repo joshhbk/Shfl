@@ -461,10 +461,15 @@ final class ShufflePlayer {
 
     private func executeBoundarySwap(nextSongId: String) async {
         defer {
+            boundarySwapState = .idle
             if queueNeedsBuild {
+                // Queue was mutated while .swapping (e.g. algorithm change or add).
+                // Arm the boundary swap so any subsequent song transition triggers
+                // a sync, AND schedule a resync retry as a fallback for cases where
+                // the observer transition was suppressed during .swapping and no new
+                // transition will arrive to trigger the armed swap.
                 armBoundarySwap()
-            } else {
-                boundarySwapState = .idle
+                scheduleActiveAddResyncRetry(source: "boundary-swap-followup", failureKind: .stale)
             }
         }
 
