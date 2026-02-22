@@ -36,6 +36,13 @@ final class AppSettings {
         }
     }
 
+    var hasCompletedOnboarding: Bool {
+        didSet {
+            guard hasCompletedOnboarding != oldValue else { return }
+            defaults.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding")
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
@@ -51,6 +58,8 @@ final class AppSettings {
 
         let autofillRaw = defaults.string(forKey: "autofillAlgorithm") ?? AutofillAlgorithm.random.rawValue
         self.autofillAlgorithm = AutofillAlgorithm(rawValue: autofillRaw) ?? .random
+
+        self.hasCompletedOnboarding = defaults.bool(forKey: "hasCompletedOnboarding")
     }
 }
 

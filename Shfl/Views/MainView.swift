@@ -23,7 +23,9 @@ struct MainView: View {
                     isShuffling: viewModel.isShuffling
                 )
             } else {
-                authorizationView
+                WelcomeView {
+                    Task { await viewModel.requestAuthorization() }
+                }
             }
         }
         .tint(deviceAccentColor)
@@ -33,6 +35,17 @@ struct MainView: View {
         }
         .task {
             await viewModel.onAppear()
+        }
+        .onChange(of: viewModel.isAuthorized) { _, isAuthorized in
+            guard isAuthorized,
+                  !appSettings.hasCompletedOnboarding,
+                  viewModel.player.queueState.songPool.isEmpty else { return }
+            appSettings.hasCompletedOnboarding = true
+            viewModel.isLoading = true
+            viewModel.loadingMessage = "Finding songs in your library..."
+            Task {
+                await viewModel.autofillLibrary()
+            }
         }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
             Task {
@@ -113,30 +126,4 @@ struct MainView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var authorizationView: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "music.note.list")
-                .font(.system(size: 64))
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 8) {
-                Text("Welcome to Shuffled")
-                    .font(.title2.bold())
-
-                Text("Connect to Apple Music to start shuffling")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            Button("Connect Apple Music") {
-                Task {
-                    await viewModel.requestAuthorization()
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-        }
-        .padding(32)
-    }
 }

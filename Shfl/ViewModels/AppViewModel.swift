@@ -91,6 +91,25 @@ final class AppViewModel {
         sessionCoordinator.persistSongs()
     }
 
+    func autofillLibrary() async {
+        isLoading = true
+        loadingMessage = "Finding songs in your library..."
+        do {
+            let source = LibraryAutofillSource(
+                musicService: musicService,
+                algorithm: appSettings.autofillAlgorithm
+            )
+            let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
+            loadingMessage = "Building your shuffle queue..."
+            try await playbackCoordinator.seedSongs(songs)
+            try await playbackCoordinator.prepareQueue()
+            sessionCoordinator.persistSongs()
+        } catch {
+            print("Failed to autofill library: \(error)")
+        }
+        isLoading = false
+    }
+
     func shuffleAll() async {
         isShuffling = true
         do {
