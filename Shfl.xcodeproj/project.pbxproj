@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00022F10000000000002 /* Vortex */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		DC1306A52EFDBDA400200F38 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -133,6 +138,7 @@
 			);
 			name = Shfl;
 			packageProductDependencies = (
+				DCAA00022F10000000000002 /* Vortex */,
 			);
 			productName = Shfl;
 			productReference = DC1306952EFDBDA300200F38 /* Shfl.app */;
@@ -216,6 +222,9 @@
 			);
 			mainGroup = DC13068C2EFDBDA300200F38;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DCAA00012F10000000000001 /* XCRemoteSwiftPackageReference "Vortex" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DC1306962EFDBDA300200F38 /* Products */;
 			projectDirPath = "";
@@ -648,6 +657,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DCAA00012F10000000000001 /* XCRemoteSwiftPackageReference "Vortex" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/twostraws/Vortex";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DCAA00022F10000000000002 /* Vortex */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00012F10000000000001 /* XCRemoteSwiftPackageReference "Vortex" */;
+			productName = Vortex;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DC13068D2EFDBDA300200F38 /* Project object */;
 }

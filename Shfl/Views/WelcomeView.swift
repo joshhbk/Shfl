@@ -1,48 +1,100 @@
 import SwiftUI
+import Vortex
 
 struct WelcomeView: View {
     let onConnect: () -> Void
 
     @State private var themeIndex = Int.random(in: 0..<ShuffleTheme.allThemes.count)
+    @State private var gradientStart: UnitPoint = .topLeading
+    @State private var gradientEnd: UnitPoint = .bottomTrailing
+    @State private var appeared = false
 
     private var theme: ShuffleTheme {
         ShuffleTheme.allThemes[themeIndex]
     }
 
+    private static let gradientPoints: [(start: UnitPoint, end: UnitPoint)] = [
+        (.topLeading, .bottomTrailing),
+        (.top, .bottom),
+        (.topTrailing, .bottomLeading),
+        (.leading, .trailing),
+        (.bottomLeading, .topTrailing),
+    ]
+
     var body: some View {
         ZStack {
-            BrushedMetalBackground()
+            WelcomeBackground(
+                color: theme.bodyGradientTop,
+                gradientStart: gradientStart,
+                gradientEnd: gradientEnd
+            )
+
+            ShuffleParticles(currentTheme: theme)
 
             VStack(spacing: 0) {
                 Spacer()
 
                 WelcomeClickWheel()
                     .padding(.bottom, 40)
+                    .scaleEffect(appeared ? 1 : 0.6)
+                    .opacity(appeared ? 1 : 0)
+                    .animation(.spring(duration: 0.7, bounce: 0.4).delay(0.15), value: appeared)
 
                 WelcomeHeader()
+                    .offset(y: appeared ? 0 : 20)
+                    .opacity(appeared ? 1 : 0)
+                    .animation(.spring(duration: 0.6).delay(0.35), value: appeared)
 
                 Spacer()
 
                 WelcomeConnectButton(onConnect: onConnect)
                     .padding(.bottom, 16)
+                    .offset(y: appeared ? 0 : 30)
+                    .opacity(appeared ? 1 : 0)
+                    .animation(.spring(duration: 0.6).delay(0.5), value: appeared)
 
                 WelcomeThemeDots(activeIndex: themeIndex)
                     .padding(.bottom, 8)
+                    .opacity(appeared ? 1 : 0)
+                    .animation(.easeIn(duration: 0.4).delay(0.65), value: appeared)
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 24)
         }
         .environment(\.shuffleTheme, theme)
+        .onAppear {
+            appeared = true
+        }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
                 guard !Task.isCancelled else { break }
                 let nextIndex = (themeIndex + 1) % ShuffleTheme.allThemes.count
+                let points = Self.gradientPoints[nextIndex % Self.gradientPoints.count]
                 withAnimation(.easeInOut(duration: 0.8)) {
                     themeIndex = nextIndex
+                    gradientStart = points.start
+                    gradientEnd = points.end
                 }
             }
         }
+    }
+}
+
+// MARK: - Animated Background
+
+private struct WelcomeBackground: View {
+    let color: Color
+    let gradientStart: UnitPoint
+    let gradientEnd: UnitPoint
+
+    var body: some View {
+        LinearGradient(
+            colors: [color, color.opacity(0.7)],
+            startPoint: gradientStart,
+            endPoint: gradientEnd
+        )
+        .ignoresSafeArea()
     }
 }
 

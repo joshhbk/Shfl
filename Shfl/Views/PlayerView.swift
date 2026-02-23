@@ -14,7 +14,7 @@ struct PlayerView: View {
 
     @Environment(\.appSettings) private var appSettings
     @State private var themeController: ThemeController
-    @State private var tintProvider = TintedThemeProvider()
+    @State private var tintProvider: TintedThemeProvider
     @State private var progressState: PlayerProgressState?
     @State private var colorExtractor = AlbumArtColorExtractor()
     @State private var showError = false
@@ -44,6 +44,8 @@ struct PlayerView: View {
         self.onShuffle = onShuffle
         self.isShuffling = isShuffling
         self._themeController = State(wrappedValue: ThemeController(themeId: initialThemeId))
+        let initialTheme = initialThemeId.flatMap { ShuffleTheme.theme(byId: $0) } ?? .pink
+        self._tintProvider = State(wrappedValue: TintedThemeProvider(theme: initialTheme))
     }
 
     var body: some View {

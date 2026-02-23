@@ -4,10 +4,16 @@ struct MainView: View {
     @Bindable var viewModel: AppViewModel
     let appSettings: AppSettings
 
+    private var loadingTheme: ShuffleTheme {
+        ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
+    }
+
     var body: some View {
         Group {
             if viewModel.isLoading {
-                loadingView
+                LoadingView(message: viewModel.loadingMessage)
+                    .environment(\.shuffleTheme, loadingTheme)
+                    .transition(.opacity)
             } else if viewModel.isAuthorized {
                 PlayerView(
                     player: viewModel.player,
@@ -22,12 +28,16 @@ struct MainView: View {
                     onShuffle: { Task { await viewModel.shuffleAll() } },
                     isShuffling: viewModel.isShuffling
                 )
+                .transition(.opacity)
             } else {
                 WelcomeView {
                     Task { await viewModel.requestAuthorization() }
                 }
+                .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.5), value: viewModel.isLoading)
+        .animation(.easeInOut(duration: 0.5), value: viewModel.isAuthorized)
         .tint(deviceAccentColor)
         .environment(\.appSettings, appSettings)
         .onAppear {
@@ -112,18 +122,6 @@ struct MainView: View {
 
     private var deviceAccentColor: Color {
         (ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink).accentColor
-    }
-
-    private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-
-            Text(viewModel.loadingMessage)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
 }

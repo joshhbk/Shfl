@@ -10,17 +10,8 @@ final class TintedThemeProvider {
     /// Tracks whether we have ever had an album color — first tint uses a longer animation
     private var hasHadAlbumColor = false
 
-    init() {
-        // Start with a default silver theme; will be updated immediately on appear
-        self.computedTheme = ShuffleTheme(
-            id: "silver",
-            name: "Silver",
-            bodyGradientTop: Color(red: 0.58, green: 0.58, blue: 0.60),
-            bodyGradientBottom: Color(red: 0.48, green: 0.48, blue: 0.50),
-            wheelStyle: .dark,
-            textStyle: .dark,
-            centerButtonIconColor: .black
-        )
+    init(theme: ShuffleTheme = .silver) {
+        self.computedTheme = theme
     }
 
     /// Update the computed theme by blending album color with the current theme
