@@ -34,7 +34,7 @@ struct WelcomeView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                WelcomeClickWheel()
+                WelcomeAppIcon()
                     .padding(.bottom, 40)
                     .scaleEffect(appeared ? 1 : 0.6)
                     .opacity(appeared ? 1 : 0)
@@ -98,21 +98,24 @@ private struct WelcomeBackground: View {
     }
 }
 
-// MARK: - Click Wheel (decorative)
+// MARK: - App Icon
 
-private struct WelcomeClickWheel: View {
+private struct WelcomeAppIcon: View {
+    @Environment(\.shuffleTheme) private var theme
+
+    private var iconName: String {
+        UIApplication.shared.alternateIconName ?? "AppIcon"
+    }
+
     var body: some View {
-        ClickWheelView(
-            isPlaying: false,
-            onPlayPause: {},
-            onSkipForward: {},
-            onSkipBack: {},
-            onVolumeUp: {},
-            onVolumeDown: {},
-            scale: 0.85
-        )
-        .allowsHitTesting(false)
-        .opacity(0.75)
+        Image(iconName)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(theme.textColor)
+            .frame(width: 160, height: 160)
+            .clipShape(RoundedRectangle(cornerRadius: 36))
+            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
     }
 }
 

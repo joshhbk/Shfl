@@ -13,6 +13,15 @@
 			</array>
 		</dict>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>SplashBackground</string>
+		<key>UIImageName</key>
+		<string>SplashLogo</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<false/>
+	</dict>
 	<key>CFBundleIcons</key>
 	<dict>
 		<key>CFBundleAlternateIcons</key>

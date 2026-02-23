@@ -4,40 +4,50 @@ struct MainView: View {
     @Bindable var viewModel: AppViewModel
     let appSettings: AppSettings
 
+    @State private var showSplash = true
+
     private var loadingTheme: ShuffleTheme {
         ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
     }
 
     var body: some View {
-        Group {
-            if viewModel.isLoading {
-                LoadingView(message: viewModel.loadingMessage)
-                    .environment(\.shuffleTheme, loadingTheme)
+        ZStack {
+            Group {
+                if viewModel.isLoading {
+                    LoadingView(message: viewModel.loadingMessage)
+                        .environment(\.shuffleTheme, loadingTheme)
+                        .transition(.opacity)
+                } else if viewModel.isAuthorized {
+                    PlayerView(
+                        player: viewModel.player,
+                        musicService: viewModel.musicService,
+                        initialThemeId: appSettings.currentThemeId,
+                        onManageTapped: { viewModel.openManage() },
+                        onAddTapped: { viewModel.openPickerDirect() },
+                        onSettingsTapped: { viewModel.openSettings() },
+                        onPlayPauseTapped: { Task { await viewModel.togglePlayback() } },
+                        onSkipForwardTapped: { Task { await viewModel.skipToNext() } },
+                        onSkipBackTapped: { Task { await viewModel.restartOrSkipToPrevious() } },
+                        onShuffle: { Task { await viewModel.shuffleAll() } },
+                        isShuffling: viewModel.isShuffling
+                    )
                     .transition(.opacity)
-            } else if viewModel.isAuthorized {
-                PlayerView(
-                    player: viewModel.player,
-                    musicService: viewModel.musicService,
-                    initialThemeId: appSettings.currentThemeId,
-                    onManageTapped: { viewModel.openManage() },
-                    onAddTapped: { viewModel.openPickerDirect() },
-                    onSettingsTapped: { viewModel.openSettings() },
-                    onPlayPauseTapped: { Task { await viewModel.togglePlayback() } },
-                    onSkipForwardTapped: { Task { await viewModel.skipToNext() } },
-                    onSkipBackTapped: { Task { await viewModel.restartOrSkipToPrevious() } },
-                    onShuffle: { Task { await viewModel.shuffleAll() } },
-                    isShuffling: viewModel.isShuffling
-                )
-                .transition(.opacity)
-            } else {
-                WelcomeView {
-                    Task { await viewModel.requestAuthorization() }
+                } else {
+                    WelcomeView {
+                        Task { await viewModel.requestAuthorization() }
+                    }
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
+            }
+            .animation(.easeInOut(duration: 0.5), value: viewModel.isLoading)
+            .animation(.easeInOut(duration: 0.5), value: viewModel.isAuthorized)
+
+            if showSplash {
+                SplashView(theme: loadingTheme) {
+                    showSplash = false
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.5), value: viewModel.isLoading)
-        .animation(.easeInOut(duration: 0.5), value: viewModel.isAuthorized)
         .tint(deviceAccentColor)
         .environment(\.appSettings, appSettings)
         .onAppear {
