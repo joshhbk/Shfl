@@ -1,13 +1,27 @@
+import MusicKit
 import SwiftUI
 
 /// Floating album art card with layered shadows and subtle border
 struct AlbumArtCard: View {
     let artworkURL: URL?
+    let songId: String?
     var size: CGFloat = 280
+
+    @State private var resolvedURL: URL?
+
+    init(artworkURL: URL?, songId: String? = nil, size: CGFloat = 280) {
+        self.artworkURL = artworkURL
+        self.songId = songId
+        self.size = size
+    }
+
+    private var displayURL: URL? {
+        resolvedURL ?? artworkURL
+    }
 
     var body: some View {
         Group {
-            if let url = artworkURL {
+            if let url = displayURL {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .empty:
@@ -37,6 +51,22 @@ struct AlbumArtCard: View {
         .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
         .shadow(color: .black.opacity(0.20), radius: 8, x: 0, y: 4)
         .shadow(color: .black.opacity(0.10), radius: 20, x: 0, y: 10)
+        .task(id: songId) {
+            resolvedURL = nil
+            guard let songId else { return }
+
+            if let url = ArtworkCache.shared.artworkURL(for: songId) {
+                resolvedURL = url
+                return
+            }
+
+            ArtworkCache.shared.requestArtwork(for: songId)
+
+            for await artwork in ArtworkCache.shared.artworkUpdates(for: songId) {
+                resolvedURL = artwork.url(width: 1200, height: 1200)
+                break
+            }
+        }
     }
 
     private var placeholderView: some View {

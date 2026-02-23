@@ -55,7 +55,7 @@ struct ClassicPlayerLayout: View {
 
             // Album art card - show real art when playing/paused, placeholder otherwise
             ZStack {
-                AlbumArtCard(artworkURL: playingOrPausedSong?.artworkURL, size: 280)
+                AlbumArtCard(artworkURL: playingOrPausedSong?.artworkURL, songId: playingOrPausedSong?.id, size: 280)
                     .id(playingOrPausedSong?.id)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
