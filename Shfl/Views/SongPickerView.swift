@@ -80,37 +80,24 @@ struct SongPickerView: View {
             Tab("Songs", systemImage: "music.note", value: PickerTab.songs) {
                 NavigationStack {
                     tabContent(for: .songs)
-                        .navigationTitle("Add Songs")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                sortButton
-                            }
-                        }
                 }
             }
 
             Tab("Artists", systemImage: "music.mic", value: PickerTab.artists) {
                 NavigationStack {
                     tabContent(for: .artists)
-                        .navigationTitle("Add Songs")
-                        .navigationBarTitleDisplayMode(.inline)
                 }
             }
 
             Tab("Playlists", systemImage: "music.note.list", value: PickerTab.playlists) {
                 NavigationStack {
                     tabContent(for: .playlists)
-                        .navigationTitle("Add Songs")
-                        .navigationBarTitleDisplayMode(.inline)
                 }
             }
 
             Tab("Search", systemImage: "magnifyingglass", value: PickerTab.search, role: .search) {
                 NavigationStack {
                     searchTabContent
-                        .navigationTitle("Search Library")
-                        .navigationBarTitleDisplayMode(.inline)
                 }
                 .searchable(text: searchTextBinding, prompt: "Search your library")
             }
@@ -189,15 +176,12 @@ struct SongPickerView: View {
             overlayPills
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                headerActionRow
-                headerDivider
-            }
-            .padding(.bottom, 4)
-            .background(
-                Color(.systemGroupedBackground)
-                    .shadow(.drop(color: .black.opacity(0.25), radius: 6, y: 4))
-            )
+            headerActionRow
+                .padding(.bottom, 4)
+                .background(
+                    Color(.systemGroupedBackground)
+                        .shadow(.drop(color: .black.opacity(0.08), radius: 3, y: 2))
+                )
         }
     }
 
@@ -219,13 +203,12 @@ struct SongPickerView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 headerActionRow
-                headerDivider
                 searchScopePicker
             }
             .padding(.bottom, 4)
             .background(
                 Color(.systemGroupedBackground)
-                    .shadow(.drop(color: .black.opacity(0.25), radius: 6, y: 4))
+                    .shadow(.drop(color: .black.opacity(0.08), radius: 3, y: 2))
             )
         }
     }
@@ -248,23 +231,13 @@ struct SongPickerView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     headerActionRow
-                    headerDivider
                     legacyBrowseModePickerBar
                 }
                 .padding(.bottom, 4)
                 .background(
                     Color(.systemGroupedBackground)
-                        .shadow(.drop(color: .black.opacity(0.25), radius: 6, y: 4))
+                        .shadow(.drop(color: .black.opacity(0.08), radius: 3, y: 2))
                 )
-            }
-            .navigationTitle("Add Songs")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if searchScope == .songs {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        sortButton
-                    }
-                }
             }
             .searchable(text: $searchText, prompt: "Search your library")
             .task {
@@ -348,21 +321,23 @@ struct SongPickerView: View {
 
     private var headerActionRow: some View {
         HStack(spacing: 12) {
-            CompactCapacityBar(current: selectedSongIds.count, maximum: player.capacity)
+            CapacityRing(
+                current: selectedSongIds.count,
+                maximum: player.capacity
+            )
 
-            Spacer(minLength: 8)
+            Spacer()
 
-            autofillClearGroup
+            autofillButton
+
+            clearButton
+
+            if showSortButton {
+                sortButton
+            }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private var headerDivider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.06))
-            .frame(height: 0.5)
-            .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     private var searchScopePicker: some View {
@@ -399,57 +374,57 @@ struct SongPickerView: View {
         }
     }
 
-    private var autofillClearGroup: some View {
-        HStack(spacing: 0) {
-            Button {
-                Task { @MainActor in
-                    let algorithm = appSettings?.autofillAlgorithm ?? .random
-                    let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
-                    await viewModel.autofill(
-                        into: player,
-                        using: source,
-                        addSongs: { songs in
-                            try await onAddSongsWithQueueRebuild(songs)
-                        }
-                    )
-                    selectedSongIds = Set(player.allSongs.map(\.id))
-                }
-            } label: {
-                Text("Autofill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(isAutofillDisabled ? .secondary : .primary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+    private var autofillButton: some View {
+        Button {
+            Task { @MainActor in
+                let algorithm = appSettings?.autofillAlgorithm ?? .random
+                let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
+                await viewModel.autofill(
+                    into: player,
+                    using: source,
+                    addSongs: { songs in
+                        try await onAddSongsWithQueueRebuild(songs)
+                    }
+                )
+                selectedSongIds = Set(player.allSongs.map(\.id))
             }
-            .disabled(isAutofillDisabled)
+        } label: {
+            Label("Autofill", systemImage: "shuffle")
+                .font(.system(size: 14, weight: .semibold))
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .disabled(isAutofillDisabled)
+    }
 
-            Rectangle()
-                .fill(.separator)
-                .frame(width: 0.5, height: 20)
-
-            Button {
-                Task { @MainActor in await onRemoveAllSongs() }
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    selectedSongIds.removeAll()
-                }
-            } label: {
-                Text("Clear")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(selectedSongIds.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+    private var clearButton: some View {
+        Button {
+            Task { @MainActor in await onRemoveAllSongs() }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                selectedSongIds.removeAll()
             }
-            .disabled(selectedSongIds.isEmpty)
+        } label: {
+            Text("Clear")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(selectedSongIds.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
         }
         .buttonStyle(.plain)
-        .background(.fill.tertiary, in: Capsule())
-        .overlay(Capsule().strokeBorder(.separator, lineWidth: 0.5))
+        .disabled(selectedSongIds.isEmpty)
     }
 
     private var isAutofillDisabled: Bool {
         selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading
+    }
+
+    private var showSortButton: Bool {
+        if #available(iOS 26, *) {
+            return activeTab == .songs || (activeTab == .search && searchScope == .songs)
+        } else {
+            return searchScope == .songs
+        }
     }
 
     // MARK: - Song Browse List
@@ -764,4 +739,162 @@ struct SongPickerView: View {
             }
         }
     }
+}
+
+// MARK: - Previews
+
+private final class PreviewPickerMusicService: MusicService {
+    static let sampleSongs: [Song] = [
+        Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil, playCount: 142),
+        Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil, playCount: 98),
+        Song(id: "3", title: "Hotel California", artist: "Eagles", albumTitle: "Hotel California", artworkURL: nil, playCount: 76),
+        Song(id: "4", title: "Comfortably Numb", artist: "Pink Floyd", albumTitle: "The Wall", artworkURL: nil, playCount: 63),
+        Song(id: "5", title: "Sweet Child O' Mine", artist: "Guns N' Roses", albumTitle: "Appetite for Destruction", artworkURL: nil, playCount: 55),
+        Song(id: "6", title: "Wish You Were Here", artist: "Pink Floyd", albumTitle: "Wish You Were Here", artworkURL: nil, playCount: 49),
+        Song(id: "7", title: "Back in Black", artist: "AC/DC", albumTitle: "Back in Black", artworkURL: nil, playCount: 41),
+        Song(id: "8", title: "Imagine", artist: "John Lennon", albumTitle: "Imagine", artworkURL: nil, playCount: 37),
+        Song(id: "9", title: "Hey Jude", artist: "The Beatles", albumTitle: "Hey Jude", artworkURL: nil, playCount: 30),
+        Song(id: "10", title: "Smells Like Teen Spirit", artist: "Nirvana", albumTitle: "Nevermind", artworkURL: nil, playCount: 25),
+    ]
+
+    static let sampleArtists: [Artist] = [
+        Artist(id: "a1", name: "Queen"),
+        Artist(id: "a2", name: "Led Zeppelin"),
+        Artist(id: "a3", name: "Pink Floyd"),
+        Artist(id: "a4", name: "Eagles"),
+    ]
+
+    static let samplePlaylists: [Playlist] = [
+        Playlist(id: "p1", name: "Classic Rock Hits"),
+        Playlist(id: "p2", name: "Road Trip Mix"),
+        Playlist(id: "p3", name: "Chill Vibes"),
+    ]
+
+    var isAuthorized: Bool { true }
+    var currentPlaybackTime: TimeInterval { 0 }
+    var currentSongDuration: TimeInterval { 180 }
+    var currentSongId: String? { nil }
+    var transportQueueEntryCount: Int { 0 }
+
+    var playbackStateStream: AsyncStream<PlaybackState> {
+        AsyncStream { $0.yield(.empty) }
+    }
+
+    func requestAuthorization() async -> Bool { true }
+
+    func fetchLibrarySongs(sortedBy: SortOption, limit: Int, offset: Int) async throws -> LibraryPage {
+        let end = min(offset + limit, Self.sampleSongs.count)
+        guard offset < Self.sampleSongs.count else { return LibraryPage(songs: [], hasMore: false) }
+        return LibraryPage(songs: Array(Self.sampleSongs[offset..<end]), hasMore: end < Self.sampleSongs.count)
+    }
+
+    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        let filtered = Self.sampleSongs.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query) }
+        return LibraryPage(songs: filtered, hasMore: false)
+    }
+
+    func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
+        let filtered = Self.sampleArtists.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        return ArtistPage(artists: filtered, hasMore: false)
+    }
+
+    func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
+        let filtered = Self.samplePlaylists.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        return PlaylistPage(playlists: filtered, hasMore: false)
+    }
+
+    func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
+        ArtistPage(artists: Self.sampleArtists, hasMore: false)
+    }
+
+    func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
+        PlaylistPage(playlists: Self.samplePlaylists, hasMore: false)
+    }
+
+    func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        let filtered = Self.sampleSongs.filter { $0.artist == artistName }
+        return LibraryPage(songs: filtered, hasMore: false)
+    }
+
+    func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
+        LibraryPage(songs: Array(Self.sampleSongs.prefix(3)), hasMore: false)
+    }
+
+    func setQueue(songs: [Song]) async throws {}
+    func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {}
+    func play() async throws {}
+    func pause() async {}
+    func pauseImmediately() {}
+    func skipToNext() async throws {}
+    func skipToPrevious() async throws {}
+    func restartOrSkipToPrevious() async throws {}
+    func seek(to time: TimeInterval) {}
+}
+
+#Preview("Songs Tab") {
+    let service = PreviewPickerMusicService()
+    let player = ShufflePlayer(musicService: service)
+
+    SongPickerView(
+        player: player,
+        musicService: service,
+        initialSortOption: .mostPlayed,
+        onAddSong: { _ in },
+        onAddSongsWithQueueRebuild: { _ in },
+        onRemoveSong: { _ in },
+        onRemoveAllSongs: {},
+        onDismiss: {}
+    )
+    .environment(\.appSettings, AppSettings())
+}
+
+#Preview("With Selected Songs") {
+    struct Wrapper: View {
+        let service = PreviewPickerMusicService()
+        @State private var player: ShufflePlayer?
+
+        var body: some View {
+            if let player {
+                SongPickerView(
+                    player: player,
+                    musicService: service,
+                    initialSortOption: .mostPlayed,
+                    onAddSong: { _ in },
+                    onAddSongsWithQueueRebuild: { _ in },
+                    onRemoveSong: { _ in },
+                    onRemoveAllSongs: {},
+                    onDismiss: {}
+                )
+                .environment(\.appSettings, AppSettings())
+            } else {
+                ProgressView()
+                    .task {
+                        let p = ShufflePlayer(musicService: service)
+                        for song in PreviewPickerMusicService.sampleSongs.prefix(5) {
+                            try? await p.addSong(song)
+                        }
+                        player = p
+                    }
+            }
+        }
+    }
+
+    return Wrapper()
+}
+
+#Preview("Empty Library") {
+    let service = MockMusicService()
+    let player = ShufflePlayer(musicService: service)
+
+    SongPickerView(
+        player: player,
+        musicService: service,
+        initialSortOption: .mostPlayed,
+        onAddSong: { _ in },
+        onAddSongsWithQueueRebuild: { _ in },
+        onRemoveSong: { _ in },
+        onRemoveAllSongs: {},
+        onDismiss: {}
+    )
+    .environment(\.appSettings, AppSettings())
 }

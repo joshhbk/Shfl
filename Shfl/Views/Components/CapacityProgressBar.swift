@@ -107,7 +107,7 @@ struct CompactCapacityBar: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(Color(.systemFill))
 
                     RoundedRectangle(cornerRadius: 3)
                         .fill(isFull ? Color.green : Color.accentColor)
@@ -122,9 +122,10 @@ struct CompactCapacityBar: View {
             .frame(height: 6)
 
             Text("\(current) / \(maximum)")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(isFull ? .green : .secondary)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(isFull ? .green : .primary)
                 .monospacedDigit()
+                .contentTransition(.numericText())
                 .fixedSize()
         }
         .modifier(CapacityPulseModifier(current: current, maximum: maximum, pulseOpacity: $pulseOpacity))
@@ -162,4 +163,75 @@ struct CompactCapacityBar: View {
         }
     }
     return CelebrationDemo()
+}
+
+struct CapacityRing: View {
+    let current: Int
+    let maximum: Int
+
+    @State private var pulseOpacity: Double = 0
+
+    private var progress: Double {
+        CapacityProgressBar.calculateProgress(current: current, maximum: maximum)
+    }
+
+    private var isFull: Bool {
+        current >= maximum
+    }
+
+    private var ringColor: Color {
+        isFull ? .green : .accentColor
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .stroke(Color(.systemFill), lineWidth: 3.5)
+
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(ringColor, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .brightness(pulseOpacity * 0.3)
+                    .animation(
+                        progress == 0 ? nil : .spring(response: 0.35, dampingFraction: 0.65),
+                        value: progress
+                    )
+            }
+            .frame(width: 32, height: 32)
+
+            HStack(spacing: 3) {
+                Text("\(current)")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(isFull ? .green : .primary)
+                    .contentTransition(.numericText())
+                Text("of \(maximum)")
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            .monospacedDigit()
+        }
+        .modifier(CapacityPulseModifier(current: current, maximum: maximum, pulseOpacity: $pulseOpacity))
+    }
+}
+
+#Preview("Ring States") {
+    VStack(spacing: 20) {
+        CapacityRing(current: 0, maximum: 120)
+        CapacityRing(current: 5, maximum: 120)
+        CapacityRing(current: 80, maximum: 120)
+        CapacityRing(current: 120, maximum: 120)
+    }
+    .padding()
+}
+
+#Preview("Compact States") {
+    VStack(spacing: 16) {
+        CompactCapacityBar(current: 0, maximum: 120)
+        CompactCapacityBar(current: 5, maximum: 120)
+        CompactCapacityBar(current: 80, maximum: 120)
+        CompactCapacityBar(current: 120, maximum: 120)
+    }
+    .padding()
 }
