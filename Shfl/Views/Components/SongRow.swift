@@ -6,6 +6,8 @@ struct SongRow: View, Equatable {
     let isAtCapacity: Bool
     let onToggle: () -> Void
 
+    @Environment(\.shuffleTheme) private var theme
+
     @State private var showNope = false
     @State private var showGlow = false
     @State private var checkmarkBounce = false
@@ -41,14 +43,14 @@ struct SongRow: View, Equatable {
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundStyle(isSelected ? .blue : .gray.opacity(0.3))
+                    .foregroundStyle(isSelected ? theme.accentColor : .gray.opacity(0.3))
                     .scaleEffect(checkmarkBounce ? 1.2 : 1.0)
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
-            .background(Self.backgroundColor(isSelected: isSelected))
+            .background(isSelected ? theme.accentColor.opacity(0.15) : Color.clear)
             .overlay(
-                Color.blue.opacity(showGlow ? 0.15 : 0)
+                theme.accentColor.opacity(showGlow ? 0.15 : 0)
                     .animation(.easeOut(duration: 0.4), value: showGlow)
             )
             .contentShape(Rectangle())
@@ -110,10 +112,6 @@ struct SongRow: View, Equatable {
 
     // MARK: - Static Helpers (for testing)
 
-    static func backgroundColor(isSelected: Bool) -> Color {
-        isSelected ? Color.blue.opacity(0.08) : Color.clear
-    }
-
     static func rowOpacity(isSelected: Bool, isAtCapacity: Bool) -> Double {
         if isAtCapacity && !isSelected {
             return 0.5
@@ -122,25 +120,60 @@ struct SongRow: View, Equatable {
     }
 }
 
-#Preview {
-    VStack(spacing: 0) {
-        SongRow(
-            song: Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil),
-            isSelected: false,
-            onToggle: {}
-        )
-        Divider()
-        SongRow(
-            song: Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil),
-            isSelected: true,
-            onToggle: {}
-        )
-        Divider()
-        SongRow(
-            song: Song(id: "3", title: "Hotel California", artist: "Eagles", albumTitle: "Hotel California", artworkURL: nil),
-            isSelected: false,
-            isAtCapacity: true,
-            onToggle: {}
-        )
+#Preview("All Themes — Light") {
+    ScrollView {
+        ForEach(ShuffleTheme.allThemes) { theme in
+            VStack(alignment: .leading, spacing: 0) {
+                Text(theme.name)
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
+
+                SongRow(
+                    song: Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil),
+                    isSelected: true,
+                    onToggle: {}
+                )
+                Divider().padding(.leading, 72)
+                SongRow(
+                    song: Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil),
+                    isSelected: false,
+                    onToggle: {}
+                )
+            }
+            .environment(\.shuffleTheme, theme)
+        }
     }
+    .preferredColorScheme(.light)
+}
+
+#Preview("All Themes — Dark") {
+    ScrollView {
+        ForEach(ShuffleTheme.allThemes) { theme in
+            VStack(alignment: .leading, spacing: 0) {
+                Text(theme.name)
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
+
+                SongRow(
+                    song: Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil),
+                    isSelected: true,
+                    onToggle: {}
+                )
+                Divider().padding(.leading, 72)
+                SongRow(
+                    song: Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil),
+                    isSelected: false,
+                    onToggle: {}
+                )
+            }
+            .environment(\.shuffleTheme, theme)
+        }
+    }
+    .preferredColorScheme(.dark)
 }

@@ -127,7 +127,12 @@ struct MainView: View {
             onDismiss: onDismiss
         )
         .tint(deviceAccentColor)
+        .environment(\.shuffleTheme, currentTheme)
         .environment(\.appSettings, appSettings)
+    }
+
+    private var currentTheme: ShuffleTheme {
+        ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
     }
 
     private var deviceAccentColor: Color {
