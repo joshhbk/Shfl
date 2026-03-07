@@ -58,6 +58,7 @@ struct PlaylistListView: View {
                 }
             }
         }
+        .scrollDismissesKeyboard(.immediately)
         .navigationDestination(for: Playlist.self) { playlist in
             PlaylistDetailView(
                 playlistId: playlist.id,

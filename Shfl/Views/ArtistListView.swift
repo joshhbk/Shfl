@@ -58,6 +58,7 @@ struct ArtistListView: View {
                 }
             }
         }
+        .scrollDismissesKeyboard(.immediately)
         .navigationDestination(for: Artist.self) { artist in
             ArtistDetailView(
                 artistName: artist.name,
