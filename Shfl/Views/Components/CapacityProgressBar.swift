@@ -184,14 +184,14 @@ struct CapacityRing: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ZStack {
                 Circle()
-                    .stroke(Color(.systemFill), lineWidth: 3.5)
+                    .stroke(Color(.systemFill), lineWidth: 2.5)
 
                 Circle()
                     .trim(from: 0, to: progress)
-                    .stroke(ringColor, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                    .stroke(ringColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .brightness(pulseOpacity * 0.3)
                     .animation(
@@ -199,15 +199,15 @@ struct CapacityRing: View {
                         value: progress
                     )
             }
-            .frame(width: 32, height: 32)
+            .frame(width: 22, height: 22)
 
-            HStack(spacing: 3) {
+            HStack(spacing: 2) {
                 Text("\(current)")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(isFull ? .green : .primary)
                     .contentTransition(.numericText())
                 Text("of \(maximum)")
-                    .font(.system(size: 15, design: .rounded))
+                    .font(.system(size: 13, design: .rounded))
                     .foregroundStyle(.secondary)
             }
             .monospacedDigit()

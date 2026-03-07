@@ -149,22 +149,33 @@ struct PlayerView: View {
 
 // MARK: - Previews
 
-private final class PreviewMockMusicService: MusicService {
-    let initialState: PlaybackState
+private enum PreviewPlayerState: String, CaseIterable, Identifiable {
+    case empty
+    case loading
+    case playing
+    case paused
+    case error
 
-    init(initialState: PlaybackState = .empty) {
-        self.initialState = initialState
-    }
+    var id: String { rawValue }
+}
+
+private struct PreviewPlaybackError: LocalizedError {
+    let errorDescription: String?
+}
+
+private final class PreviewMockMusicService: MusicService {
+    private var continuations: [AsyncStream<PlaybackState>.Continuation] = []
+    private var currentState: PlaybackState = .empty
 
     var isAuthorized: Bool { true }
     var currentPlaybackTime: TimeInterval { 78 }
     var currentSongDuration: TimeInterval { 242 }
-    var currentSongId: String? { "preview-1" }
-    var transportQueueEntryCount: Int { 0 }
+    var currentSongId: String? { currentState.currentSongId }
+    var transportQueueEntryCount: Int { currentState.currentSong == nil ? 0 : 1 }
     var playbackStateStream: AsyncStream<PlaybackState> {
-        let state = initialState
-        return AsyncStream { continuation in
-            continuation.yield(state)
+        AsyncStream { continuation in
+            continuations.append(continuation)
+            continuation.yield(currentState)
         }
     }
     func requestAuthorization() async -> Bool { true }
@@ -201,6 +212,11 @@ private final class PreviewMockMusicService: MusicService {
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
     func seek(to time: TimeInterval) {}
+
+    func emit(_ state: PlaybackState) {
+        currentState = state
+        continuations.forEach { $0.yield(state) }
+    }
 }
 
 private let previewSong = Song(
@@ -211,99 +227,79 @@ private let previewSong = Song(
     artworkURL: URL(string: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/3c/1b/a9/3c1ba9e1-cf27-f6d1-6287-a3f0be3483a0/00602547288233.rgb.jpg/600x600bb.jpg")
 )
 
-#Preview("Empty State") {
-    let mockService = PreviewMockMusicService()
-    let player = ShufflePlayer(musicService: mockService)
-    PlayerView(
-        player: player,
-        musicService: mockService,
-        onManageTapped: {},
-        onAddTapped: {},
-        onSettingsTapped: {}
+private let previewQueueSongs = [
+    previewSong,
+    Song(
+        id: "preview-2",
+        title: "Dreams",
+        artist: "Fleetwood Mac",
+        albumTitle: "Rumours",
+        artworkURL: nil
     )
+]
+
+private struct PlayerViewPreviewHost: View {
+    private let musicService: PreviewMockMusicService
+    private let player: ShufflePlayer
+    private let themeId: String
+
+    init(state: PreviewPlayerState, themeId: String) {
+        self.themeId = themeId
+
+        let musicService = PreviewMockMusicService()
+        let player = ShufflePlayer(musicService: musicService)
+        try? player.seedSongs(previewQueueSongs)
+
+        switch state {
+        case .empty:
+            break
+        case .loading:
+            musicService.emit(.loading(previewSong))
+        case .playing:
+            musicService.emit(.playing(previewSong))
+        case .paused:
+            musicService.emit(.paused(previewSong))
+        case .error:
+            musicService.emit(.error(PreviewPlaybackError(errorDescription: "Preview playback failed.")))
+        }
+
+        self.musicService = musicService
+        self.player = player
+    }
+
+    var body: some View {
+        PlayerView(
+            player: player,
+            musicService: musicService,
+            initialThemeId: themeId,
+            onManageTapped: {},
+            onAddTapped: {},
+            onSettingsTapped: {},
+            onPlayPauseTapped: {},
+            onSkipForwardTapped: {},
+            onSkipBackTapped: {},
+            onShuffle: {},
+            isShuffling: false
+        )
+    }
+}
+
+#Preview("Empty State") {
+    PlayerViewPreviewHost(state: .empty, themeId: "silver")
+}
+
+#Preview("Loading") {
+    PlayerViewPreviewHost(state: .loading, themeId: "silver")
 }
 
 #Preview("Playing") {
-    ZStack {
-        GeometryReader { geometry in
-            Image("SampleAlbumArt")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped()
-                .blur(radius: 3)
-                .ignoresSafeArea()
-        }
+    PlayerViewPreviewHost(state: .playing, themeId: "silver")
+}
 
-        VStack(spacing: 0) {
-            HStack {
-                Button(action: {}) {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(ShuffleTheme.silver.bodyGradientTop)
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .strokeBorder(.white.opacity(0.3), lineWidth: 1)
-                        )
-                }
-                Spacer()
-                Button(action: {}) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(ShuffleTheme.silver.bodyGradientTop)
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .strokeBorder(.white.opacity(0.3), lineWidth: 1)
-                        )
-                }
-            }
-            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-            .padding(.horizontal, 20)
-            .padding(.top, 60)
+#Preview("Paused") {
+    PlayerViewPreviewHost(state: .paused, themeId: "silver")
+}
 
-            Spacer()
-
-            ShuffleBodyView(height: 120) {
-                VStack(spacing: 4) {
-                    Text(previewSong.title)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(ShuffleTheme.silver.textColor)
-                        .lineLimit(1)
-                    Text(previewSong.artist)
-                        .font(.system(size: 14))
-                        .foregroundStyle(ShuffleTheme.silver.secondaryTextColor)
-                        .lineLimit(1)
-
-                    PlaybackProgressBar(currentTime: 78, duration: 242)
-                        .padding(.top, 8)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .padding(.horizontal, 20)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
-
-            ShuffleBodyView {
-                ClickWheelView(
-                    isPlaying: true,
-                    onPlayPause: {},
-                    onSkipForward: {},
-                    onSkipBack: {},
-                    onVolumeUp: {},
-                    onVolumeDown: {},
-                    scale: 0.6
-                )
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 34)
-        }
-    }
-    .environment(\.shuffleTheme, .silver)
+#Preview("Error") {
+    PlayerViewPreviewHost(state: .error, themeId: "silver")
 }
