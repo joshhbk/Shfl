@@ -53,7 +53,6 @@ final class AppPlaybackSessionCoordinator {
     }
 
     func onAppear() async {
-        loadingMessage = "Loading your music..."
         print("📱 onAppear: Loading songs and playback state...")
 
         async let authStatus = musicService.isAuthorized
@@ -71,8 +70,6 @@ final class AppPlaybackSessionCoordinator {
         }
 
         if !player.allSongs.isEmpty {
-            loadingMessage = "Preparing playback..."
-
             if let state = playbackState {
                 print("📱 onAppear: Attempting to restore playback state (song=\(state.currentSongId ?? "nil"), position=\(state.playbackPosition))")
                 let restored = await restorePlaybackState(state)

@@ -31,45 +31,48 @@ struct SplashView: View {
         .scaleEffect(dismissing ? 1.08 : 1.0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
-        .onAppear(perform: startTimeline)
+        .task {
+            await startTimeline()
+        }
     }
 
-    private func startTimeline() {
-        // 0.3s — particles emerge, logo pulses
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation(.easeIn(duration: 0.6)) {
-                showParticles = true
-            }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                logoPulse = true
-            }
+    @MainActor
+    private func startTimeline() async {
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled else { return }
+
+        withAnimation(.easeIn(duration: 0.6)) {
+            showParticles = true
+        }
+        withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+            logoPulse = true
         }
 
-        // 0.8s — background morphs to theme color
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            withAnimation(.easeInOut(duration: 0.8)) {
-                morphBackground = true
-            }
+        try? await Task.sleep(for: .milliseconds(500))
+        guard !Task.isCancelled else { return }
+
+        withAnimation(.easeInOut(duration: 0.8)) {
+            morphBackground = true
         }
 
-        // 1.6s — logo fades out
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            withAnimation(.easeOut(duration: 0.3)) {
-                logoFadeOut = true
-            }
+        try? await Task.sleep(for: .milliseconds(800))
+        guard !Task.isCancelled else { return }
+
+        withAnimation(.easeOut(duration: 0.3)) {
+            logoFadeOut = true
         }
 
-        // 1.8s — begin dissolve out (particles + background fade, slight zoom)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-            withAnimation(.easeInOut(duration: 0.7)) {
-                dismissing = true
-            }
+        try? await Task.sleep(for: .milliseconds(200))
+        guard !Task.isCancelled else { return }
+
+        withAnimation(.easeInOut(duration: 0.7)) {
+            dismissing = true
         }
 
-        // 2.5s — fully gone, remove from hierarchy
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            onComplete()
-        }
+        try? await Task.sleep(for: .milliseconds(700))
+        guard !Task.isCancelled else { return }
+
+        onComplete()
     }
 }
 

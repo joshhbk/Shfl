@@ -27,18 +27,19 @@ struct LoadingView: View {
 
 struct ShuffleParticles: View {
     let currentTheme: ShuffleTheme
+    private let particleThemes: [ShuffleTheme]
+    private let system: VortexSystem
 
-    private var otherThemes: [ShuffleTheme] {
-        ShuffleTheme.allThemes.filter { $0.id != currentTheme.id }
-    }
-
-    private var tags: [String] {
-        otherThemes.map { "theme-\($0.id)" }
+    init(currentTheme: ShuffleTheme) {
+        self.currentTheme = currentTheme
+        let particleThemes = ShuffleTheme.allThemes.filter { $0.id != currentTheme.id }
+        self.particleThemes = particleThemes
+        self.system = Self.makeSystem(tags: particleThemes.map { "theme-\($0.id)" })
     }
 
     var body: some View {
-        VortexView(createSystem()) {
-            ForEach(otherThemes) { theme in
+        VortexView(system) {
+            ForEach(particleThemes) { theme in
                 Circle()
                     .fill(theme.bodyGradientTop.opacity(0.5))
                     .frame(width: 45)
@@ -49,7 +50,7 @@ struct ShuffleParticles: View {
         .ignoresSafeArea()
     }
 
-    private func createSystem() -> VortexSystem {
+    private static func makeSystem(tags: [String]) -> VortexSystem {
         let system = VortexSystem(tags: tags)
         system.birthRate = 8
         system.lifespan = 4
