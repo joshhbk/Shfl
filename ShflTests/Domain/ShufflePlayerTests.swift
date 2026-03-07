@@ -1826,6 +1826,31 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(song.id, "2", "Restored current song should remain visible while paused")
     }
 
+    func testRestoreQueueAppliesSavedPositionImmediately() async throws {
+        let songs = (1...3).map { i in
+            Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        for song in songs {
+            try await player.addSong(song)
+        }
+
+        let success = await player.restoreSession(
+            queueOrder: ["1", "2", "3"],
+            currentSongId: "2",
+            playedIds: ["1"],
+            playbackPosition: 42
+        )
+        XCTAssertTrue(success, "Restore should succeed with valid state")
+
+        let playbackTime = mockService.currentPlaybackTime
+        let seekCount = await mockService.seekCallCount
+        let lastSeekTime = await mockService.lastSeekTime
+
+        XCTAssertEqual(playbackTime, 42, accuracy: 0.001, "Restore should apply the saved playback position immediately")
+        XCTAssertEqual(seekCount, 1, "Restore should perform a single seek while rebuilding paused session state")
+        XCTAssertEqual(lastSeekTime, 42, accuracy: 0.001, "Restore seek should target the saved playback position")
+    }
+
     func testRestoreQueuePreservesHydratedCurrentSongMetadata() async throws {
         let songs = [
             Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil),
@@ -1865,7 +1890,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(song.artworkURL, hydratedArtwork, "Restore should keep transport-hydrated artwork when IDs match")
     }
 
-    func testTogglePlaybackAfterRestoreReappliesSavedPosition() async throws {
+    func testTogglePlaybackAfterRestoreDoesNotReapplySavedPosition() async throws {
         let songs = (1...3).map { i in
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
@@ -1887,9 +1912,9 @@ final class ShufflePlayerTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
 
         let seekCount = await mockService.seekCallCount
-        let lastSeekTime = await mockService.lastSeekTime
-        XCTAssertEqual(seekCount, 1, "First explicit play after restore should apply saved playback position")
-        XCTAssertEqual(lastSeekTime, 42, accuracy: 0.001, "Restore position should be re-applied on explicit play")
+        let playbackTime = mockService.currentPlaybackTime
+        XCTAssertEqual(seekCount, 0, "First explicit play after restore should not perform a restore-specific seek")
+        XCTAssertEqual(playbackTime, 42, accuracy: 0.001, "Explicit play should continue from the already-restored playback position")
     }
 
     // MARK: - Remove Song Queue Updates

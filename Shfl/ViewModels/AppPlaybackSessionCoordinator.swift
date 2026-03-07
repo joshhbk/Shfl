@@ -117,14 +117,6 @@ final class AppPlaybackSessionCoordinator {
         }
 
         let currentState = player.playbackState
-        let isPlaying: Bool
-        switch currentState {
-        case .playing:
-            isPlaying = true
-        default:
-            isPlaying = false
-        }
-
         let queueOrder = player.currentQueueOrder
         let playedIds = player.currentPlayedSongIds
         let currentSongId = currentState.currentSongId
@@ -143,7 +135,6 @@ final class AppPlaybackSessionCoordinator {
         let state = PersistedPlaybackState(
             currentSongId: currentSongId,
             playbackPosition: playbackTime,
-            wasPlaying: isPlaying,
             queueOrder: queueOrder,
             playedSongIds: playedIds
         )

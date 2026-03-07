@@ -5,7 +5,6 @@ import SwiftData
 final class PersistedPlaybackState {
     var currentSongId: String?
     var playbackPosition: Double
-    var wasPlaying: Bool
     var savedAt: Date
     var queueOrderJSON: String
     var playedSongIdsJSON: String
@@ -13,14 +12,12 @@ final class PersistedPlaybackState {
     init(
         currentSongId: String?,
         playbackPosition: Double,
-        wasPlaying: Bool,
         savedAt: Date,
         queueOrderJSON: String,
         playedSongIdsJSON: String
     ) {
         self.currentSongId = currentSongId
         self.playbackPosition = playbackPosition
-        self.wasPlaying = wasPlaying
         self.savedAt = savedAt
         self.queueOrderJSON = queueOrderJSON
         self.playedSongIdsJSON = playedSongIdsJSON
@@ -76,7 +73,6 @@ extension PersistedPlaybackState {
     convenience init(
         currentSongId: String?,
         playbackPosition: Double,
-        wasPlaying: Bool,
         queueOrder: [String],
         playedSongIds: Set<String>
     ) {
@@ -99,7 +95,6 @@ extension PersistedPlaybackState {
         self.init(
             currentSongId: currentSongId,
             playbackPosition: playbackPosition,
-            wasPlaying: wasPlaying,
             savedAt: Date(),
             queueOrderJSON: queueJSON,
             playedSongIdsJSON: playedJSON

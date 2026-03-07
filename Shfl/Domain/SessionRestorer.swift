@@ -5,7 +5,6 @@ struct SessionRestoreResult {
     let restoredQueueState: QueueState
     let restoredPlaybackState: PlaybackState
     let lastObservedSongId: String?
-    let pendingRestoreSeek: (songId: String, position: TimeInterval)?
 }
 
 /// Encapsulates the multi-step session restoration flow:
@@ -54,13 +53,9 @@ struct SessionRestorer {
 
             // Seek to saved position (best-effort, no autoplay probe).
             let clampedPosition = max(0, playbackPosition)
-            var pendingSeek: (songId: String, position: TimeInterval)?
             if clampedPosition > 0 {
                 print("🔄 restoreSession: Seeking to position \(clampedPosition)")
                 musicService.seek(to: clampedPosition)
-                if let currentSongId = restoredState.currentSongId {
-                    pendingSeek = (songId: currentSongId, position: clampedPosition)
-                }
             }
 
             print("🔄 restoreSession: Applying paused state without forcing extra transport pause")
@@ -82,8 +77,7 @@ struct SessionRestorer {
             return SessionRestoreResult(
                 restoredQueueState: restoredState,
                 restoredPlaybackState: restoredPlaybackState,
-                lastObservedSongId: restoredState.currentSongId,
-                pendingRestoreSeek: pendingSeek
+                lastObservedSongId: restoredState.currentSongId
             )
         } catch {
             print("🔄 restoreSession: Failed to set queue: \(error)")

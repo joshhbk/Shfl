@@ -7,14 +7,13 @@ struct PlaybackStateResolution {
     let shouldUpdateCurrentSong: Bool
     let songIdToMarkPlayed: String?
     let shouldClearHistory: Bool
-    let pendingSeekConsumed: (songId: String, position: TimeInterval)?
 }
 
 /// Observes the MusicKit playback state stream and resolves raw states into
 /// structured mutations that `ShufflePlayer` applies to its observable state.
 ///
 /// Owns the observation lifecycle and resolution-related private state
-/// (`lastObservedSongId`, `suppressHistoryUpdates`, `pendingRestoreSeek`).
+/// (`lastObservedSongId`, `suppressHistoryUpdates`).
 @MainActor
 final class PlaybackStateObserver {
     /// Last resolved song ID, used to detect song transitions for history tracking.
@@ -23,9 +22,6 @@ final class PlaybackStateObserver {
     /// When true, song transitions do not add the previous song to played history.
     /// Set during multi-step operations like session restoration.
     private(set) var suppressHistoryUpdates = false
-
-    /// Deferred restore seek applied on first explicit user play after restoration.
-    private(set) var pendingRestoreSeek: (songId: String, position: TimeInterval)?
 
     private let musicService: MusicService
     private var stateTask: Task<Void, Never>?
@@ -50,14 +46,6 @@ final class PlaybackStateObserver {
         suppressHistoryUpdates = false
     }
 
-    func setPendingRestoreSeek(songId: String, position: TimeInterval) {
-        pendingRestoreSeek = (songId: songId, position: position)
-    }
-
-    func clearPendingRestoreSeek() {
-        pendingRestoreSeek = nil
-    }
-
     deinit {
         stateTask?.cancel()
     }
@@ -80,7 +68,7 @@ final class PlaybackStateObserver {
 
     /// Resolves a raw MusicKit state against the current queue state.
     /// Returns a description of what mutations to apply.
-    /// Note: mutates `lastObservedSongId` and `pendingRestoreSeek` as side effects.
+    /// Note: mutates `lastObservedSongId` as a side effect.
     func resolve(_ newState: PlaybackState, queueState: QueueState) -> PlaybackStateResolution {
         // During session restoration, MusicKit can emit `.stopped` before queued `.play` resolves.
         // Preserve the visible "current song loaded but not playing" state in that case.
@@ -108,8 +96,7 @@ final class PlaybackStateObserver {
                 resolvedSongId: nil,
                 shouldUpdateCurrentSong: false,
                 songIdToMarkPlayed: nil,
-                shouldClearHistory: false,
-                pendingSeekConsumed: nil
+                shouldClearHistory: false
             )
         }
 
@@ -174,25 +161,12 @@ final class PlaybackStateObserver {
             shouldClearHistory = false
         }
 
-        // Check for pending restore seek
-        let pendingSeekConsumed: (songId: String, position: TimeInterval)?
-        if case .playing = resolvedState,
-           let pendingSeek = pendingRestoreSeek,
-           let resolvedSongId,
-           pendingSeek.songId == resolvedSongId {
-            pendingRestoreSeek = nil
-            pendingSeekConsumed = pendingSeek
-        } else {
-            pendingSeekConsumed = nil
-        }
-
         return PlaybackStateResolution(
             resolvedState: resolvedState,
             resolvedSongId: resolvedSongId,
             shouldUpdateCurrentSong: resolvedSongId != nil,
             songIdToMarkPlayed: songIdToMarkPlayed,
-            shouldClearHistory: shouldClearHistory,
-            pendingSeekConsumed: pendingSeekConsumed
+            shouldClearHistory: shouldClearHistory
         )
     }
 }

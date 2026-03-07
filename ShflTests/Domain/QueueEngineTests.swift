@@ -16,8 +16,7 @@ final class QueueEngineTests: XCTestCase {
             resolvedSongId: song.id,
             shouldUpdateCurrentSong: true,
             songIdToMarkPlayed: nil,
-            shouldClearHistory: true,
-            pendingSeekConsumed: nil
+            shouldClearHistory: true
         )
 
         let reduction = try QueueEngineReducer.reduce(state: state, intent: .playbackResolution(resolution))
@@ -41,8 +40,7 @@ final class QueueEngineTests: XCTestCase {
             resolvedSongId: song.id,
             shouldUpdateCurrentSong: true,
             songIdToMarkPlayed: nil,
-            shouldClearHistory: true,
-            pendingSeekConsumed: nil
+            shouldClearHistory: true
         )
 
         let reduction = try QueueEngineReducer.reduce(state: state, intent: .playbackResolution(resolution))
@@ -66,8 +64,7 @@ final class QueueEngineTests: XCTestCase {
             resolvedSongId: song.id,
             shouldUpdateCurrentSong: true,
             songIdToMarkPlayed: nil,
-            shouldClearHistory: true,
-            pendingSeekConsumed: nil
+            shouldClearHistory: true
         )
 
         let reduction = try QueueEngineReducer.reduce(state: state, intent: .playbackResolution(resolution))

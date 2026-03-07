@@ -25,7 +25,6 @@ final class PlaybackStateRepositoryTests: XCTestCase {
         let state = PersistedPlaybackState(
             currentSongId: "song-1",
             playbackPosition: 42,
-            wasPlaying: false,
             queueOrder: ["song-1", "song-2"],
             playedSongIds: ["song-9"]
         )
@@ -44,7 +43,6 @@ final class PlaybackStateRepositoryTests: XCTestCase {
         let original = PersistedPlaybackState(
             currentSongId: "original",
             playbackPosition: 10,
-            wasPlaying: false,
             queueOrder: ["original"],
             playedSongIds: []
         )
@@ -57,7 +55,6 @@ final class PlaybackStateRepositoryTests: XCTestCase {
         let replacement = PersistedPlaybackState(
             currentSongId: "replacement",
             playbackPosition: 99,
-            wasPlaying: false,
             queueOrder: ["replacement"],
             playedSongIds: ["replacement"]
         )

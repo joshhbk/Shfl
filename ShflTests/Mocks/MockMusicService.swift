@@ -251,6 +251,7 @@ actor MockMusicService: MusicService {
         // Track seek calls for testing using nonisolated(unsafe) vars
         seekCallCount += 1
         lastSeekTime = time
+        mockPlaybackTime = time
     }
 
     /// Call this from tests to set mock playback time before adding songs

@@ -163,9 +163,6 @@ final class ShufflePlayer {
 #endif
             recordOperation(.playbackResolutionReducerFailed, detail: error.localizedDescription)
         }
-        if let seek = resolution.pendingSeekConsumed {
-            musicService.seek(to: seek.position)
-        }
         recordOperation(
             .playbackResolution,
             detail: "state=\(playbackStateLabel(resolution.resolvedState)), song=\(resolution.resolvedSongId ?? "nil")"
@@ -186,7 +183,6 @@ final class ShufflePlayer {
         operationJournalVersion &+= 1
         operationNotice = nil
         playbackObserver.clearLastObservedSongId()
-        playbackObserver.clearPendingRestoreSeek()
         recordOperation(.hardResetQueue)
     }
 
@@ -436,8 +432,7 @@ final class ShufflePlayer {
             resolvedSongId: enrichedSong.id,
             shouldUpdateCurrentSong: true,
             songIdToMarkPlayed: songIdToMarkPlayed,
-            shouldClearHistory: false,
-            pendingSeekConsumed: nil
+            shouldClearHistory: false
         )
         do {
             let reduction = try reduce(.playbackResolution(correctedResolution))
@@ -1419,8 +1414,6 @@ final class ShufflePlayer {
         playedIds: Set<String>,
         playbackPosition: TimeInterval
     ) async -> Bool {
-        playbackObserver.clearPendingRestoreSeek()
-
         playbackObserver.beginSuppressingHistory()
         defer { playbackObserver.endSuppressingHistory() }
 
@@ -1450,9 +1443,6 @@ final class ShufflePlayer {
             return false
         }
         playbackObserver.setLastObservedSongId(result.lastObservedSongId)
-        if let seek = result.pendingRestoreSeek {
-            playbackObserver.setPendingRestoreSeek(songId: seek.songId, position: seek.position)
-        }
         recordOperation(.restoreSessionSuccess)
         return true
     }

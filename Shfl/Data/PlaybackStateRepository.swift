@@ -4,7 +4,6 @@ import SwiftData
 nonisolated struct PersistedPlaybackSnapshot: Equatable, Sendable {
     let currentSongId: String?
     let playbackPosition: Double
-    let wasPlaying: Bool
     let savedAt: Date
     let queueOrder: [String]
     let playedSongIds: Set<String>
@@ -12,7 +11,6 @@ nonisolated struct PersistedPlaybackSnapshot: Equatable, Sendable {
     init(model: PersistedPlaybackState) {
         self.currentSongId = model.currentSongId
         self.playbackPosition = model.playbackPosition
-        self.wasPlaying = model.wasPlaying
         self.savedAt = model.savedAt
         self.queueOrder = model.queueOrder
         self.playedSongIds = model.playedSongIds
