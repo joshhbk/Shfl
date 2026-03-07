@@ -1,22 +1,6 @@
 import Foundation
 import SwiftData
 
-nonisolated struct PersistedPlaybackSnapshot: Equatable, Sendable {
-    let currentSongId: String?
-    let playbackPosition: Double
-    let savedAt: Date
-    let queueOrder: [String]
-    let playedSongIds: Set<String>
-
-    init(model: PersistedPlaybackState) {
-        self.currentSongId = model.currentSongId
-        self.playbackPosition = model.playbackPosition
-        self.savedAt = model.savedAt
-        self.queueOrder = model.queueOrder
-        self.playedSongIds = model.playedSongIds
-    }
-}
-
 @MainActor
 final class PlaybackStateRepository {
     private let modelContext: ModelContext
@@ -36,7 +20,7 @@ final class PlaybackStateRepository {
     }
 
     /// Loads playback state on a background thread to avoid blocking the main thread during startup.
-    nonisolated func loadPlaybackStateAsync() async throws -> PersistedPlaybackSnapshot? {
+    nonisolated func loadPlaybackStateAsync() async throws -> PlaybackSessionSnapshot? {
         let container = self.container
         return try await Task.detached {
             let context = ModelContext(container)
@@ -45,8 +29,17 @@ final class PlaybackStateRepository {
             )
             let states = try context.fetch(descriptor)
             guard let latest = states.first else { return nil }
-            return PersistedPlaybackSnapshot(model: latest)
+            return PlaybackSessionSnapshot(model: latest)
         }.value
+    }
+
+    func loadPlaybackState() throws -> PlaybackSessionSnapshot? {
+        let descriptor = FetchDescriptor<PersistedPlaybackState>(
+            sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
+        )
+        let states = try modelContext.fetch(descriptor)
+        guard let latest = states.first else { return nil }
+        return PlaybackSessionSnapshot(model: latest)
     }
 
     /// Saves the playback state atomically (deletes old, inserts new).
@@ -66,6 +59,18 @@ final class PlaybackStateRepository {
         }
     }
 
+    func savePlaybackState(_ snapshot: PlaybackSessionSnapshot) throws {
+        try savePlaybackState(
+            PersistedPlaybackState(
+                currentSongId: snapshot.currentSongId,
+                playbackPosition: snapshot.playbackPosition,
+                savedAt: snapshot.savedAt,
+                queueOrderJSON: PersistedPlaybackState.queueOrderJSONString(from: snapshot.queueOrder),
+                playedSongIdsJSON: PersistedPlaybackState.playedSongIdsJSONString(from: snapshot.playedSongIds)
+            )
+        )
+    }
+
     /// Clears all persisted playback state.
     func clearPlaybackState() throws {
         do {
@@ -82,7 +87,7 @@ final class PlaybackStateRepository {
     }
 
     /// Checks if the given state is older than the stale threshold.
-    func isStateStale(_ state: PersistedPlaybackSnapshot) -> Bool {
+    func isStateStale(_ state: PlaybackSessionSnapshot) -> Bool {
         let calendar = Calendar.current
         guard let staleDate = calendar.date(
             byAdding: .day,

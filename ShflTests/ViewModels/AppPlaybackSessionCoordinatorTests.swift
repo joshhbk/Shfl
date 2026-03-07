@@ -86,8 +86,12 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         playbackCoordinator: PlaybackCoordinator,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) -> AppPlaybackSessionCoordinator {
-        let repository = SongRepository(modelContext: modelContext)
+        let songRepository = SongRepository(modelContext: modelContext)
         let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
+        let sessionSnapshotService = SessionSnapshotService(
+            songRepository: songRepository,
+            playbackStateRepository: playbackStateRepository
+        )
         let scrobbleTracker = ScrobbleTracker(
             scrobbleManager: ScrobbleManager(transports: []),
             musicService: mockService
@@ -97,8 +101,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
             player: player,
             playbackCoordinator: playbackCoordinator,
             musicService: mockService,
-            repository: repository,
-            playbackStateRepository: playbackStateRepository,
+            sessionSnapshotService: sessionSnapshotService,
             scrobbleTracker: scrobbleTracker,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )

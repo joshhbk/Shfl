@@ -27,6 +27,22 @@ final class PersistedPlaybackState {
 // MARK: - JSON Encoding/Decoding Helpers
 
 extension PersistedPlaybackState {
+    static func queueOrderJSONString(from queueOrder: [String]) -> String {
+        guard let data = try? JSONEncoder().encode(queueOrder),
+              let json = String(data: data, encoding: .utf8) else {
+            return "[]"
+        }
+        return json
+    }
+
+    static func playedSongIdsJSONString(from playedSongIds: Set<String>) -> String {
+        guard let data = try? JSONEncoder().encode(Array(playedSongIds)),
+              let json = String(data: data, encoding: .utf8) else {
+            return "[]"
+        }
+        return json
+    }
+
     var queueOrder: [String] {
         get {
             guard !queueOrderJSON.isEmpty else { return [] }
@@ -76,28 +92,22 @@ extension PersistedPlaybackState {
         queueOrder: [String],
         playedSongIds: Set<String>
     ) {
-        let queueJSON: String
-        if let data = try? JSONEncoder().encode(queueOrder),
-           let json = String(data: data, encoding: .utf8) {
-            queueJSON = json
-        } else {
-            queueJSON = "[]"
-        }
-
-        let playedJSON: String
-        if let data = try? JSONEncoder().encode(Array(playedSongIds)),
-           let json = String(data: data, encoding: .utf8) {
-            playedJSON = json
-        } else {
-            playedJSON = "[]"
-        }
-
         self.init(
             currentSongId: currentSongId,
             playbackPosition: playbackPosition,
             savedAt: Date(),
-            queueOrderJSON: queueJSON,
-            playedSongIdsJSON: playedJSON
+            queueOrderJSON: Self.queueOrderJSONString(from: queueOrder),
+            playedSongIdsJSON: Self.playedSongIdsJSONString(from: playedSongIds)
         )
+    }
+}
+
+extension PlaybackSessionSnapshot {
+    init(model: PersistedPlaybackState) {
+        self.currentSongId = model.currentSongId
+        self.playbackPosition = model.playbackPosition
+        self.savedAt = model.savedAt
+        self.queueOrder = model.queueOrder
+        self.playedSongIds = model.playedSongIds
     }
 }

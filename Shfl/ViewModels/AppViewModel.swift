@@ -63,13 +63,18 @@ final class AppViewModel {
         )
         let scrobbleManager = ScrobbleManager(transports: [lastFMTransport])
         let scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, musicService: musicService)
+        let songRepository = SongRepository(modelContext: modelContext)
+        let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
+        let sessionSnapshotService = SessionSnapshotService(
+            songRepository: songRepository,
+            playbackStateRepository: playbackStateRepository
+        )
 
         self.sessionCoordinator = AppPlaybackSessionCoordinator(
             player: player,
             playbackCoordinator: playbackCoordinator,
             musicService: musicService,
-            repository: SongRepository(modelContext: modelContext),
-            playbackStateRepository: PlaybackStateRepository(modelContext: modelContext),
+            sessionSnapshotService: sessionSnapshotService,
             scrobbleTracker: scrobbleTracker,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
