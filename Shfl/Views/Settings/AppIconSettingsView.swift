@@ -3,19 +3,19 @@ import SwiftUI
 enum AppIconVariant: String, CaseIterable, Identifiable {
     case primary = "AppIcon"
     case blue = "AppIcon-blue"
-    case purple = "AppIcon-purple"
+    case pink = "AppIcon-purple" // Bundle name preserved for compatibility
     case orange = "AppIcon-orange"
-    case gray = "AppIcon-green" // Bundle name preserved for compatibility
+    case green = "AppIcon-green"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .primary: "Default"
+        case .primary: "Silver"
         case .blue: "Blue"
-        case .purple: "Purple"
+        case .pink: "Pink"
         case .orange: "Orange"
-        case .gray: "Gray"
+        case .green: "Green"
         }
     }
 

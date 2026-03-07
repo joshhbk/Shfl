@@ -23,6 +23,7 @@ struct SplashView: View {
             )
 
             SplashLogo(
+                theme: theme,
                 pulsing: logoPulse,
                 fadedOut: logoFadeOut
             )
@@ -105,15 +106,17 @@ private struct SplashParticles: View {
 // MARK: - Splash Logo
 
 private struct SplashLogo: View {
+    let theme: ShuffleTheme
     let pulsing: Bool
     let fadedOut: Bool
 
     var body: some View {
         Image("SplashLogo")
+            .renderingMode(.template)
             .resizable()
             .scaledToFit()
+            .foregroundStyle(theme.centerButtonIconColor)
             .frame(width: 120, height: 120)
-            .clipShape(RoundedRectangle(cornerRadius: 27))
             .scaleEffect(fadedOut ? 0.8 : (pulsing ? 1.05 : 1.0))
             .opacity(fadedOut ? 0 : 1)
     }
