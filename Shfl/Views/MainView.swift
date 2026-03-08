@@ -167,6 +167,11 @@ struct MainView: View {
                 isShuffling: viewModel.isShuffling
             )
             .transition(.opacity)
+            .task(id: viewModel.player.queueState.isEmpty) {
+                if viewModel.player.queueState.isEmpty {
+                    viewModel.prefetchLibraryIfNeeded()
+                }
+            }
         } else {
             WelcomeView {
                 Task { await viewModel.requestAuthorization() }

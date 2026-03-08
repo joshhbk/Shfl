@@ -1,4 +1,5 @@
 import SwiftUI
+import Vortex
 
 struct PlayerView: View {
     var player: ShufflePlayer
@@ -53,10 +54,13 @@ struct PlayerView: View {
             ZStack {
                 BrushedMetalBackground()
 
+                if player.songCount == 0 && !isShuffling {
+                    IdleShuffleParticles(currentTheme: themeController.currentTheme)
+                }
+
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
                     hasSongs: player.songCount > 0,
-                    isControlsDisabled: player.songCount == 0,
                     progressState: progressState,
                     onPlayPause: onPlayPauseTapped,
                     onSkipForward: onSkipForwardTapped,
@@ -145,6 +149,49 @@ struct PlayerView: View {
         }
     }
 
+}
+
+// MARK: - Idle Particles (dialed-down Vortex — ~6 particles alive vs ~32 in ShuffleParticles)
+
+private struct IdleShuffleParticles: View {
+    let currentTheme: ShuffleTheme
+    private let particleThemes: [ShuffleTheme]
+    private let system: VortexSystem
+
+    init(currentTheme: ShuffleTheme) {
+        self.currentTheme = currentTheme
+        let particleThemes = ShuffleTheme.allThemes.filter { $0.id != currentTheme.id }
+        self.particleThemes = particleThemes
+        self.system = Self.makeSystem(tags: particleThemes.map { "theme-\($0.id)" })
+    }
+
+    var body: some View {
+        VortexView(system) {
+            ForEach(particleThemes) { theme in
+                Circle()
+                    .fill(theme.bodyGradientTop.opacity(0.5))
+                    .frame(width: 45)
+                    .tag("theme-\(theme.id)")
+            }
+        }
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
+    }
+
+    private static func makeSystem(tags: [String]) -> VortexSystem {
+        let system = VortexSystem(tags: tags)
+        system.birthRate = 2
+        system.lifespan = 3
+        system.speed = 0.15
+        system.speedVariation = 0.1
+        system.angle = .zero
+        system.angleRange = .degrees(360)
+        system.size = 0.4
+        system.sizeVariation = 0.3
+        system.position = [0.5, 0.5]
+        system.shape = .ellipse(radius: 0.3)
+        return system
+    }
 }
 
 // MARK: - Previews
@@ -248,18 +295,21 @@ private struct PlayerViewPreviewHost: View {
 
         let musicService = PreviewMockMusicService()
         let player = ShufflePlayer(musicService: musicService)
-        try? player.seedSongs(previewQueueSongs)
 
         switch state {
         case .empty:
             break
         case .loading:
+            try? player.seedSongs(previewQueueSongs)
             musicService.emit(.loading(previewSong))
         case .playing:
+            try? player.seedSongs(previewQueueSongs)
             musicService.emit(.playing(previewSong))
         case .paused:
+            try? player.seedSongs(previewQueueSongs)
             musicService.emit(.paused(previewSong))
         case .error:
+            try? player.seedSongs(previewQueueSongs)
             musicService.emit(.error(PreviewPlaybackError(errorDescription: "Preview playback failed.")))
         }
 

@@ -12,6 +12,10 @@ final class AppViewModel {
     @ObservationIgnored private let appSettings: AppSettings
     @ObservationIgnored private let sessionCoordinator: AppPlaybackSessionCoordinator
 
+    /// Pre-fetched library songs, ready for instant shuffle on play press
+    @ObservationIgnored private var prefetchedSongs: [Song]?
+    @ObservationIgnored private var prefetchTask: Task<Void, Never>?
+
     var showingManage = false
     var showingPicker = false
     var showingPickerDirect = false
@@ -118,11 +122,20 @@ final class AppViewModel {
     func shuffleAll() async {
         isShuffling = true
         do {
-            let source = LibraryAutofillSource(
-                musicService: musicService,
-                algorithm: appSettings.autofillAlgorithm
-            )
-            let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
+            let songs: [Song]
+            if let prefetched = prefetchedSongs {
+                songs = prefetched
+                prefetchedSongs = nil
+                prefetchTask = nil
+            } else {
+                prefetchTask?.cancel()
+                prefetchTask = nil
+                let source = LibraryAutofillSource(
+                    musicService: musicService,
+                    algorithm: appSettings.autofillAlgorithm
+                )
+                songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
+            }
             try await playbackCoordinator.seedSongs(songs)
             try await playbackCoordinator.play()
             sessionCoordinator.persistSongs()
@@ -132,6 +145,30 @@ final class AppViewModel {
         // Clear after play() returns — view guards isShuffling in both
         // the empty and loading slots to keep the spinner visible until .playing
         isShuffling = false
+    }
+
+    /// Starts a background library fetch so songs are ready when the user presses play.
+    /// Safe to call multiple times — guards against redundant work.
+    func prefetchLibraryIfNeeded() {
+        guard isAuthorized,
+              player.queueState.isEmpty,
+              prefetchedSongs == nil,
+              prefetchTask == nil else { return }
+
+        prefetchTask = Task {
+            do {
+                let source = LibraryAutofillSource(
+                    musicService: musicService,
+                    algorithm: appSettings.autofillAlgorithm
+                )
+                let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
+                guard !Task.isCancelled else { return }
+                self.prefetchedSongs = songs
+            } catch {
+                // Silent — shuffleAll fetches fresh on miss
+            }
+            self.prefetchTask = nil
+        }
     }
 
     func openManage() {

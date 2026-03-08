@@ -4,7 +4,6 @@ import SwiftUI
 struct ClassicPlayerLayout: View {
     let playbackState: PlaybackState
     let hasSongs: Bool
-    let isControlsDisabled: Bool
     let progressState: PlayerProgressState?
     let onPlayPause: () -> Void
     let onSkipForward: () -> Void
@@ -28,6 +27,8 @@ struct ClassicPlayerLayout: View {
             return nil
         }
     }
+
+    @State private var wheelPulsing = false
 
     /// Coarse state category for animating layout transitions between empty/loading/active
     private var stateCategory: Int {
@@ -61,7 +62,7 @@ struct ClassicPlayerLayout: View {
             }
             .animation(.easeInOut(duration: 0.4), value: playingOrPausedSong?.id)
             .padding(.bottom, 16)
-            .opacity(hasSongs || playbackState.isActive ? 1 : 0)
+            .opacity(hasSongs || playbackState.isActive ? 1 : 0.35)
 
             // Song info - floating directly on background
             SongInfoDisplay(
@@ -69,8 +70,6 @@ struct ClassicPlayerLayout: View {
                 hasSongs: hasSongs,
                 progressState: progressState,
                 onSeek: onSeek,
-                onAddSongs: onAdd,
-                onShuffle: onShuffle,
                 isShuffling: isShuffling
             )
             .frame(maxWidth: .infinity)
@@ -80,18 +79,30 @@ struct ClassicPlayerLayout: View {
             // Click wheel - floating with shadow
             ClickWheelView(
                 isPlaying: playbackState.isPlaying,
-                onPlayPause: onPlayPause,
+                onPlayPause: hasSongs ? onPlayPause : onShuffle,
                 onSkipForward: onSkipForward,
                 onSkipBack: onSkipBack,
                 onVolumeUp: { VolumeController.increaseVolume() },
                 onVolumeDown: { VolumeController.decreaseVolume() },
                 scale: 0.75
             )
-            .disabled(isControlsDisabled)
-            .opacity(isControlsDisabled ? 0.6 : 1.0)
+            .disabled(isShuffling)
+            .scaleEffect(wheelPulsing ? 1.02 : 1.0)
             .padding(.bottom, safeAreaInsets.bottom + 20)
         }
         .animation(.easeInOut(duration: 0.3), value: stateCategory)
         .animation(.easeInOut(duration: 0.2), value: showError)
+        .onAppear {
+            guard !hasSongs else { return }
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                wheelPulsing = true
+            }
+        }
+        .onChange(of: hasSongs) { _, hasSongs in
+            guard hasSongs else { return }
+            withAnimation(.easeInOut(duration: 0.3)) {
+                wheelPulsing = false
+            }
+        }
     }
 }

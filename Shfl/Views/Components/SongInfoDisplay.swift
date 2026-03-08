@@ -8,8 +8,6 @@ struct SongInfoDisplay: View {
     let hasSongs: Bool
     let progressState: PlayerProgressState?
     let onSeek: (TimeInterval) -> Void
-    let onAddSongs: () -> Void
-    let onShuffle: () -> Void
     let isShuffling: Bool
 
     init(
@@ -17,16 +15,12 @@ struct SongInfoDisplay: View {
         hasSongs: Bool = false,
         progressState: PlayerProgressState? = nil,
         onSeek: @escaping (TimeInterval) -> Void = { _ in },
-        onAddSongs: @escaping () -> Void = {},
-        onShuffle: @escaping () -> Void = {},
         isShuffling: Bool = false
     ) {
         self.playbackState = playbackState
         self.hasSongs = hasSongs
         self.progressState = progressState
         self.onSeek = onSeek
-        self.onAddSongs = onAddSongs
-        self.onShuffle = onShuffle
         self.isShuffling = isShuffling
     }
 
@@ -40,7 +34,7 @@ struct SongInfoDisplay: View {
                 playbackState: playbackState,
                 loading: { _ in
                     if isShuffling {
-                        emptyContent
+                        EmptyPlayerContent(animateEntrance: false)
                     }
                 },
                 active: { song in
@@ -48,7 +42,7 @@ struct SongInfoDisplay: View {
                 },
                 empty: {
                     if !hasSongs || isShuffling {
-                        emptyContent
+                        EmptyPlayerContent(animateEntrance: !isShuffling)
                     }
                 }
             )
@@ -101,70 +95,36 @@ struct SongInfoDisplay: View {
         }
     }
 
-    @ViewBuilder
-    private var emptyContent: some View {
-        VStack(spacing: 12) {
-            Text("No songs yet")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(theme.textColor)
+}
 
-            HStack(spacing: 12) {
-                shuffleButton
-                addSongsButton
+// MARK: - Empty Player Content
+
+private struct EmptyPlayerContent: View {
+    @Environment(\.shuffleTheme) private var theme
+
+    @State private var appeared: Bool
+
+    init(animateEntrance: Bool = true) {
+        self._appeared = State(wrappedValue: !animateEntrance)
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "shuffle")
+                    .font(.system(size: 18, weight: .bold))
+                Text("Ready to shuffle")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
             }
+            .foregroundStyle(theme.textColor)
+            .lineLimit(1)
         }
-    }
-
-    private var shuffleButton: some View {
-        Button(action: onShuffle) {
-            shuffleButtonLabel
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(ctaBackgroundColor, in: Capsule())
+        .offset(y: appeared ? 0 : 12)
+        .opacity(appeared ? 1 : 0)
+        .animation(.spring(duration: 0.5).delay(0.1), value: appeared)
+        .onAppear {
+            guard !appeared else { return }
+            appeared = true
         }
-        .buttonStyle(.plain)
-        .disabled(isShuffling)
-    }
-
-    @ViewBuilder
-    private var shuffleButtonLabel: some View {
-        if isShuffling {
-            ProgressView()
-                .tint(ctaTextColor)
-        } else {
-            Label("Shuffle", systemImage: "shuffle")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(ctaTextColor)
-        }
-    }
-
-    private var addSongsButton: some View {
-        Button(action: onAddSongs) {
-            Label("Add Songs", systemImage: "plus")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(ctaTextColor)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(ctaBackgroundColor, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(isShuffling)
-    }
-
-    /// CTA button background - contrasts with theme
-    private var ctaBackgroundColor: Color {
-        switch theme.textStyle {
-        case .light:
-            // Light text themes (pink, orange, etc.) - use dark background
-            return Color.black.opacity(0.7)
-        case .dark:
-            // Dark text themes (silver) - use dark background too for consistency
-            return Color.black.opacity(0.8)
-        }
-    }
-
-    /// CTA button text - always light on dark background
-    private var ctaTextColor: Color {
-        .white
     }
 }
