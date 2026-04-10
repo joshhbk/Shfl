@@ -74,6 +74,18 @@ struct MainView: View {
                 await viewModel.autofillLibrary()
             }
         }
+        .onChange(of: viewModel.player.playbackState) { oldState, newState in
+            switch newState {
+            case .empty, .stopped:
+                guard oldState.isActive,
+                      viewModel.player.songCount > 0,
+                      !viewModel.isShuffling else { break }
+                viewModel.isShuffling = true
+                Task { await viewModel.reshuffleFromLibrary() }
+            default:
+                break
+            }
+        }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
             Task {
                 await viewModel.onShuffleAlgorithmChanged(newAlgorithm)

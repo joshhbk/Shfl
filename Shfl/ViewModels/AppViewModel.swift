@@ -119,6 +119,29 @@ final class AppViewModel {
         isLoading = false
     }
 
+    /// Auto-reshuffles from the library when the queue is exhausted.
+    /// Clears the current queue, fetches fresh songs, and starts playback.
+    func reshuffleFromLibrary() async {
+        isShuffling = true
+        prefetchedSongs = nil
+        prefetchTask?.cancel()
+        prefetchTask = nil
+        do {
+            await playbackCoordinator.removeAllSongs()
+            let source = LibraryAutofillSource(
+                musicService: musicService,
+                algorithm: appSettings.autofillAlgorithm
+            )
+            let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
+            try await playbackCoordinator.seedSongs(songs)
+            try await playbackCoordinator.play()
+            sessionCoordinator.persistSongs()
+        } catch {
+            print("Failed to reshuffle from library: \(error)")
+        }
+        isShuffling = false
+    }
+
     func shuffleAll() async {
         isShuffling = true
         do {
