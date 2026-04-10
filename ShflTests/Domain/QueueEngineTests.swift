@@ -148,6 +148,50 @@ final class QueueEngineTests: XCTestCase {
         )
     }
 
+    func testAddSongsWithRebuildFromEmptySetsQueueNeedsBuild() throws {
+        let newSongs = [
+            Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil),
+            Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        ]
+
+        let state = QueueEngineState(
+            queueState: .empty,
+            playbackState: .empty,
+            revision: 3,
+            queueNeedsBuild: false
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .addSongsWithRebuild(newSongs, algorithm: nil))
+        XCTAssertFalse(reduction.wasNoOp)
+        XCTAssertTrue(
+            reduction.nextState.queueNeedsBuild,
+            "Adding songs from empty state should set queueNeedsBuild so invariants pass if MusicKit emits stale states"
+        )
+        XCTAssertEqual(reduction.nextState.queueState.songPool.count, 2)
+        XCTAssertTrue(reduction.nextState.queueState.queueOrder.isEmpty, "Queue should not be built yet")
+        XCTAssertTrue(reduction.transportCommands.isEmpty)
+    }
+
+    func testAddSongFromEmptySetsQueueNeedsBuild() throws {
+        let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+
+        let state = QueueEngineState(
+            queueState: .empty,
+            playbackState: .empty,
+            revision: 1,
+            queueNeedsBuild: false
+        )
+
+        let reduction = try QueueEngineReducer.reduce(state: state, intent: .addSong(song))
+        XCTAssertFalse(reduction.wasNoOp)
+        XCTAssertTrue(
+            reduction.nextState.queueNeedsBuild,
+            "Adding first song from empty state should set queueNeedsBuild"
+        )
+        XCTAssertEqual(reduction.nextState.queueState.songPool.count, 1)
+        XCTAssertTrue(reduction.transportCommands.isEmpty)
+    }
+
     func testAddSongsWithRebuildDuringActivePlaybackDefersTransportWhenPlaybackSongMissing() throws {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)

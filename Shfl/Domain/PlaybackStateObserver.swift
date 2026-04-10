@@ -113,6 +113,7 @@ final class PlaybackStateObserver {
                 $0.artist == musicKitSong.artist &&
                 $0.albumTitle == musicKitSong.albumTitle
             }) {
+            // MARK: Song found in pool
             // Found a stable mapping in the pool. Keep MusicKit artwork freshness.
             resolvedSongId = poolSong.id
             let mergedSong = Song(
@@ -134,9 +135,20 @@ final class PlaybackStateObserver {
             default:
                 resolvedState = normalizedState
             }
+        } else if normalizedState.currentSong != nil {
+            // Song not in pool by ID or metadata — stale emission from a previous queue.
+            // Discard to prevent invariant violations from playback-song-not-in-pool.
+            lastObservedSongId = nil
+            return PlaybackStateResolution(
+                resolvedState: .empty,
+                resolvedSongId: nil,
+                shouldUpdateCurrentSong: false,
+                songIdToMarkPlayed: nil,
+                shouldClearHistory: false
+            )
         } else {
-            // No match in pool - use MusicKit's data as-is
-            resolvedSongId = normalizedState.currentSongId
+            // No song in the state (empty/stopped/error)
+            resolvedSongId = nil
             resolvedState = normalizedState
         }
 

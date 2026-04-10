@@ -150,6 +150,9 @@ enum QueueEngineReducer {
         } else if state.queueState.hasQueue {
             // Queue exists but has not yet incorporated new pool mutations.
             queueNeedsBuild = true
+        } else if !queueState.isEmpty {
+            // Songs added from empty state — queue needs to be built on next play.
+            queueNeedsBuild = true
         }
     }
 
