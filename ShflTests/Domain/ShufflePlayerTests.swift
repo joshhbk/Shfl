@@ -73,7 +73,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Verify queue was populated
         var queue = await player.lastShuffledQueue
@@ -99,7 +99,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Step 4: Play
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Step 5: Verify queue is populated
         queue = await player.lastShuffledQueue
@@ -114,11 +114,11 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Step 2: Pause
         await player.pause()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Verify we're paused
         var playbackState = await player.playbackState
@@ -143,7 +143,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Step 5: Toggle playback (while paused with songs but no queue)
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Step 6: Queue should now be populated with new songs
         queue = await player.lastShuffledQueue
@@ -162,7 +162,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Step 2: Clear songs but KEEP playback state active (don't stop MusicKit)
         // This simulates real app behavior where MusicKit may still report active state
@@ -192,7 +192,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Step 4: Play should build new queue
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Step 5: Verify queue is now populated
         queue = await player.lastShuffledQueue
@@ -230,7 +230,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Now play
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Queue should be populated
         queue = await player.lastShuffledQueue
@@ -247,7 +247,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.play()
 
         // Give async stream time to update
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let state = await player.playbackState
         XCTAssertTrue(state.isPlaying)
@@ -257,9 +257,9 @@ final class ShufflePlayerTests: XCTestCase {
         let song = Song(id: "1", title: "Test", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         await player.pause()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let state = await player.playbackState
         if case .paused = state {
@@ -275,9 +275,9 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         try await player.skipToNext()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let state = await player.playbackState
         XCTAssertTrue(state.isPlaying)
@@ -289,13 +289,13 @@ final class ShufflePlayerTests: XCTestCase {
 
         // First toggle starts playback
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         var state = await player.playbackState
         XCTAssertTrue(state.isPlaying)
 
         // Second toggle pauses
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         state = await player.playbackState
         if case .paused = state {
             // Expected
@@ -305,7 +305,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Third toggle resumes
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         state = await player.playbackState
         XCTAssertTrue(state.isPlaying)
     }
@@ -318,7 +318,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Determine which song is currently playing (mock shuffles the queue)
         let state = await player.playbackState
@@ -330,7 +330,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Simulate song transition to the other song
         await mockService.simulatePlaybackState(.playing(otherSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let playedIds = await player.playedSongIdsForTesting
         XCTAssertTrue(playedIds.contains(currentSong.id), "First song should be in history after transition")
@@ -343,7 +343,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Determine which song is currently playing (mock shuffles the queue)
         let state = await player.playbackState
@@ -355,9 +355,9 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Simulate song transition then stop
         await mockService.simulatePlaybackState(.playing(otherSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let playedIds = await player.playedSongIdsForTesting
         XCTAssertTrue(playedIds.isEmpty)
@@ -367,10 +367,10 @@ final class ShufflePlayerTests: XCTestCase {
         let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.simulatePlaybackState(.empty)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let playedIds = await player.playedSongIdsForTesting
         XCTAssertTrue(playedIds.isEmpty)
@@ -384,7 +384,7 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Verify initial queue has 1 song
         var queue = await player.lastShuffledQueue
@@ -394,7 +394,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Verify internal queue order is updated
         queue = await player.lastShuffledQueue
@@ -417,7 +417,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let callCount = await mockService.setQueueCallCount
         XCTAssertEqual(callCount, 0, "setQueue should NOT be called when not playing")
@@ -431,7 +431,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Determine which song is currently playing
         let state = await player.playbackState
@@ -445,7 +445,7 @@ final class ShufflePlayerTests: XCTestCase {
         // Add new song
         let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song3)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Transport sync is deferred
         let replaceCallCount = await mockService.replaceQueueCallCount
@@ -465,7 +465,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentBeforeAdd = await player.playbackState.currentSongId else {
             XCTFail("Expected current song before active add")
@@ -476,7 +476,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let newSong = Song(id: "4", title: "Song 4", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(newSong)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Active add defers transport sync
         let replaceCallCount = await mockService.replaceQueueCallCount
@@ -487,7 +487,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertTrue(domainQueueIds.contains("4"), "New song should be in domain queue")
 
         // Deferred rebuild fires on the next playback resolution; wait for it to settle
-        try await Task.sleep(nanoseconds: 200_000_000)
+        await waitForStateUpdate()
 
         let currentAfterAdd = await player.playbackState.currentSongId
         XCTAssertEqual(currentAfterAdd, currentBeforeAdd, "Active add should preserve current song context")
@@ -501,7 +501,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentSong = await player.playbackState.currentSong else {
             XCTFail("Expected an active current song")
@@ -510,7 +510,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Force a stale queue while inactive, then reactivate without pressing play.
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         try await player.addSong(
             Song(id: "4", title: "Song 4", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         )
@@ -518,14 +518,14 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertTrue(needsBuildBefore, "Stopped add should mark queue rebuild pending")
 
         await mockService.simulatePlaybackState(.paused(currentSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
         try await player.addSong(
             Song(id: "5", title: "Song 5", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         )
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Active add defers transport sync to avoid playback interruption
         let needsBuildAfter = await player.queueNeedsBuild
@@ -546,7 +546,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Determine which song is currently playing
         let state = await player.playbackState
@@ -558,12 +558,12 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Simulate transition: first song finished, now playing second song
         await mockService.simulatePlaybackState(.playing(secondSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Add new songs using batch method
         let newSongs = [Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)]
         try await player.addSongsWithQueueRebuild(newSongs)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Domain queue should be canonical (transport sync is deferred)
         let domainQueue = await player.lastShuffledQueue
@@ -581,10 +581,10 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await player.removeSong(id: "2")
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Song should be removed from internal list
         let containsSong = await player.containsSong(id: "2")
@@ -601,12 +601,12 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Remove currently playing song
         let currentSongId = await player.playbackState.currentSongId
         await player.removeSong(id: currentSongId!)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Playback should still be active (song finishes naturally)
         let state = await player.playbackState
@@ -647,7 +647,7 @@ final class ShufflePlayerTests: XCTestCase {
         }
 
         try await player.play(algorithm: .pureRandom)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let queue = await player.lastShuffledQueue
         XCTAssertEqual(queue.count, songs.count)
@@ -664,7 +664,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Determine which song is currently playing (mock shuffles the queue)
         let state = await player.playbackState
@@ -676,16 +676,16 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Simulate song transition to build history
         await mockService.simulatePlaybackState(.playing(otherSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         var playedIds = await player.playedSongIdsForTesting
         XCTAssertTrue(playedIds.contains(currentSong.id), "History should contain played song")
 
         // Pause and play again - should clear history
         await player.pause()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         playedIds = await player.playedSongIdsForTesting
         XCTAssertTrue(playedIds.isEmpty, "History should be cleared on fresh play")
@@ -697,13 +697,13 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist A", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist B", albumTitle: "Album", artworkURL: nil)
         try await player.addSongsWithQueueRebuild([song2], algorithm: .artistSpacing)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let usedAlgorithm = await player.lastUsedAlgorithm
         XCTAssertEqual(usedAlgorithm, .artistSpacing, "Shuffle algorithm should be applied on queue rebuild")
@@ -714,13 +714,13 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let playCount = await mockService.playCallCount
         XCTAssertEqual(playCount, 0, "play() should NOT be called during addSong queue replacement")
@@ -732,11 +732,11 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Song is in pool and domain queue; transport sync is deferred.
         let containsSong = await player.containsSong(id: "2")
@@ -753,7 +753,7 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.setReplaceQueueDelay(nanoseconds: 300_000_000)
 
@@ -858,7 +858,7 @@ final class ShufflePlayerTests: XCTestCase {
         _ = await playTask.result
         _ = await firstClearTask.result
         _ = await secondClearTask.result
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let operations = await player.recentQueueOperations
         XCTAssertTrue(
@@ -880,14 +880,14 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.setMockPlaybackTime(45.0)
         await mockService.resetQueueTracking()
 
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song2)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // replaceQueue policy should not disturb playback position or trigger an explicit seek.
         let seekCount = mockService.seekCallCount
@@ -900,14 +900,14 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.setMockPlaybackTime(45.0)
         await mockService.resetQueueTracking()
 
         let currentSongId = await player.playbackState.currentSongId!
         await player.removeSong(id: currentSongId)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let seekCount = mockService.seekCallCount
         XCTAssertEqual(seekCount, 0, "seek() should NOT be called when removing current song")
@@ -920,7 +920,7 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
@@ -928,7 +928,7 @@ final class ShufflePlayerTests: XCTestCase {
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
         try await player.addSongsWithQueueRebuild(newSongs)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Transport sync is deferred
         let replaceCallCount = await mockService.replaceQueueCallCount
@@ -953,7 +953,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentSong = await player.playbackState.currentSong else {
             XCTFail("Expected a current song")
@@ -963,7 +963,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let song3 = Song(id: "3", title: "Song 3", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSongsWithQueueRebuild([song3])
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let containsSong3 = await player.containsSong(id: "3")
         XCTAssertTrue(containsSong3, "Added songs should be in pool immediately")
@@ -976,7 +976,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Same-song resolution should NOT trigger the deferred rebuild.
         await mockService.simulatePlaybackState(.playing(currentSong))
-        try await Task.sleep(nanoseconds: 200_000_000)
+        await waitForStateUpdate()
 
         let needsBuildAfterSameSong = await player.queueNeedsBuild
         XCTAssertTrue(needsBuildAfterSameSong, "Same-song resolution should not trigger boundary swap")
@@ -995,7 +995,7 @@ final class ShufflePlayerTests: XCTestCase {
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song1)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
@@ -1003,7 +1003,7 @@ final class ShufflePlayerTests: XCTestCase {
             Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
         try await player.addSongsWithQueueRebuild(newSongs)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Domain queue should include all songs (transport sync is deferred)
         let domainQueueIds = Set(await player.lastShuffledQueue.map(\.id))
@@ -1049,11 +1049,11 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Stop playback
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Add 2 more songs while stopped
         for i in 4...5 {
@@ -1065,7 +1065,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Play again
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Queue should contain ALL 5 songs
         let queue = await player.lastShuffledQueue
@@ -1085,7 +1085,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Capture a valid song for playback-state simulation.
         guard let currentSong = await player.lastShuffledQueue.first else {
@@ -1095,7 +1095,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Stop, then add songs while stopped to force pool/queue drift.
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         for i in 4...5 {
             let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -1112,7 +1112,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Playback state changes should NOT auto-reconcile while a rebuild is pending.
         await mockService.simulatePlaybackState(.paused(currentSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let staleAfter = await player.queueState.isQueueStale
         XCTAssertTrue(staleAfter, "Playback-state changes should not silently repair a stale queue")
@@ -1121,7 +1121,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(replaceCallCount, 0, "No replaceQueue should run during passive playback-state changes")
 
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let staleAfterPlay = await player.queueState.isQueueStale
         XCTAssertFalse(staleAfterPlay, "Explicit play should rebuild stale queue")
@@ -1135,14 +1135,14 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let currentBeforePause = await player.playbackState.currentSongId
         await player.pause()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.simulatePlaybackState(.empty)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let normalizedState = await player.playbackState
         if case .paused = normalizedState {
@@ -1155,7 +1155,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         await mockService.resetQueueTracking()
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let setQueueCallCount = await mockService.setQueueCallCount
         XCTAssertEqual(setQueueCallCount, 0, "Resume from paused should not rebuild queue after transient empty")
@@ -1173,11 +1173,11 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Stop playback
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Remove 2 songs while stopped
         await player.removeSong(id: "2")
@@ -1187,7 +1187,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Play again
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Queue should contain only the remaining 3 songs
         let queue = await player.lastShuffledQueue
@@ -1203,18 +1203,18 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         let songBeforeStop = await player.playbackState.currentSongId
 
         // Simulate full playthrough ending
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
         // Play again — should resume queue context without forcing a full reshuffle.
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // setQueue should not be called for stopped->play replay without explicit corruption.
         let setQueueCallCount = await mockService.setQueueCallCount
@@ -1240,11 +1240,11 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Stop playback
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
@@ -1262,7 +1262,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Play again — should rebuild with new algorithm
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let usedAlgorithm = await player.lastUsedAlgorithm
         XCTAssertEqual(usedAlgorithm, .artistSpacing, "Should use the new algorithm after play")
@@ -1281,7 +1281,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentSong = await player.playbackState.currentSong else {
             XCTFail("Expected active current song before algorithm change")
@@ -1296,7 +1296,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Change algorithm to artistSpacing
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let usedAlgorithm = await player.lastUsedAlgorithm
         XCTAssertEqual(usedAlgorithm, .artistSpacing, "Algorithm should be updated")
@@ -1330,7 +1330,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Simulate listening progression before adding new songs.
         let state = await player.playbackState
@@ -1340,21 +1340,21 @@ final class ShufflePlayerTests: XCTestCase {
         }
         if let nextSong = initialSongs.first(where: { $0.id != currentlyPlaying.id }) {
             await mockService.simulatePlaybackState(.playing(nextSong))
-            try await Task.sleep(nanoseconds: 100_000_000)
+            await waitForStateUpdate()
         }
 
         // Repro step: add two songs while queue is active (single-song path).
         try await player.addSong(newSongs[0])
         try await player.addSong(newSongs[1])
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Repro step: change algorithm, then pause/play.
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         await player.pause()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let domainQueueIds = await player.lastShuffledQueue.map(\.id)
         let transportQueueIds = await mockService.lastQueuedSongs.map(\.id)
@@ -1386,20 +1386,20 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
         await player.pause()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let precomputedQueueIds = await player.lastShuffledQueue.map(\.id)
         let needsBuildBeforeResume = await player.queueNeedsBuild
         XCTAssertTrue(needsBuildBeforeResume, "Paused algorithm change should stage deferred queue sync")
 
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let setQueueCalls = await mockService.setQueueCallCount
         XCTAssertEqual(setQueueCalls, 0, "Paused resume should use the precomputed queue instead of fresh setQueue reshuffle")
@@ -1421,13 +1421,13 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let currentSongId = await player.playbackState.currentSongId
 
         await mockService.resetQueueTracking()
         await player.reshuffleWithNewAlgorithm(.pureRandom)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let currentSongIdAfterReshuffle = await player.playbackState.currentSongId
         XCTAssertEqual(
@@ -1465,7 +1465,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song2)
         try await player.addSong(song3)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Determine current song and simulate transition
         let state = await player.playbackState
@@ -1478,11 +1478,11 @@ final class ShufflePlayerTests: XCTestCase {
 
         // Simulate playing through first song
         await mockService.simulatePlaybackState(.playing(nextSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
         await player.reshuffleWithNewAlgorithm(.noRepeat)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Deferred while active: no immediate transport replace.
         let replaceCallsBeforeBoundary = await mockService.replaceQueueCallCount
@@ -1514,7 +1514,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let activeSong = await player.playbackState.currentSong else {
             XCTFail("Expected active song")
@@ -1527,7 +1527,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let extra = Song(id: "4", title: "Song 4", artist: "Artist 4", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(extra)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
         await mockService.setReplaceQueueDelay(nanoseconds: 350_000_000)
@@ -1564,7 +1564,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let activeSong = await player.playbackState.currentSong else {
             XCTFail("Expected active song")
@@ -1577,7 +1577,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         let extra = Song(id: "5", title: "Song 5", artist: "Artist 5", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(extra)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.setReplaceQueueDelay(nanoseconds: 400_000_000)
         await mockService.simulatePlaybackState(.playing(firstTransition))
@@ -1624,7 +1624,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentBeforeRemove = await player.playbackState.currentSongId else {
             XCTFail("Expected active current song")
@@ -1633,7 +1633,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         await mockService.resetQueueTracking()
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let needsBuildBeforeRemove = await player.queueNeedsBuild
         XCTAssertTrue(needsBuildBeforeRemove, "Algorithm change should stage deferred boundary sync")
@@ -1645,7 +1645,7 @@ final class ShufflePlayerTests: XCTestCase {
         }
 
         await player.removeSong(id: removableId)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let replaceCallsAfterRemove = await mockService.replaceQueueCallCount
         XCTAssertEqual(replaceCallsAfterRemove, 1, "Remove should perform a single active replaceQueue sync")
@@ -1670,10 +1670,10 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(songA)
         try await player.addSong(songB)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.simulatePlaybackState(.playing(songB))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let resolvedId = await player.playbackState.currentSongId
         XCTAssertEqual(resolvedId, "b", "Playback mapping should prioritize exact ID before metadata fallback")
@@ -1703,7 +1703,7 @@ final class ShufflePlayerTests: XCTestCase {
             playedIds: playedIds,
             playbackPosition: 0
         )
-        try await Task.sleep(nanoseconds: 200_000_000)
+        await waitForStateUpdate()
 
         // Verify restoration succeeded
         XCTAssertTrue(success, "Restore should succeed")
@@ -1870,7 +1870,7 @@ final class ShufflePlayerTests: XCTestCase {
             artworkURL: hydratedArtwork
         )
         await mockService.simulatePlaybackState(.paused(hydratedSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let success = await player.restoreSession(
             queueOrder: ["1", "2", "3"],
@@ -1909,7 +1909,7 @@ final class ShufflePlayerTests: XCTestCase {
         await mockService.resetQueueTracking()
 
         try await player.togglePlayback()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let seekCount = await mockService.seekCallCount
         let playbackTime = mockService.currentPlaybackTime
@@ -1928,7 +1928,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song2)
         try await player.addSong(song3)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await mockService.resetQueueTracking()
 
@@ -1936,7 +1936,7 @@ final class ShufflePlayerTests: XCTestCase {
         let currentSongId = await player.playbackState.currentSongId
         let songToRemove = currentSongId == "1" ? "2" : "1"
         await player.removeSong(id: songToRemove)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Verify replaceQueue was called to update MusicKit
         let replaceCallCount = await mockService.replaceQueueCallCount
@@ -1959,7 +1959,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song2)
         try await player.addSong(song3)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let currentSongId = await player.playbackState.currentSongId
         let songToRemove = currentSongId == "1" ? "2" : "1"
@@ -1969,7 +1969,7 @@ final class ShufflePlayerTests: XCTestCase {
             NSError(domain: NSURLErrorDomain, code: NSURLErrorNetworkConnectionLost)
         )
         await player.removeSong(id: songToRemove)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let queueAfterFailure = await player.lastShuffledQueue.map(\.id)
         XCTAssertEqual(
@@ -1992,14 +1992,14 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let currentSongId = await player.playbackState.currentSongId
         XCTAssertNotNil(currentSongId)
 
         // Remove the currently playing song
         await player.removeSong(id: currentSongId!)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Should have skipped to the next song
         let newCurrentSongId = await player.playbackState.currentSongId
@@ -2014,7 +2014,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let song6 = Song(id: "6", title: "Song 6", artist: "Artist 6", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song6)
@@ -2022,7 +2022,7 @@ final class ShufflePlayerTests: XCTestCase {
         let songToRemove = currentSongId == "2" ? "1" : "2"
         await player.removeSong(id: songToRemove)
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
-        try await Task.sleep(nanoseconds: 200_000_000)
+        await waitForStateUpdate()
 
         let internalQueue = await player.lastShuffledQueue.map(\.id)
         let transportQueue = await mockService.lastQueuedSongs.map(\.id)
@@ -2040,7 +2040,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentSong = await player.lastShuffledQueue.first else {
             XCTFail("Expected a current song in queue")
@@ -2050,13 +2050,13 @@ final class ShufflePlayerTests: XCTestCase {
         // Trigger 25 stale cycles; phase-2 flow keeps telemetry empty and defers rebuild to play.
         for cycle in 0..<25 {
             await mockService.simulatePlaybackState(.stopped)
-            try await Task.sleep(nanoseconds: 50_000_000)
+            await waitForStateUpdate()
 
             let extra = Song(id: "extra\(cycle)", title: "Extra \(cycle)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
             try await player.addSong(extra)
 
             await mockService.simulatePlaybackState(.paused(currentSong))
-            try await Task.sleep(nanoseconds: 50_000_000)
+            await waitForStateUpdate()
         }
 
         let needsBuild = await player.queueNeedsBuild
@@ -2070,11 +2070,11 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Stop and add a song to create drift.
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let extra = Song(id: "extra", title: "Extra", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(extra)
@@ -2085,7 +2085,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertTrue(needsBuildBeforePlay, "Stale queue should require rebuild before play")
 
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let staleAfterPlay = await player.queueState.isQueueStale
         XCTAssertFalse(staleAfterPlay, "Play should rebuild queue and clear stale state")
@@ -2100,11 +2100,11 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         // Stop, add songs to force pool/queue count drift.
         await mockService.simulatePlaybackState(.stopped)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         for i in 4...5 {
             let song = Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
@@ -2128,7 +2128,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentSong = await player.playbackState.currentSong else {
             XCTFail("Expected current song after play")
@@ -2138,7 +2138,7 @@ final class ShufflePlayerTests: XCTestCase {
         // Simulate MusicKit reporting a catalog/raw transport ID while playback mapping resolves to the pool ID.
         mockService.mockCurrentSongId = "1358312005"
         await mockService.simulatePlaybackState(.paused(currentSong))
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let invariant = await player.queueInvariantCheck
         XCTAssertTrue(
@@ -2158,7 +2158,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let extraSongs = [
             Song(id: "extra1", title: "Extra 1", artist: "Artist", albumTitle: "Album", artworkURL: nil),
@@ -2167,12 +2167,12 @@ final class ShufflePlayerTests: XCTestCase {
 
         for song in extraSongs {
             await mockService.simulatePlaybackState(.stopped)
-            try await Task.sleep(nanoseconds: 100_000_000)
+            await waitForStateUpdate()
             try await player.addSong(song)
             let needsBuild = await player.queueNeedsBuild
             XCTAssertTrue(needsBuild, "Each stopped add should mark rebuild pending")
             try await player.play()
-            try await Task.sleep(nanoseconds: 100_000_000)
+            await waitForStateUpdate()
         }
 
     }
@@ -2185,7 +2185,7 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await player.hardResetQueueForDebug()
 
@@ -2211,10 +2211,10 @@ final class ShufflePlayerTests: XCTestCase {
             try await player.addSong(song)
         }
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         await player.reshuffleWithNewAlgorithm(.artistSpacing)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         guard let currentSongId = await player.playbackState.currentSongId,
               let firstTransition = await player.lastShuffledQueue.first(where: { $0.id != currentSongId }) else {
@@ -2251,7 +2251,7 @@ final class ShufflePlayerTests: XCTestCase {
         let song = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try await player.addSong(song)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         for i in 0..<(QueueOperationJournal.maxRecords + 40) {
             if i.isMultiple(of: 2) {
@@ -2260,7 +2260,12 @@ final class ShufflePlayerTests: XCTestCase {
                 await mockService.simulatePlaybackState(.playing(song))
             }
         }
-        try await Task.sleep(nanoseconds: 200_000_000)
+        // Drain all 290 observer emissions before asserting
+        let drained = await waitForCondition(timeoutNanoseconds: 3_000_000_000) { [self] in
+            let count = await self.player!.recentQueueOperations.count
+            return count >= QueueOperationJournal.maxRecords
+        }
+        XCTAssertTrue(drained, "Observer should drain all pending state emissions")
 
         let records = await player.recentQueueOperations
         XCTAssertEqual(records.count, QueueOperationJournal.maxRecords, "Journal should trim to max records")
@@ -2277,7 +2282,7 @@ final class ShufflePlayerTests: XCTestCase {
         try await player.addSong(song1)
         try await player.addSong(song2)
         try await player.play()
-        try await Task.sleep(nanoseconds: 100_000_000)
+        await waitForStateUpdate()
 
         let json = await player.exportQueueDiagnosticsSnapshot(
             trigger: "unit-test",
