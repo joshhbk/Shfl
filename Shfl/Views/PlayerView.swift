@@ -54,7 +54,7 @@ struct PlayerView: View {
             ZStack {
                 BrushedMetalBackground()
 
-                if player.songCount == 0 && !isShuffling {
+                if player.playbackState.currentSong == nil && !isShuffling {
                     IdleShuffleParticles(currentTheme: themeController.currentTheme)
                 }
 
@@ -198,6 +198,7 @@ private struct IdleShuffleParticles: View {
 
 private enum PreviewPlayerState: String, CaseIterable, Identifiable {
     case empty
+    case armed
     case loading
     case playing
     case paused
@@ -299,6 +300,8 @@ private struct PlayerViewPreviewHost: View {
         switch state {
         case .empty:
             break
+        case .armed:
+            try? player.seedSongs(previewQueueSongs)
         case .loading:
             try? player.seedSongs(previewQueueSongs)
             musicService.emit(.loading(previewSong))
@@ -336,6 +339,10 @@ private struct PlayerViewPreviewHost: View {
 
 #Preview("Empty State") {
     PlayerViewPreviewHost(state: .empty, themeId: "silver")
+}
+
+#Preview("Armed State") {
+    PlayerViewPreviewHost(state: .armed, themeId: "silver")
 }
 
 #Preview("Loading") {

@@ -34,19 +34,21 @@ struct SongInfoDisplay: View {
                 playbackState: playbackState,
                 loading: { _ in
                     if isShuffling {
-                        EmptyPlayerContent(animateEntrance: false)
+                        EmptyPlayerContent(variant: emptyVariant, animateEntrance: false)
                     }
                 },
                 active: { song in
                     activeContent(song: song)
                 },
                 empty: {
-                    if !hasSongs || isShuffling {
-                        EmptyPlayerContent(animateEntrance: !isShuffling)
-                    }
+                    EmptyPlayerContent(variant: emptyVariant, animateEntrance: !isShuffling)
                 }
             )
         }
+    }
+
+    private var emptyVariant: EmptyPlayerContent.Variant {
+        hasSongs ? .armed : .libraryEmpty
     }
 
     /// Invisible spacer that matches the active content's intrinsic height.
@@ -100,11 +102,25 @@ struct SongInfoDisplay: View {
 // MARK: - Empty Player Content
 
 private struct EmptyPlayerContent: View {
+    enum Variant {
+        case libraryEmpty
+        case armed
+
+        var text: String {
+            switch self {
+            case .libraryEmpty: return "Start shuffling"
+            case .armed: return "Ready to shuffle"
+            }
+        }
+    }
+
     @Environment(\.shuffleTheme) private var theme
 
+    let variant: Variant
     @State private var appeared: Bool
 
-    init(animateEntrance: Bool = true) {
+    init(variant: Variant, animateEntrance: Bool = true) {
+        self.variant = variant
         self._appeared = State(wrappedValue: !animateEntrance)
     }
 
@@ -113,8 +129,10 @@ private struct EmptyPlayerContent: View {
             HStack(spacing: 8) {
                 Image(systemName: "shuffle")
                     .font(.system(size: 18, weight: .bold))
-                Text("Ready to shuffle")
+                Text(variant.text)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .contentTransition(.opacity)
+                    .animation(.easeOut(duration: 0.3), value: variant.text)
             }
             .foregroundStyle(theme.textColor)
             .lineLimit(1)

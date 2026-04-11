@@ -39,6 +39,11 @@ struct ClassicPlayerLayout: View {
         }
     }
 
+    /// Faster pulse signals "library is loaded, tap to shuffle" vs the calmer empty-library rhythm.
+    private var pulsePeriod: Double {
+        hasSongs ? 0.8 : 1.2
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if showError {
@@ -93,16 +98,33 @@ struct ClassicPlayerLayout: View {
         .animation(.easeInOut(duration: 0.3), value: stateCategory)
         .animation(.easeInOut(duration: 0.2), value: showError)
         .onAppear {
-            guard !hasSongs else { return }
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                wheelPulsing = true
-            }
+            refreshPulseAnimation()
         }
-        .onChange(of: hasSongs) { _, hasSongs in
-            guard hasSongs else { return }
+        .onChange(of: playbackState.isActive) { _, _ in
+            refreshPulseAnimation()
+        }
+        .onChange(of: hasSongs) { _, _ in
+            refreshPulseAnimation()
+        }
+    }
+
+    private func refreshPulseAnimation() {
+        guard !playbackState.isActive else {
             withAnimation(.easeInOut(duration: 0.3)) {
                 wheelPulsing = false
             }
+            return
+        }
+
+        // Reset scale without animating so the restart with the new period isn't masked
+        // by an in-flight repeatForever chain.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            wheelPulsing = false
+        }
+        withAnimation(.easeInOut(duration: pulsePeriod).repeatForever(autoreverses: true)) {
+            wheelPulsing = true
         }
     }
 }
