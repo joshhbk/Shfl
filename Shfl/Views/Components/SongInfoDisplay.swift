@@ -30,21 +30,24 @@ struct SongInfoDisplay: View {
             activeHeightReference
                 .hidden()
 
-            PlaybackStateContent(
-                playbackState: playbackState,
-                loading: { _ in
-                    if isShuffling {
-                        EmptyPlayerContent(variant: emptyVariant, animateEntrance: false)
-                    }
-                },
-                active: { song in
-                    activeContent(song: song)
-                },
-                empty: {
-                    EmptyPlayerContent(variant: emptyVariant, animateEntrance: !isShuffling)
-                }
-            )
+            // Single transition point: "is there a song to display?"
+            // Switching on currentSong (instead of per-branch on playbackState) keeps
+            // the view stable across loading → playing and empty → loading(shuffle),
+            // so we only cross-fade once per user-visible state change.
+            if let song = displayedSong {
+                activeContent(song: song)
+                    .transition(.opacity)
+            } else {
+                EmptyPlayerContent(variant: emptyVariant, animateEntrance: !isShuffling)
+                    .transition(.opacity)
+            }
         }
+    }
+
+    /// The song to render in `activeContent`, if any. Returns nil during shuffle so
+    /// the pre-playback copy stays on screen from the wheel tap all the way to audio start.
+    private var displayedSong: Song? {
+        isShuffling ? nil : playbackState.currentSong
     }
 
     private var emptyVariant: EmptyPlayerContent.Variant {
