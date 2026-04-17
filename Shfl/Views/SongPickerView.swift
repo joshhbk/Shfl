@@ -38,6 +38,8 @@ struct SongPickerView: View {
     @FocusState private var isSearchFieldFocused: Bool
 
     @Environment(\.appSettings) private var appSettings
+    @Environment(\.shuffleTheme) private var shuffleTheme
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         player: ShufflePlayer,
@@ -203,27 +205,69 @@ struct SongPickerView: View {
     }
 
     @available(iOS 26, *)
+    @ViewBuilder
     private func pickerNavigationChrome<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    toolbarCapacityView
+        let style = PickerHeaderStyle.resolve(theme: shuffleTheme, colorScheme: colorScheme)
+        if style.isTinted {
+            content()
+                .toolbar(.hidden, for: .navigationBar)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    tintedHeader(style: style)
                 }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    toolbarActionGroup
+        } else {
+            content()
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        toolbarCapacityView(style: style)
+                    }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        autofillToolbarButton(style: style)
+                        clearToolbarButton(style: style)
+                        if showSortButton {
+                            sortToolbarButton(style: style)
+                        }
+                    }
                 }
-            }
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbarBackground(style.background, for: .navigationBar)
+        }
     }
 
     @available(iOS 26, *)
-    private var toolbarCapacityView: some View {
+    private func tintedHeader(style: PickerHeaderStyle) -> some View {
+        HStack(spacing: 12) {
+            CapacityRing(
+                current: selectedSongIds.count,
+                maximum: player.capacity,
+                style: style
+            )
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isStaticText)
+            .accessibilityLabel("\(selectedSongIds.count) of \(player.capacity) songs selected")
+
+            Spacer(minLength: 8)
+
+            autofillPill(style: style)
+            clearPill(style: style)
+            if showSortButton {
+                sortPill(style: style)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background {
+            style.background
+                .ignoresSafeArea(.container, edges: .top)
+        }
+    }
+
+    @available(iOS 26, *)
+    private func toolbarCapacityView(style: PickerHeaderStyle) -> some View {
         CapacityRing(
             current: selectedSongIds.count,
-            maximum: player.capacity
+            maximum: player.capacity,
+            style: style
         )
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
@@ -232,16 +276,56 @@ struct SongPickerView: View {
     }
 
     @available(iOS 26, *)
-    private var toolbarActionGroup: some View {
-        HStack(spacing: 6) {
-            autofillToolbarButton
-            clearToolbarButton
-
-            if showSortButton {
-                sortToolbarButton
-            }
+    private func autofillPill(style: PickerHeaderStyle) -> some View {
+        Button {
+            performAutofill()
+        } label: {
+            Text("Autofill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(isAutofillDisabled ? style.disabledContent : style.primaryContent)
+                .padding(.horizontal, 14)
+                .frame(height: 32)
         }
-        .padding(.leading, 6)
+        .buttonStyle(.plain)
+        .glassEffect(.regular.tint(style.pillBackground).interactive(), in: .capsule)
+        .disabled(isAutofillDisabled)
+    }
+
+    @available(iOS 26, *)
+    private func clearPill(style: PickerHeaderStyle) -> some View {
+        Button {
+            clearSelectedSongs()
+        } label: {
+            Text("Clear")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(selectedSongIds.isEmpty ? style.disabledContent : style.primaryContent)
+                .padding(.horizontal, 14)
+                .frame(height: 32)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.tint(style.pillBackground).interactive(), in: .capsule)
+        .disabled(selectedSongIds.isEmpty)
+    }
+
+    @available(iOS 26, *)
+    private func sortPill(style: PickerHeaderStyle) -> some View {
+        Menu {
+            Picker("Sort", selection: Binding(
+                get: { appSettings?.librarySortOption ?? .mostPlayed },
+                set: { appSettings?.librarySortOption = $0 }
+            )) {
+                ForEach(SortOption.allCases, id: \.self) { option in
+                    Text(option.displayName).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(style.primaryContent)
+                .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.tint(style.pillBackground).interactive(), in: .capsule)
     }
 
     private var searchTabContent: some View {
@@ -445,7 +529,7 @@ struct SongPickerView: View {
     }
 
     @available(iOS 26, *)
-    private var autofillToolbarButton: some View {
+    private func autofillToolbarButton(style: PickerHeaderStyle) -> some View {
         Button {
             performAutofill()
         }
@@ -454,7 +538,7 @@ struct SongPickerView: View {
                 .font(.system(size: 16, weight: .semibold))
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isAutofillDisabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+        .foregroundStyle(isAutofillDisabled ? style.disabledContent : style.primaryContent)
         .disabled(isAutofillDisabled)
         .padding(.horizontal, 8)
         .frame(height: 32)
@@ -473,20 +557,23 @@ struct SongPickerView: View {
     }
 
     @available(iOS 26, *)
-    private var clearToolbarButton: some View {
-        Button("Clear") {
+    private func clearToolbarButton(style: PickerHeaderStyle) -> some View {
+        let enabledColor: Color = style.isTinted ? style.primaryContent : .red
+        let fontWeight: Font.Weight = style.isTinted ? .semibold : .medium
+
+        return Button("Clear") {
             clearSelectedSongs()
         }
         .buttonStyle(.plain)
-        .font(.system(size: 16, weight: .medium))
-        .foregroundStyle(selectedSongIds.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+        .font(.system(size: 16, weight: fontWeight))
+        .foregroundStyle(selectedSongIds.isEmpty ? style.disabledContent : enabledColor)
         .disabled(selectedSongIds.isEmpty)
         .padding(.horizontal, 8)
         .frame(height: 32)
     }
 
     @available(iOS 26, *)
-    private var sortToolbarButton: some View {
+    private func sortToolbarButton(style: PickerHeaderStyle) -> some View {
         Menu {
             Picker("Sort", selection: Binding(
                 get: { appSettings?.librarySortOption ?? .mostPlayed },
@@ -500,7 +587,7 @@ struct SongPickerView: View {
             Image(systemName: "arrow.up.arrow.down")
                 .font(.system(size: 19, weight: .medium))
                 .frame(width: 28, height: 32)
-                .foregroundStyle(.pink)
+                .foregroundStyle(style.isTinted ? style.primaryContent : .pink)
         }
         .buttonStyle(.plain)
     }

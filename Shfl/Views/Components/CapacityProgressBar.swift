@@ -168,6 +168,7 @@ struct CompactCapacityBar: View {
 struct CapacityRing: View {
     let current: Int
     let maximum: Int
+    var style: PickerHeaderStyle = .systemDefault
 
     @State private var pulseOpacity: Double = 0
 
@@ -180,14 +181,14 @@ struct CapacityRing: View {
     }
 
     private var ringColor: Color {
-        isFull ? .green : .accentColor
+        isFull ? .green : style.ringFill
     }
 
     var body: some View {
         HStack(spacing: 6) {
             ZStack {
                 Circle()
-                    .stroke(Color(.systemFill), lineWidth: 2.5)
+                    .stroke(style.ringTrack, lineWidth: 2.5)
 
                 Circle()
                     .trim(from: 0, to: progress)
@@ -204,11 +205,11 @@ struct CapacityRing: View {
             HStack(spacing: 2) {
                 Text("\(current)")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(isFull ? .green : .primary)
+                    .foregroundStyle(isFull ? .green : style.primaryContent)
                     .contentTransition(.numericText())
                 Text("of \(maximum)")
                     .font(.system(size: 13, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(style.secondaryContent)
             }
             .monospacedDigit()
         }
