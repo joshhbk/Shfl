@@ -20,7 +20,7 @@ final class QueueTransportSyncTestHarness {
     let mockService: MockMusicService
     lazy var sync: QueueTransportSync = {
         QueueTransportSync(
-            musicService: mockService,
+            playbackTransport: mockService,
             readQueueRevision: { self.queueRevision },
             readEngineState: {
                 QueueEngineState(queueState: self.queueState, playbackState: self.playbackState, revision: self.queueRevision, queueNeedsBuild: self.queueNeedsBuild)

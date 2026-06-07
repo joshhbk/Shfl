@@ -105,7 +105,7 @@ final class AppViewModel {
         loadingMessage = "Finding songs in your library..."
         do {
             let source = LibraryAutofillSource(
-                musicService: musicService,
+				libraryCatalog: musicService,
                 algorithm: appSettings.autofillAlgorithm
             )
             let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
@@ -129,7 +129,7 @@ final class AppViewModel {
         do {
             await playbackCoordinator.removeAllSongs()
             let source = LibraryAutofillSource(
-                musicService: musicService,
+				libraryCatalog: musicService,
                 algorithm: appSettings.autofillAlgorithm
             )
             let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
@@ -154,7 +154,7 @@ final class AppViewModel {
                 prefetchTask?.cancel()
                 prefetchTask = nil
                 let source = LibraryAutofillSource(
-                    musicService: musicService,
+				libraryCatalog: musicService,
                     algorithm: appSettings.autofillAlgorithm
                 )
                 songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
@@ -181,7 +181,7 @@ final class AppViewModel {
         prefetchTask = Task {
             do {
                 let source = LibraryAutofillSource(
-                    musicService: musicService,
+                    libraryCatalog: musicService,
                     algorithm: appSettings.autofillAlgorithm
                 )
                 let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)

@@ -107,41 +107,12 @@ final class AppPlaybackSessionCoordinator {
     }
 
     private func persistCurrentSession() {
-        let sessionSnapshot = AppSessionSnapshot(
-            songs: player.allSongs,
-            playback: currentPlaybackSnapshot()
-        )
-
-        let playbackSnapshot = sessionSnapshot.playback
-        if !player.hasRestorableState {
-            print("💾 No restorable playback state to save; persisting songs and clearing playback snapshot")
-        }
-
-        let currentSongId = playbackSnapshot?.currentSongId
-        let currentSongTitle = player.playbackState.currentSong?.title ?? "nil"
-        let playbackTime = musicService.currentPlaybackTime
-        let queueOrder = playbackSnapshot?.queueOrder ?? []
-        let playedIds = playbackSnapshot?.playedSongIds ?? []
-
-        #if DEBUG
-        print("💾 Persisting state:")
-        print("💾   currentSongId: \(currentSongId ?? "nil")")
-        print("💾   currentSongTitle: \(currentSongTitle)")
-        print("💾   playbackTime: \(playbackTime)")
-        print("💾   queueOrder: \(queueOrder.count) songs, first=\(queueOrder.first ?? "nil")")
-        print("💾   playedIds: \(playedIds.count)")
-        #endif
-
         do {
-            try sessionSnapshotService.save(sessionSnapshot)
-            lastPersistedSongId = playbackSnapshot?.currentSongId
-            #if DEBUG
-            if let playbackSnapshot {
-                print("💾 Saved playback state: song=\(playbackSnapshot.currentSongId ?? "nil"), position=\(playbackSnapshot.playbackPosition), queueOrder=\(queueOrder.count)")
-            } else {
-                print("💾 Cleared playback state while saving song snapshot")
-            }
-            #endif
+            try sessionSnapshotService.saveCurrentSession(
+                from: player,
+                playbackTime: musicService.currentPlaybackTime
+            )
+            lastPersistedSongId = player.playbackState.currentSongId
         } catch {
             print("💾 Failed to save session snapshot: \(error)")
         }
@@ -198,48 +169,15 @@ final class AppPlaybackSessionCoordinator {
         }
     }
 
-    private func currentPlaybackSnapshot() -> PlaybackSessionSnapshot? {
-        guard player.hasRestorableState else { return nil }
-
-        let currentState = player.playbackState
-        return PlaybackSessionSnapshot(
-            currentSongId: currentState.currentSongId,
-            playbackPosition: musicService.currentPlaybackTime,
-            savedAt: Date(),
-            queueOrder: player.currentQueueOrder,
-            playedSongIds: player.currentPlayedSongIds
-        )
-    }
 
     private func restorePlaybackState(_ state: PlaybackSessionSnapshot) async -> Bool {
-        if sessionSnapshotService.isPlaybackStateStale(state) {
-            print("🔄 Playback state is stale (>7 days), using fresh shuffle")
-            try? sessionSnapshotService.clearPlayback()
-            return false
-        }
-
-        let queueOrder = state.queueOrder
-        let playedIds = state.playedSongIds
-
-        guard !queueOrder.isEmpty else {
-            print("🔄 Saved queue is empty, using fresh shuffle")
-            return false
-        }
-
-        let success = await playbackCoordinator.restoreSession(
-            queueOrder: queueOrder,
-            currentSongId: state.currentSongId,
-            playedIds: playedIds,
-            playbackPosition: state.playbackPosition
+        let success = await sessionSnapshotService.restorePlaybackState(
+            state,
+            playbackCoordinator: playbackCoordinator
         )
-
         if success {
             didRestorePlaybackState = true
-            print("🔄 Restored playback state: song=\(state.currentSongId ?? "nil"), position=\(state.playbackPosition)")
-        } else {
-            print("🔄 Failed to restore queue, using fresh shuffle")
         }
-
         return success
     }
 }

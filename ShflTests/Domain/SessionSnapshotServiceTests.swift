@@ -122,4 +122,42 @@ final class SessionSnapshotServiceTests: XCTestCase {
         XCTAssertEqual(loaded.songs, [song])
         XCTAssertNil(loaded.playback)
     }
+
+    // MARK: - Stale detection (policy deepened into service)
+
+    func testIsPlaybackStateStaleReturnsFalseForRecentState() {
+        let recent = PlaybackSessionSnapshot(
+            currentSongId: "1",
+            playbackPosition: 30,
+            savedAt: Date().addingTimeInterval(-3600), // 1 hour ago
+            queueOrder: ["1"],
+            playedSongIds: []
+        )
+
+        XCTAssertFalse(service.isPlaybackStateStale(recent))
+    }
+
+    func testIsPlaybackStateStaleReturnsTrueForOldState() {
+        let old = PlaybackSessionSnapshot(
+            currentSongId: "1",
+            playbackPosition: 30,
+            savedAt: Date().addingTimeInterval(-(8 * 24 * 3600)), // 8 days ago
+            queueOrder: ["1"],
+            playedSongIds: []
+        )
+
+        XCTAssertTrue(service.isPlaybackStateStale(old))
+    }
+
+    func testIsPlaybackStateStaleReturnsTrueWhenDateCalculationFails() {
+        let distantPast = PlaybackSessionSnapshot(
+            currentSongId: "1",
+            playbackPosition: 0,
+            savedAt: Date.distantPast,
+            queueOrder: [],
+            playedSongIds: []
+        )
+
+        XCTAssertTrue(service.isPlaybackStateStale(distantPast))
+    }
 }

@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - Shared types
+
 enum SortOption: String, CaseIterable, Sendable {
     case mostPlayed
     case recentlyPlayed
@@ -38,13 +40,21 @@ enum QueueApplyPolicy: Sendable, Equatable {
     case forcePaused
 }
 
-protocol MusicService: Sendable {
+// MARK: - MusicAuthorizing
+
+/// Authorization-only interface. Consumers that only need auth gate depend on this.
+protocol MusicAuthorizing: Sendable {
     /// Request authorization to access Apple Music
     func requestAuthorization() async -> Bool
 
     /// Check current authorization status
     var isAuthorized: Bool { get async }
+}
 
+// MARK: - LibraryCatalog
+
+/// Library browsing and search interface. Consumers like pickers, lanes, autofill depend on this.
+protocol LibraryCatalog: Sendable {
     /// Fetch songs from user's library with sorting and pagination
     func fetchLibrarySongs(
         sortedBy: SortOption,
@@ -72,15 +82,16 @@ protocol MusicService: Sendable {
 
     /// Fetch songs from a specific playlist by ID with pagination
     func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage
+}
 
+// MARK: - PlaybackTransport
+
+/// Playback transport interface. Consumers that queue songs and control playback depend on this.
+protocol PlaybackTransport: Sendable {
     /// Set the playback queue with songs and shuffle them
     func setQueue(songs: [Song]) async throws
 
     /// Replace queue entries with explicit playback behavior.
-    /// - Parameters:
-    ///   - queue: Full queue order to install in transport
-    ///   - startAtSongId: Song ID that should be selected as current entry after replacement
-    ///   - policy: Explicit playback behavior to apply after queue replacement
     func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws
 
     /// Start playback
@@ -114,9 +125,13 @@ protocol MusicService: Sendable {
     var currentSongDuration: TimeInterval { get }
 
     /// ID of the currently playing song (nil if nothing playing)
-    /// This reads directly from MusicKit, not from cached state
     var currentSongId: String? { get }
 
     /// Number of entries in the MusicKit transport queue (best-effort snapshot).
     var transportQueueEntryCount: Int { get }
 }
+
+// MARK: - Combined typealias (backward compat)
+
+/// Combined interface for consumers that need all three capabilities.
+typealias MusicService = MusicAuthorizing & LibraryCatalog & PlaybackTransport

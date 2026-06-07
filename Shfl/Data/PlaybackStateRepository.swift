@@ -7,9 +7,6 @@ final class PlaybackStateRepository {
     private let container: ModelContainer
     private let saveHandler: () throws -> Void
 
-    /// Number of days after which saved state is considered stale
-    private static let staleThresholdDays: Int = 7
-
     init(
         modelContext: ModelContext,
         saveHandler: (() throws -> Void)? = nil
@@ -86,16 +83,4 @@ final class PlaybackStateRepository {
         }
     }
 
-    /// Checks if the given state is older than the stale threshold.
-    func isStateStale(_ state: PlaybackSessionSnapshot) -> Bool {
-        let calendar = Calendar.current
-        guard let staleDate = calendar.date(
-            byAdding: .day,
-            value: -Self.staleThresholdDays,
-            to: Date()
-        ) else {
-            return true
-        }
-        return state.savedAt < staleDate
-    }
 }

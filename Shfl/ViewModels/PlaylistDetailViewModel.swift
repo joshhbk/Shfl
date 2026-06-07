@@ -3,15 +3,13 @@ import Foundation
 @Observable
 @MainActor
 final class PlaylistDetailViewModel {
-    private(set) var songs: [Song] = []
-    private(set) var isLoading = true
-    private(set) var hasMorePages = true
-    private(set) var errorMessage: String?
+    let lane: LibraryLane<Song>
 
-    @ObservationIgnored private let musicService: MusicService
-    @ObservationIgnored private let pageSize = 50
-    @ObservationIgnored private var currentOffset = 0
-    @ObservationIgnored private var isLoadingMore = false
+    // Facade properties for view compatibility
+    var songs: [Song] { lane.items }
+    var isLoading: Bool { lane.isLoading }
+    var hasMorePages: Bool { lane.hasMorePages }
+    var errorMessage: String? { lane.errorMessage }
 
     let playlistId: String
     let playlistName: String
@@ -19,52 +17,27 @@ final class PlaylistDetailViewModel {
     init(playlistId: String, playlistName: String, musicService: MusicService) {
         self.playlistId = playlistId
         self.playlistName = playlistName
-        self.musicService = musicService
+        self.lane = LibraryLane<Song>(
+            fetchPage: { offset, limit in
+                let page = try await musicService.fetchSongs(
+                    byPlaylistId: playlistId,
+                    limit: limit,
+                    offset: offset
+                )
+                return PageResult(items: page.songs, hasMore: page.hasMore)
+            },
+            searchPage: { _, _, _ in
+                // Playlist detail doesn't support search
+                return PageResult(items: [], hasMore: false)
+            }
+        )
     }
 
     func loadInitialPage() async {
-        guard songs.isEmpty else {
-            isLoading = false
-            return
-        }
-
-        isLoading = true
-        currentOffset = 0
-
-        do {
-            let page = try await musicService.fetchSongs(
-                byPlaylistId: playlistId,
-                limit: pageSize,
-                offset: 0
-            )
-            songs = page.songs
-            hasMorePages = page.hasMore
-            currentOffset = page.songs.count
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-
-        isLoading = false
+        await lane.loadInitial(force: false)
     }
 
     func loadMorePages() async {
-        guard hasMorePages, !isLoadingMore else { return }
-
-        isLoadingMore = true
-
-        do {
-            let page = try await musicService.fetchSongs(
-                byPlaylistId: playlistId,
-                limit: pageSize,
-                offset: currentOffset
-            )
-            songs.append(contentsOf: page.songs)
-            hasMorePages = page.hasMore
-            currentOffset += page.songs.count
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-
-        isLoadingMore = false
+        await lane.loadMore()
     }
 }

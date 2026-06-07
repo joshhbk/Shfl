@@ -19,7 +19,7 @@ struct LibraryAutofillSourceTests {
         let songs = (1...10).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         let result = try await source.fetchSongs(excluding: [], limit: 5)
 
         #expect(result.count == 5)
@@ -31,7 +31,7 @@ struct LibraryAutofillSourceTests {
         let songs = (1...10).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         let excluding: Set<String> = ["1", "2", "3"]
         let result = try await source.fetchSongs(excluding: excluding, limit: 10)
 
@@ -46,7 +46,7 @@ struct LibraryAutofillSourceTests {
         let songs = [makeSong(id: "1"), makeSong(id: "2")]
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         let result = try await source.fetchSongs(excluding: ["1", "2"], limit: 10)
 
         #expect(result.isEmpty)
@@ -58,7 +58,7 @@ struct LibraryAutofillSourceTests {
         let songs = (1...100).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         let result = try await source.fetchSongs(excluding: [], limit: 20)
 
         #expect(result.count == 20)
@@ -70,7 +70,7 @@ struct LibraryAutofillSourceTests {
         let songs = (1...5).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         let result = try await source.fetchSongs(excluding: [], limit: 50)
 
         #expect(result.count == 5)
@@ -83,7 +83,7 @@ struct LibraryAutofillSourceTests {
         let songs = (1...20).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService, algorithm: .random)
+        let source = LibraryAutofillSource(libraryCatalog: mockService, algorithm: .random)
 
         // Run multiple times - at least one should differ from original order
         var foundDifferentOrder = false
@@ -106,7 +106,7 @@ struct LibraryAutofillSourceTests {
         let songs = (1...10).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService, algorithm: .recentlyAdded)
+        let source = LibraryAutofillSource(libraryCatalog: mockService, algorithm: .recentlyAdded)
         let result = try await source.fetchSongs(excluding: [], limit: 10)
 
         // Should return all songs (shuffled)
@@ -123,7 +123,7 @@ struct LibraryAutofillSourceTests {
         let songs = (1...750).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
-        let source = LibraryAutofillSource(musicService: mockService, algorithm: .random)
+        let source = LibraryAutofillSource(libraryCatalog: mockService, algorithm: .random)
         let result = try await source.fetchSongs(excluding: [], limit: 750)
 
         // All 750 songs should be reachable
@@ -140,7 +140,7 @@ struct LibraryAutofillSourceTests {
         await mockService.setLibrarySongs(songs)
 
         // Init without algorithm parameter
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         let result = try await source.fetchSongs(excluding: [], limit: 5)
 
         // Should still work (not crash)
