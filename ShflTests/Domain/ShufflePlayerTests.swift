@@ -7,7 +7,7 @@ final class ShufflePlayerTests: XCTestCase {
 
     override func setUp() async throws {
         mockService = MockMusicService()
-        player = await ShufflePlayer(musicService: mockService)
+        player = await ShufflePlayer(playbackTransport: mockService)
     }
 
     // MARK: - Song Management

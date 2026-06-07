@@ -14,12 +14,12 @@ final class PlaylistDetailViewModel {
     let playlistId: String
     let playlistName: String
 
-    init(playlistId: String, playlistName: String, musicService: MusicService) {
+    init(playlistId: String, playlistName: String, libraryCatalog: LibraryCatalog) {
         self.playlistId = playlistId
         self.playlistName = playlistName
         self.lane = LibraryLane<Song>(
-            fetchPage: { offset, limit in
-                let page = try await musicService.fetchSongs(
+            fetchPage: { [libraryCatalog, playlistId] offset, limit in
+                let page = try await libraryCatalog.fetchSongs(
                     byPlaylistId: playlistId,
                     limit: limit,
                     offset: offset
@@ -27,7 +27,6 @@ final class PlaylistDetailViewModel {
                 return PageResult(items: page.songs, hasMore: page.hasMore)
             },
             searchPage: { _, _, _ in
-                // Playlist detail doesn't support search
                 return PageResult(items: [], hasMore: false)
             }
         )

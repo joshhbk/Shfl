@@ -46,7 +46,7 @@ struct ScrobbleTrackerTests {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
         let mockService = MockMusicService()
-        let tracker = await ScrobbleTracker(scrobbleManager: manager, musicService: mockService)
+        let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
             id: "1",
@@ -76,7 +76,7 @@ struct ScrobbleTrackerTests {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
         let mockService = MockMusicService()
-        let tracker = await ScrobbleTracker(scrobbleManager: manager, musicService: mockService)
+        let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
             id: "1",
@@ -101,7 +101,7 @@ struct ScrobbleTrackerTests {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
         let mockService = MockMusicService()
-        let tracker = await ScrobbleTracker(scrobbleManager: manager, musicService: mockService)
+        let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
             id: "1",
@@ -128,7 +128,7 @@ struct ScrobbleTrackerTests {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
         let mockService = MockMusicService()
-        let tracker = await ScrobbleTracker(scrobbleManager: manager, musicService: mockService)
+        let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
             id: "1",
@@ -155,7 +155,7 @@ struct ScrobbleTrackerTests {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
         let mockService = MockMusicService()
-        let tracker = await ScrobbleTracker(scrobbleManager: manager, musicService: mockService)
+        let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)

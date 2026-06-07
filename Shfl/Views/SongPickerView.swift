@@ -60,7 +60,7 @@ struct SongPickerView: View {
         self.onDismiss = onDismiss
         self._viewModel = State(
             wrappedValue: LibraryBrowserViewModel(
-                musicService: musicService,
+                libraryCatalog: musicService,
                 initialSortOption: initialSortOption
             )
         )
@@ -1067,7 +1067,7 @@ private final class PreviewPickerMusicService: MusicService {
 
 #Preview("Songs Tab") {
     let service = PreviewPickerMusicService()
-    let player = ShufflePlayer(musicService: service)
+    let player = ShufflePlayer(playbackTransport: service)
 
     SongPickerView(
         player: player,
@@ -1103,7 +1103,7 @@ private final class PreviewPickerMusicService: MusicService {
             } else {
                 ProgressView()
                     .task {
-                        let p = ShufflePlayer(musicService: service)
+                        let p = ShufflePlayer(playbackTransport: service)
                         for song in PreviewPickerMusicService.sampleSongs.prefix(5) {
                             try? await p.addSong(song)
                         }
@@ -1118,7 +1118,7 @@ private final class PreviewPickerMusicService: MusicService {
 
 #Preview("Empty Library") {
     let service = MockMusicService()
-    let player = ShufflePlayer(musicService: service)
+    let player = ShufflePlayer(playbackTransport: service)
 
     SongPickerView(
         player: player,

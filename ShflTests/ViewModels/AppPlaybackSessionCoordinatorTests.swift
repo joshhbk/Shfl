@@ -30,7 +30,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
     }
 
     func testHandleDidEnterBackgroundPersistsSongsAndPlaybackState() async throws {
-        let player = ShufflePlayer(musicService: mockService)
+        let player = ShufflePlayer(playbackTransport: mockService)
         let playbackCoordinator = PlaybackCoordinator(player: player, appSettings: appSettings)
         let coordinator = makeCoordinator(player: player, playbackCoordinator: playbackCoordinator)
 
@@ -60,7 +60,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
     }
 
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
-        let player = ShufflePlayer(musicService: mockService)
+        let player = ShufflePlayer(playbackTransport: mockService)
         let playbackCoordinator = PlaybackCoordinator(player: player, appSettings: appSettings)
 
         var persistCallCount = 0
@@ -94,13 +94,14 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         )
         let scrobbleTracker = ScrobbleTracker(
             scrobbleManager: ScrobbleManager(transports: []),
-            musicService: mockService
+            playbackTransport: mockService
         )
 
         return AppPlaybackSessionCoordinator(
             player: player,
             playbackCoordinator: playbackCoordinator,
-            musicService: mockService,
+            authorizer: mockService,
+            playbackTransport: mockService,
             sessionSnapshotService: sessionSnapshotService,
             scrobbleTracker: scrobbleTracker,
             lifecyclePersistenceHook: lifecyclePersistenceHook

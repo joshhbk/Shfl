@@ -343,7 +343,7 @@ private struct ShuffledSongRow: View {
 #Preview {
     NavigationStack {
         DebugQueueView()
-            .environment(\.shufflePlayer, ShufflePlayer(musicService: MockMusicService()))
+            .environment(\.shufflePlayer, ShufflePlayer(playbackTransport: MockMusicService()))
             .environment(\.appSettings, AppSettings())
     }
 }

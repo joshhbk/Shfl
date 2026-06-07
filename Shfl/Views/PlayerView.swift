@@ -295,7 +295,7 @@ private struct PlayerViewPreviewHost: View {
         self.themeId = themeId
 
         let musicService = PreviewMockMusicService()
-        let player = ShufflePlayer(musicService: musicService)
+        let player = ShufflePlayer(playbackTransport: musicService)
 
         switch state {
         case .empty:
