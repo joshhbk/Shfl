@@ -55,7 +55,7 @@ final class AppViewModel {
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) {
         self.musicService = musicService
-        let player = ShufflePlayer(musicService: musicService)
+        let player = ShufflePlayer(playbackTransport: musicService)
         self.player = player
         self.playbackCoordinator = PlaybackCoordinator(player: player, appSettings: appSettings)
         self.appSettings = appSettings
@@ -66,7 +66,7 @@ final class AppViewModel {
             sharedSecret: LastFMConfig.sharedSecret
         )
         let scrobbleManager = ScrobbleManager(transports: [lastFMTransport])
-        let scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, musicService: musicService)
+        let scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, playbackTransport: musicService)
         let songRepository = SongRepository(modelContext: modelContext)
         let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
         let sessionSnapshotService = SessionSnapshotService(
@@ -77,7 +77,8 @@ final class AppViewModel {
         self.sessionCoordinator = AppPlaybackSessionCoordinator(
             player: player,
             playbackCoordinator: playbackCoordinator,
-            musicService: musicService,
+            authorizer: musicService,
+            playbackTransport: musicService,
             sessionSnapshotService: sessionSnapshotService,
             scrobbleTracker: scrobbleTracker,
             lifecyclePersistenceHook: lifecyclePersistenceHook

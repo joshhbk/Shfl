@@ -7,7 +7,8 @@ final class AppPlaybackSessionCoordinator {
     let player: ShufflePlayer
     let playbackCoordinator: PlaybackCoordinator
 
-    @ObservationIgnored private let musicService: MusicService
+    @ObservationIgnored private let authorizer: MusicAuthorizing
+    @ObservationIgnored private let playbackTransport: PlaybackTransport
     @ObservationIgnored private let sessionSnapshotService: SessionSnapshotService
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
     @ObservationIgnored private let lifecyclePersistenceHook: (() -> Void)?
@@ -26,14 +27,16 @@ final class AppPlaybackSessionCoordinator {
     init(
         player: ShufflePlayer,
         playbackCoordinator: PlaybackCoordinator,
-        musicService: MusicService,
+        authorizer: MusicAuthorizing,
+        playbackTransport: PlaybackTransport,
         sessionSnapshotService: SessionSnapshotService,
         scrobbleTracker: ScrobbleTracker,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) {
         self.player = player
         self.playbackCoordinator = playbackCoordinator
-        self.musicService = musicService
+        self.authorizer = authorizer
+        self.playbackTransport = playbackTransport
         self.sessionSnapshotService = sessionSnapshotService
         self.scrobbleTracker = scrobbleTracker
         self.lifecyclePersistenceHook = lifecyclePersistenceHook
@@ -52,7 +55,7 @@ final class AppPlaybackSessionCoordinator {
     func onAppear() async {
         print("📱 onAppear: Loading songs and playback state...")
 
-        async let authStatus = musicService.isAuthorized
+        async let authStatus = authorizer.isAuthorized
         async let loadedSession = try? sessionSnapshotService.load()
 
         let sessionSnapshot = await loadedSession ?? .empty
@@ -85,7 +88,7 @@ final class AppPlaybackSessionCoordinator {
     }
 
     func requestAuthorization() async {
-        isAuthorized = await musicService.requestAuthorization()
+        isAuthorized = await authorizer.requestAuthorization()
         if !isAuthorized {
             authorizationError = "Apple Music access is required to use Shuffled. Please enable it in Settings."
         }
@@ -110,7 +113,7 @@ final class AppPlaybackSessionCoordinator {
         do {
             try sessionSnapshotService.saveCurrentSession(
                 from: player,
-                playbackTime: musicService.currentPlaybackTime
+                playbackTime: playbackTransport.currentPlaybackTime
             )
             lastPersistedSongId = player.playbackState.currentSongId
         } catch {

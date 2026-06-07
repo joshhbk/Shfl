@@ -17,7 +17,7 @@ struct PlaylistDetailView: View {
         self._viewModel = State(wrappedValue: PlaylistDetailViewModel(
             playlistId: playlistId,
             playlistName: playlistName,
-            musicService: musicService
+            libraryCatalog: musicService
         ))
         self._selectedSongIds = selectedSongIds
         self.isAtCapacity = isAtCapacity

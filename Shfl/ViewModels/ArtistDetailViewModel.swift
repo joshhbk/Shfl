@@ -13,11 +13,11 @@ final class ArtistDetailViewModel {
 
     let artistName: String
 
-    init(artistName: String, musicService: MusicService) {
+    init(artistName: String, libraryCatalog: LibraryCatalog) {
         self.artistName = artistName
         self.lane = LibraryLane<Song>(
             fetchPage: { offset, limit in
-                let page = try await musicService.fetchSongs(
+                let page = try await libraryCatalog.fetchSongs(
                     byArtist: artistName,
                     limit: limit,
                     offset: offset

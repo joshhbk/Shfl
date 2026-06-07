@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class ScrobbleTracker {
     private let scrobbleManager: ScrobbleManager
-    private let musicService: any MusicService
+    private let playbackTransport: PlaybackTransport
 
     private var currentSong: Song?
     private var playStartTime: Date?
@@ -12,9 +12,9 @@ final class ScrobbleTracker {
     private var isPlaying = false
     private var timerTask: Task<Void, Never>?
 
-    init(scrobbleManager: ScrobbleManager, musicService: any MusicService) {
+    init(scrobbleManager: ScrobbleManager, playbackTransport: PlaybackTransport) {
         self.scrobbleManager = scrobbleManager
-        self.musicService = musicService
+        self.playbackTransport = playbackTransport
     }
 
     deinit {
@@ -100,7 +100,7 @@ final class ScrobbleTracker {
     }
 
     private func sendNowPlaying(_ song: Song) {
-        let durationSeconds = Int(musicService.currentSongDuration)
+        let durationSeconds = Int(playbackTransport.currentSongDuration)
         print("[Scrobble] 🎵 Now playing: \(song.title) by \(song.artist) (\(durationSeconds)s)")
         let event = ScrobbleEvent(
             track: song.title,
@@ -118,7 +118,7 @@ final class ScrobbleTracker {
         guard !hasScrobbledCurrentSong,
               let song = currentSong else { return }
 
-        let durationSeconds = Int(musicService.currentSongDuration)
+        let durationSeconds = Int(playbackTransport.currentSongDuration)
         guard Self.shouldScrobble(durationSeconds: durationSeconds) else { return }
 
         let threshold = Self.scrobbleThreshold(forDurationSeconds: durationSeconds)

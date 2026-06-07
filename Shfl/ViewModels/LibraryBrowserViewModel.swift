@@ -121,27 +121,27 @@ final class LibraryBrowserViewModel {
 
     // MARK: - Dependencies
 
-    @ObservationIgnored private let musicService: MusicService
+    @ObservationIgnored private let libraryCatalog: LibraryCatalog
 
     // MARK: - Init
 
-    init(musicService: MusicService, initialSortOption: SortOption = .mostPlayed) {
-        self.musicService = musicService
+    init(libraryCatalog: LibraryCatalog, initialSortOption: SortOption = .mostPlayed) {
+        self.libraryCatalog = libraryCatalog
         let sortRef = SortOptionRef(initialSortOption)
         self._sortOption = sortRef
 
         // Songs lane — captures sortRef instead of self to avoid "used before initialized"
         self.songsLane = LibraryLane<Song>(
-            fetchPage: { [musicService, sortRef] offset, limit in
-                let page = try await musicService.fetchLibrarySongs(
+            fetchPage: { [libraryCatalog, sortRef] offset, limit in
+                let page = try await libraryCatalog.fetchLibrarySongs(
                     sortedBy: sortRef.value,
                     limit: limit,
                     offset: offset
                 )
                 return PageResult(items: page.songs, hasMore: page.hasMore)
             },
-            searchPage: { [musicService] query, offset, limit in
-                let page = try await musicService.searchLibrarySongs(
+            searchPage: { [libraryCatalog] query, offset, limit in
+                let page = try await libraryCatalog.searchLibrarySongs(
                     query: query,
                     limit: limit,
                     offset: offset
@@ -152,12 +152,12 @@ final class LibraryBrowserViewModel {
 
         // Artists lane
         self.artistsLane = LibraryLane<Artist>(
-            fetchPage: { [musicService] offset, limit in
-                let page = try await musicService.fetchLibraryArtists(limit: limit, offset: offset)
+            fetchPage: { [libraryCatalog] offset, limit in
+                let page = try await libraryCatalog.fetchLibraryArtists(limit: limit, offset: offset)
                 return PageResult(items: page.artists, hasMore: page.hasMore)
             },
-            searchPage: { [musicService] query, offset, limit in
-                let page = try await musicService.searchLibraryArtists(
+            searchPage: { [libraryCatalog] query, offset, limit in
+                let page = try await libraryCatalog.searchLibraryArtists(
                     query: query,
                     limit: limit,
                     offset: offset
@@ -168,12 +168,12 @@ final class LibraryBrowserViewModel {
 
         // Playlists lane
         self.playlistsLane = LibraryLane<Playlist>(
-            fetchPage: { [musicService] offset, limit in
-                let page = try await musicService.fetchLibraryPlaylists(limit: limit, offset: offset)
+            fetchPage: { [libraryCatalog] offset, limit in
+                let page = try await libraryCatalog.fetchLibraryPlaylists(limit: limit, offset: offset)
                 return PageResult(items: page.playlists, hasMore: page.hasMore)
             },
-            searchPage: { [musicService] query, offset, limit in
-                let page = try await musicService.searchLibraryPlaylists(
+            searchPage: { [libraryCatalog] query, offset, limit in
+                let page = try await libraryCatalog.searchLibraryPlaylists(
                     query: query,
                     limit: limit,
                     offset: offset

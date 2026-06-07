@@ -3,10 +3,10 @@ import Foundation
 @Observable
 @MainActor
 final class ShufflePlayer {
-    @ObservationIgnored private let musicService: MusicService
+    @ObservationIgnored private let playbackTransport: PlaybackTransport
     @ObservationIgnored private let playbackObserver: PlaybackStateObserver
     @ObservationIgnored private lazy var transportSync = QueueTransportSync(
-        playbackTransport: musicService,
+        playbackTransport: playbackTransport,
         readQueueRevision: { [weak self] in self?.queueRevision ?? 0 },
         readEngineState: { [weak self] in self?.engineState ?? QueueEngineState(queueState: .empty, playbackState: .empty, revision: 0, queueNeedsBuild: false) },
         applyReduction: { [weak self] reduction in self?.applyReduction(reduction) },
@@ -51,10 +51,10 @@ final class ShufflePlayer {
     var lastUsedAlgorithm: ShuffleAlgorithm { queueState.algorithm }
 
     /// Debug: Number of entries in the MusicKit transport queue
-    var transportQueueEntryCount: Int { musicService.transportQueueEntryCount }
+    var transportQueueEntryCount: Int { playbackTransport.transportQueueEntryCount }
 
     /// Debug: ID of the song currently selected in the MusicKit transport
-    var transportCurrentSongId: String? { musicService.currentSongId }
+    var transportCurrentSongId: String? { playbackTransport.currentSongId }
 
     /// Debug: recent queue operations (most recent first).
     var recentQueueOperations: [QueueOperationRecord] {
@@ -80,9 +80,9 @@ final class ShufflePlayer {
 
     // MARK: - Initialization
 
-    init(musicService: MusicService) {
-        self.musicService = musicService
-        self.playbackObserver = PlaybackStateObserver(musicService: musicService)
+    init(playbackTransport: PlaybackTransport) {
+        self.playbackTransport = playbackTransport
+        self.playbackObserver = PlaybackStateObserver(playbackTransport: playbackTransport)
         startObserving()
         recordOperation(.playerInit)
     }
@@ -436,7 +436,7 @@ final class ShufflePlayer {
                 case .applied:
                     recordOperation(.removeAllSongs)
                 case .stale:
-                    await musicService.pause()
+                    await playbackTransport.pause()
                     applyQueueNeedsBuildMutation(false)
                     _ = transportSync.refreshTransportSnapshot()
                     operationNotice = "Queue changed while clearing. Playback paused and queue cleared."
@@ -602,7 +602,7 @@ final class ShufflePlayer {
         playbackObserver.beginSuppressingHistory()
         defer { playbackObserver.endSuppressingHistory() }
 
-        let restorer = SessionRestorer(playbackTransport: musicService)
+        let restorer = SessionRestorer(playbackTransport: playbackTransport)
         guard let result = await restorer.restore(
             queueState: queueState,
             currentPlaybackState: playbackState,

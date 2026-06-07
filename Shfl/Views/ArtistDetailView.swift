@@ -15,7 +15,7 @@ struct ArtistDetailView: View {
     ) {
         self._viewModel = State(wrappedValue: ArtistDetailViewModel(
             artistName: artistName,
-            musicService: musicService
+            libraryCatalog: musicService
         ))
         self._selectedSongIds = selectedSongIds
         self.isAtCapacity = isAtCapacity

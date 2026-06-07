@@ -23,11 +23,11 @@ final class PlaybackStateObserver {
     /// Set during multi-step operations like session restoration.
     private(set) var suppressHistoryUpdates = false
 
-    private let musicService: MusicService
+    private let playbackTransport: PlaybackTransport
     private var stateTask: Task<Void, Never>?
 
-    init(musicService: MusicService) {
-        self.musicService = musicService
+    init(playbackTransport: PlaybackTransport) {
+        self.playbackTransport = playbackTransport
     }
 
     func clearLastObservedSongId() {
@@ -59,7 +59,7 @@ final class PlaybackStateObserver {
     ) {
         stateTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            for await rawState in self.musicService.playbackStateStream {
+            for await rawState in self.playbackTransport.playbackStateStream {
                 let resolution = self.resolve(rawState, queueState: queueState())
                 onResolution(resolution)
             }
@@ -79,7 +79,7 @@ final class PlaybackStateObserver {
             normalizedState = .paused(current)
         } else if case .empty = newState,
                   queueState.hasQueue,
-                  musicService.transportQueueEntryCount > 0,
+                  playbackTransport.transportQueueEntryCount > 0,
                   lastObservedSongId != nil,
                   let current = queueState.currentSong {
             // Treat transient empty emissions as paused when we still have an active queue context.
