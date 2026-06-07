@@ -100,7 +100,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         let player = ShufflePlayer(musicService: mockService)
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
 
         await viewModel.autofill(into: player, using: source) { songs in
             try await player.addSongsWithQueueRebuild(songs)
@@ -122,7 +122,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
             try? await player.addSong(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         await viewModel.autofill(into: player, using: source) { songs in
             try await player.addSongsWithQueueRebuild(songs)
         }
@@ -143,7 +143,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         try? await player.addSong(songs[0])
         try? await player.addSong(songs[1])
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         await viewModel.autofill(into: player, using: source) { songs in
             try await player.addSongsWithQueueRebuild(songs)
         }
@@ -160,7 +160,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
             try? await player.addSong(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         await viewModel.autofill(into: player, using: source) { songs in
             try await player.addSongsWithQueueRebuild(songs)
         }
@@ -173,7 +173,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         let player = ShufflePlayer(musicService: mockService)
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
 
         // Start autofill
         let task = Task {
@@ -202,7 +202,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
         await mockService.resetQueueTracking()
 
-        let source = LibraryAutofillSource(musicService: mockService)
+        let source = LibraryAutofillSource(libraryCatalog: mockService)
         await viewModel.autofill(into: player, using: source) { songs in
             try await player.addSongsWithQueueRebuild(songs)
         }

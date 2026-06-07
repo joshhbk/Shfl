@@ -29,7 +29,7 @@ enum ActiveAddSyncFailureKind: String {
 final class QueueTransportSync {
     // MARK: - Dependencies
 
-    private let musicService: MusicService
+    private let playbackTransport: PlaybackTransport
     private let readQueueRevision: @MainActor () -> Int
     private let readEngineState: @MainActor () -> QueueEngineState
     private let applyReductionClosure: @MainActor (QueueEngineReduction) -> Void
@@ -83,7 +83,7 @@ final class QueueTransportSync {
     // MARK: - Initialization
 
     init(
-        musicService: MusicService,
+        playbackTransport: PlaybackTransport,
         readQueueRevision: @escaping @MainActor () -> Int,
         readEngineState: @escaping @MainActor () -> QueueEngineState,
         applyReduction: @escaping @MainActor (QueueEngineReduction) -> Void,
@@ -94,7 +94,7 @@ final class QueueTransportSync {
         clearLastObservedSongId: @escaping @MainActor () -> Void,
         applyQueueNeedsBuildMutation: @escaping @MainActor (Bool) -> Void
     ) {
-        self.musicService = musicService
+        self.playbackTransport = playbackTransport
         self.readQueueRevision = readQueueRevision
         self.readEngineState = readEngineState
         self.applyReductionClosure = applyReduction
@@ -149,8 +149,8 @@ final class QueueTransportSync {
     @discardableResult
     func refreshTransportSnapshot() -> TransportSnapshot {
         let snapshot = TransportSnapshot(
-            entryCount: musicService.transportQueueEntryCount,
-            currentSongId: musicService.currentSongId
+            entryCount: playbackTransport.transportQueueEntryCount,
+            currentSongId: playbackTransport.currentSongId
         )
         cachedTransportSnapshot = snapshot
         return snapshot
@@ -385,19 +385,19 @@ final class QueueTransportSync {
         }
         switch command {
         case .setQueue(let songs, _):
-            try await musicService.setQueue(songs: songs)
+            try await playbackTransport.setQueue(songs: songs)
         case .replaceQueue(let queue, let startAtSongId, let policy, _):
-            try await musicService.replaceQueue(queue: queue, startAtSongId: startAtSongId, policy: policy)
+            try await playbackTransport.replaceQueue(queue: queue, startAtSongId: startAtSongId, policy: policy)
         case .play:
-            try await musicService.play()
+            try await playbackTransport.play()
         case .pause:
-            await musicService.pause()
+            await playbackTransport.pause()
         case .skipToNext:
-            try await musicService.skipToNext()
+            try await playbackTransport.skipToNext()
         case .skipToPrevious:
-            try await musicService.skipToPrevious()
+            try await playbackTransport.skipToPrevious()
         case .restartOrSkipToPrevious:
-            try await musicService.restartOrSkipToPrevious()
+            try await playbackTransport.restartOrSkipToPrevious()
         }
     }
 
@@ -583,8 +583,8 @@ final class QueueTransportSync {
                     try? await Task.sleep(nanoseconds: Self.boundarySwapPollIntervalNanoseconds)
                     continue
                 }
-                let duration = self.musicService.currentSongDuration
-                let currentTime = self.musicService.currentPlaybackTime
+                let duration = self.playbackTransport.currentSongDuration
+                let currentTime = self.playbackTransport.currentPlaybackTime
                 let remaining = duration - currentTime
                 if duration > 0 && currentTime > 0 && remaining <= Self.boundarySwapLeadTimeSeconds {
                     self.triggerPreemptiveBoundarySwap()
@@ -655,7 +655,7 @@ final class QueueTransportSync {
         }
         recordOperation(.boundarySyncStarted, detail: "\(detail), nextSong=\(nextSong.id)")
         boundarySwapState = .swapping
-        musicService.pauseImmediately()
+        playbackTransport.pauseImmediately()
         Task { @MainActor [weak self] in
             await self?.executeBoundarySwap(nextSongId: nextSong.id)
         }
@@ -685,7 +685,7 @@ final class QueueTransportSync {
             switch outcome {
             case .applied:
                 setLastObservedSongId(nextSongId)
-                musicService.seek(to: 0)
+                playbackTransport.seek(to: 0)
                 recordOperation(.deferredTransportRebuilt, detail: "boundary-swap")
             case .stale:
                 scheduleActiveAddResyncRetry(source: "boundary-swap", failureKind: .stale)

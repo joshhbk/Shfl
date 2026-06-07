@@ -11,7 +11,7 @@ struct SessionRestoreResult {
 /// validate → restore QueueState → replace MusicKit queue → seek → determine playback state.
 @MainActor
 struct SessionRestorer {
-    let musicService: MusicService
+    let playbackTransport: PlaybackTransport
 
     /// Attempts to restore a playback session without auto-starting playback.
     /// - Returns: A `SessionRestoreResult` describing the state changes to apply, or `nil` if restoration failed.
@@ -45,7 +45,7 @@ struct SessionRestorer {
         // Restore queue and position without auto-starting playback.
         do {
             print("🔄 restoreSession: Restoring queue with \(restoredState.queueOrder.count) songs")
-            try await musicService.replaceQueue(
+            try await playbackTransport.replaceQueue(
                 queue: restoredState.queueOrder,
                 startAtSongId: restoredState.currentSongId,
                 policy: .forcePaused
@@ -55,7 +55,7 @@ struct SessionRestorer {
             let clampedPosition = max(0, playbackPosition)
             if clampedPosition > 0 {
                 print("🔄 restoreSession: Seeking to position \(clampedPosition)")
-                musicService.seek(to: clampedPosition)
+                playbackTransport.seek(to: clampedPosition)
             }
 
             print("🔄 restoreSession: Applying paused state without forcing extra transport pause")

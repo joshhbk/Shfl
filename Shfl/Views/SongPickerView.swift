@@ -870,7 +870,7 @@ struct SongPickerView: View {
     private func performAutofill() {
         Task { @MainActor in
             let algorithm = appSettings?.autofillAlgorithm ?? .random
-            let source = LibraryAutofillSource(musicService: musicService, algorithm: algorithm)
+            let source = LibraryAutofillSource(libraryCatalog: musicService, algorithm: algorithm)
             await viewModel.autofill(
                 into: player,
                 using: source,

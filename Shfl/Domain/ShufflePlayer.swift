@@ -6,7 +6,7 @@ final class ShufflePlayer {
     @ObservationIgnored private let musicService: MusicService
     @ObservationIgnored private let playbackObserver: PlaybackStateObserver
     @ObservationIgnored private lazy var transportSync = QueueTransportSync(
-        musicService: musicService,
+        playbackTransport: musicService,
         readQueueRevision: { [weak self] in self?.queueRevision ?? 0 },
         readEngineState: { [weak self] in self?.engineState ?? QueueEngineState(queueState: .empty, playbackState: .empty, revision: 0, queueNeedsBuild: false) },
         applyReduction: { [weak self] reduction in self?.applyReduction(reduction) },
@@ -602,7 +602,7 @@ final class ShufflePlayer {
         playbackObserver.beginSuppressingHistory()
         defer { playbackObserver.endSuppressingHistory() }
 
-        let restorer = SessionRestorer(musicService: musicService)
+        let restorer = SessionRestorer(playbackTransport: musicService)
         guard let result = await restorer.restore(
             queueState: queueState,
             currentPlaybackState: playbackState,
