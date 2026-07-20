@@ -5,6 +5,7 @@ struct ManageView: View {
     let onAddTapped: () -> Void
     let onRemoveSong: @MainActor (String) -> Void
     let onDismiss: () -> Void
+    @State private var isStartingNewShuffle = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,36 @@ struct ManageView: View {
 
     private var songList: some View {
         List {
+            if player.activeSession != nil {
+                Section {
+                    Label(
+                        "Changes here apply to your next shuffle. Current playback keeps its order.",
+                        systemImage: "forward.end"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                    if player.hasPendingSessionChanges {
+                        Button {
+                            isStartingNewShuffle = true
+                            Task {
+                                try? await player.startFreshShuffle()
+                                isStartingNewShuffle = false
+                            }
+                        } label: {
+                            if isStartingNewShuffle {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Text("Start New Shuffle Now")
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .disabled(isStartingNewShuffle)
+                    }
+                }
+            }
+
             Section {
                 ForEach(player.allSongs) { song in
                     SongDisplay(song: song)

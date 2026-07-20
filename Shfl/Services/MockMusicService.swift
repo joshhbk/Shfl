@@ -3,17 +3,15 @@ import Foundation
 final class MockMusicService: MusicService {
     var isAuthorized: Bool { true }
 
-    var playbackStateStream: AsyncStream<PlaybackState> {
+    var playbackEvents: AsyncStream<PlaybackEvent> {
         AsyncStream { continuation in
-            continuation.yield(.empty)
+            continuation.yield(.stateChanged(.empty))
         }
     }
 
     var currentPlaybackTime: TimeInterval { 0 }
     var currentSongDuration: TimeInterval { 180 }
     var currentSongId: String? { nil }
-    var transportQueueEntryCount: Int { 0 }
-
     func requestAuthorization() async -> Bool { true }
 
     func fetchLibrarySongs(
@@ -52,13 +50,12 @@ final class MockMusicService: MusicService {
         LibraryPage(songs: [], hasMore: false)
     }
 
-    func setQueue(songs: [Song]) async throws {}
-    func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {}
+    func load(_ request: PlaybackLoadRequest) async throws {}
     func play() async throws {}
     func pause() async {}
-    func pauseImmediately() {}
     func skipToNext() async throws {}
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
     func seek(to time: TimeInterval) {}
+    func clear() async {}
 }

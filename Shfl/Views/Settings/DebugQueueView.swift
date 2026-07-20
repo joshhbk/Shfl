@@ -3,339 +3,136 @@ import UIKit
 
 struct DebugQueueView: View {
     @Environment(\.shufflePlayer) private var player
-    @Environment(\.appSettings) private var appSettings
-
-    private var algorithm: ShuffleAlgorithm {
-        appSettings?.shuffleAlgorithm ?? .noRepeat
-    }
 
     var body: some View {
         if let player {
-            DebugQueueContent(player: player, algorithm: algorithm)
+            DebugListeningSessionContent(player: player)
         } else {
             Text("Player not available")
         }
     }
 }
 
-/// Extracted to ensure proper observation of @Observable player
-private struct DebugQueueContent: View {
+private struct DebugListeningSessionContent: View {
     let player: ShufflePlayer
-    let algorithm: ShuffleAlgorithm
 
-    @State private var lastSnapshotCopiedAt: Date?
-    @State private var lastHardResetAt: Date?
-    @State private var isPerformingHardReset = false
-    @State private var showingHardResetConfirmation = false
-
-    // Access observed properties directly to ensure SwiftUI tracks them
-    private var queue: [Song] { player.lastShuffledQueue }
-    private var usedAlgorithm: ShuffleAlgorithm { player.lastUsedAlgorithm }
-    private var invariantCheck: QueueInvariantCheck { player.queueInvariantCheck }
-    private var recentOperations: [QueueOperationRecord] { player.recentQueueOperations }
+    @State private var showingResetConfirmation = false
+    @State private var copiedAt: Date?
 
     var body: some View {
         List {
-            queueOverviewSection
-            transportParitySection
-            invariantSection
-            operationsSection
-            diagnosticsExportSection
-            hardResetSection
-            shuffledQueueSection
-        }
-        .navigationTitle("Debug Queue")
-        .alert("Hard Reset Queue?", isPresented: $showingHardResetConfirmation) {
-            Button("Hard Reset", role: .destructive) {
-                Task { await performHardReset() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This clears the current queue, playback state, and operation journal so you can start from a clean baseline.")
-        }
-    }
-
-    @ViewBuilder
-    private var queueOverviewSection: some View {
-        Section {
-            statusRow(
-                title: "Current Setting",
-                value: algorithm.displayName,
-                color: .secondary
-            )
-            statusRow(
-                title: "Algorithm Used",
-                value: usedAlgorithm.displayName,
-                color: usedAlgorithm == algorithm ? .secondary : .red
-            )
-            statusRow(
-                title: "Song Pool",
-                value: "\(player.songCount) songs",
-                color: .secondary
-            )
-            statusRow(
-                title: "Queue Order",
-                value: "\(queue.count) songs",
-                color: queue.count == player.songCount ? .secondary : .red
-            )
-        } footer: {
-            queueOverviewFooter
-        }
-    }
-
-    @ViewBuilder
-    private var queueOverviewFooter: some View {
-        if usedAlgorithm != algorithm {
-            Text("⚠️ Press play again to apply the new algorithm")
-        } else if queue.count != player.songCount && queue.count > 0 {
-            Text("⚠️ Queue size doesn't match pool! Check console logs for details.")
-        }
-    }
-
-    @ViewBuilder
-    private var transportParitySection: some View {
-        Section {
-            statusRow(
-                title: "Transport Entries",
-                value: "\(player.transportQueueEntryCount)",
-                color: .secondary
-            )
-            statusRow(
-                title: "Domain Queue",
-                value: "\(queue.count)",
-                color: .secondary
-            )
-
-            let transportParity = player.transportQueueEntryCount == queue.count
-            statusRow(
-                title: "Parity",
-                value: transportParity ? "In Sync" : "Mismatch",
-                color: transportParity ? .secondary : .red
-            )
-        } header: {
-            Text("Transport Parity")
-        } footer: {
-            Text("Compares MusicKit transport queue entry count against domain queue size.")
-        }
-    }
-
-    @ViewBuilder
-    private var invariantSection: some View {
-        Section {
-            statusRow(
-                title: "Status",
-                value: invariantCheck.isHealthy ? "Healthy" : "Violation",
-                color: invariantCheck.isHealthy ? .secondary : .red
-            )
-            statusRow(
-                title: "Unique Queue IDs",
-                value: invariantCheck.queueHasUniqueIDs ? "Yes" : "No",
-                color: invariantCheck.queueHasUniqueIDs ? .secondary : .red
-            )
-            statusRow(
-                title: "Pool/Queue Match",
-                value: invariantCheck.poolAndQueueMembershipMatch ? "Yes" : "No",
-                color: invariantCheck.poolAndQueueMembershipMatch ? .secondary : .red
-            )
-            statusRow(
-                title: "Transport Count Match",
-                value: invariantCheck.transportEntryCountMatchesQueue ? "Yes" : "No",
-                color: invariantCheck.transportEntryCountMatchesQueue ? .secondary : .red
-            )
-            statusRow(
-                title: "Transport Current Match",
-                value: invariantCheck.transportCurrentMatchesDomain ? "Yes" : "No",
-                color: invariantCheck.transportCurrentMatchesDomain ? .secondary : .red
-            )
-            statusRow(
-                title: "Reasons",
-                value: "\(invariantCheck.reasons.count)",
-                color: invariantCheck.reasons.isEmpty ? .secondary : .red
-            )
-
-            ForEach(invariantCheck.reasons, id: \.self) { reason in
-                Text(reason)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Invariant Check")
-        }
-    }
-
-    @ViewBuilder
-    private var operationsSection: some View {
-        Section {
-            statusRow(
-                title: "Stored",
-                value: "\(recentOperations.count)",
-                color: .secondary
-            )
-
-            ForEach(Array(recentOperations.prefix(12))) { operation in
-                QueueOperationRow(operation: operation)
-            }
-        } header: {
-            Text("Recent Operations")
-        } footer: {
-            Text("Operation journal is capped to the most recent \(QueueOperationJournal.maxRecords) entries.")
-        }
-    }
-
-    @ViewBuilder
-    private var diagnosticsExportSection: some View {
-        Section {
-            Button("Copy Diagnostics Snapshot") {
-                let snapshot = player.exportQueueDiagnosticsSnapshot(trigger: "debug-queue-copy")
-                UIPasteboard.general.string = snapshot
-                lastSnapshotCopiedAt = Date()
+            Section("Draft") {
+                row("Songs", "\(player.songCount)")
+                row("Algorithm", player.draft.algorithm.displayName)
+                row("Pending changes", player.hasPendingSessionChanges ? "Yes" : "No")
             }
 
-            if let copiedAt = lastSnapshotCopiedAt {
-                Text("Copied at \(copiedAt.formatted(date: .omitted, time: .standard))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Snapshot Export")
-        } footer: {
-            Text("Includes queue IDs, invariants, and operation journal as JSON.")
-        }
-    }
-
-    @ViewBuilder
-    private var hardResetSection: some View {
-        Section {
-            Button(role: .destructive) {
-                showingHardResetConfirmation = true
-            } label: {
-                if isPerformingHardReset {
-                    HStack {
-                        ProgressView()
-                        Text("Resetting Queue...")
-                    }
+            Section("Active Listening Session") {
+                if let session = player.activeSession {
+                    row("ID", session.id.uuidString)
+                    row("Seed", String(session.seed))
+                    row("Algorithm", session.algorithm.displayName)
+                    row("Songs", "\(session.songOrder.count)")
+                    row("Current transport ID", player.transportCurrentSongId ?? "None")
                 } else {
-                    Text("Hard Reset Queue")
+                    Text("No active session")
+                        .foregroundStyle(.secondary)
                 }
             }
-            .disabled(isPerformingHardReset)
 
-            if let resetAt = lastHardResetAt {
-                Text("Last reset at \(resetAt.formatted(date: .omitted, time: .standard))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Recovery")
-        } footer: {
-            Text("Use this when queue/transport state diverges and you want to restart from a known clean state.")
-        }
-    }
-
-    @ViewBuilder
-    private var shuffledQueueSection: some View {
-        Section("Shuffled Queue Order") {
-            if queue.isEmpty {
-                Text("No queue yet. Add songs and press play.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(Array(queue.enumerated()), id: \.element.id) { index, song in
-                    ShuffledSongRow(
-                        song: song,
-                        position: index + 1,
-                        showWeightedDetails: algorithm == .weightedByPlayCount || algorithm == .weightedByRecency
-                    )
+            Section("Recent Events") {
+                if player.recentPlaybackTrace.isEmpty {
+                    Text("No events")
+                        .foregroundStyle(.secondary)
                 }
-            }
-        }
-    }
-
-    private func statusRow(
-        title: String,
-        value: String,
-        color: Color,
-        titleFont: Font? = nil
-    ) -> some View {
-        HStack {
-            Text(title)
-                .font(titleFont)
-            Spacer()
-            Text(value)
-                .foregroundStyle(color)
-        }
-    }
-
-    @MainActor
-    private func performHardReset() async {
-        guard !isPerformingHardReset else { return }
-        isPerformingHardReset = true
-        await player.hardResetQueueForDebug()
-        lastHardResetAt = Date()
-        isPerformingHardReset = false
-    }
-}
-
-private struct QueueOperationRow: View {
-    let operation: QueueOperationRecord
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(operation.timestamp, style: .time)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(operation.invariantHealthy ? "Healthy" : "Violation")
-                    .font(.caption2)
-                    .foregroundStyle(operation.invariantHealthy ? Color.secondary : Color.red)
-            }
-
-            Text(operation.operation)
-                .font(.caption)
-
-            if let detail = operation.detail, !detail.isEmpty {
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 2)
-    }
-}
-
-private struct ShuffledSongRow: View {
-    let song: Song
-    let position: Int
-    let showWeightedDetails: Bool
-
-    var body: some View {
-        HStack(alignment: .top) {
-            Text("\(position)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 24, alignment: .trailing)
-
-            VStack(alignment: .leading) {
-                Text(song.title)
-                    .lineLimit(1)
-                Text(song.artist)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if showWeightedDetails {
-                    HStack(spacing: 8) {
-                        Text("Plays: \(song.playCount)")
-                        if let date = song.lastPlayedDate {
-                            Text("Last: \(date, style: .relative)")
-                        } else {
-                            Text("Never played")
+                ForEach(player.recentPlaybackTrace.prefix(20)) { entry in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text(entry.event)
+                            Spacer()
+                            Text(entry.timestamp, style: .time)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let detail = entry.detail {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
                 }
             }
+
+            Section("Exact Session Order") {
+                if let session = player.activeSession {
+                    ForEach(Array(session.songOrder.enumerated()), id: \.element.id) { index, song in
+                        VStack(alignment: .leading) {
+                            Text("\(index + 1). \(song.title)")
+                            Text("\(song.artist) · \(song.id)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Text("Start a shuffle to create a session.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button("Copy Session Diagnostics") {
+                    UIPasteboard.general.string = diagnostics
+                    copiedAt = Date()
+                }
+                if let copiedAt {
+                    Text("Copied at \(copiedAt.formatted(date: .omitted, time: .standard))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button("Clear Draft and Session", role: .destructive) {
+                    showingResetConfirmation = true
+                }
+            } footer: {
+                Text("Clear is intentionally destructive. Ordinary edits never change active playback.")
+            }
+        }
+        .navigationTitle("Playback Diagnostics")
+        .alert("Clear everything?", isPresented: $showingResetConfirmation) {
+            Button("Clear", role: .destructive) {
+                Task { await player.hardResetQueueForDebug() }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private var diagnostics: String {
+        let session = player.activeSession
+        let trace = player.recentPlaybackTrace.map {
+            "\($0.timestamp.ISO8601Format()) \($0.event) \($0.detail ?? "")"
+        }.joined(separator: "\n")
+        return """
+        draft.count=\(player.songCount)
+        draft.algorithm=\(player.draft.algorithm.rawValue)
+        pending=\(player.hasPendingSessionChanges)
+        session.id=\(session?.id.uuidString ?? "none")
+        session.seed=\(session.map { String($0.seed) } ?? "none")
+        session.algorithm=\(session?.algorithm.rawValue ?? "none")
+        session.order=\(session?.songIDs.joined(separator: ",") ?? "")
+        transport.current=\(player.transportCurrentSongId ?? "none")
+
+        \(trace)
+        """
+    }
+
+    private func row(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
 }
@@ -344,6 +141,5 @@ private struct ShuffledSongRow: View {
     NavigationStack {
         DebugQueueView()
             .environment(\.shufflePlayer, ShufflePlayer(playbackTransport: MockMusicService()))
-            .environment(\.appSettings, AppSettings())
     }
 }

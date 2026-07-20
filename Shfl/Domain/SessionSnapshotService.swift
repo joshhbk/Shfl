@@ -70,7 +70,9 @@ final class SessionSnapshotService {
                 playbackPosition: playbackTime,
                 savedAt: Date(),
                 queueOrder: player.currentQueueOrder,
-                playedSongIds: player.currentPlayedSongIds
+                playedSongIds: player.currentPlayedSongIds,
+                algorithm: player.lastUsedAlgorithm,
+                seed: player.activeSessionSeed
             )
         }()
 
@@ -111,7 +113,7 @@ final class SessionSnapshotService {
     /// Owns stale detection, empty-queue guard, and the restore fallback decision.
     func restorePlaybackState(
         _ state: PlaybackSessionSnapshot,
-        playbackCoordinator: PlaybackCoordinator
+        player: ShufflePlayer
     ) async -> Bool {
         if isPlaybackStateStale(state) {
             print("🔄 Playback state is stale (>7 days), using fresh shuffle")
@@ -127,11 +129,13 @@ final class SessionSnapshotService {
             return false
         }
 
-        let success = await playbackCoordinator.restoreSession(
+        let success = await player.restoreSession(
             queueOrder: queueOrder,
             currentSongId: state.currentSongId,
             playedIds: playedIds,
-            playbackPosition: state.playbackPosition
+            playbackPosition: state.playbackPosition,
+            algorithm: state.algorithm,
+            seed: state.seed
         )
 
         if success {

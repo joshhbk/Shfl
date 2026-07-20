@@ -1,6 +1,6 @@
 import Foundation
 
-struct Song: Equatable, Identifiable, Sendable {
+nonisolated struct Song: Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let artist: String

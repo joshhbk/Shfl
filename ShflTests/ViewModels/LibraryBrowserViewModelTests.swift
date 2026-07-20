@@ -214,9 +214,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         let replaceCallCount = await mockService.replaceQueueCallCount
         XCTAssertEqual(replaceCallCount, 0, "Autofill while active should defer transport sync")
 
-        // Domain queue should include all songs
-        let domainQueueIds = Set(player.lastShuffledQueue.map(\.id))
-        XCTAssertEqual(domainQueueIds, Set(allSongs.map(\.id)))
+        // Active session stays immutable; the draft contains the next shuffle.
+        let activeSessionIds = Set(player.lastShuffledQueue.map(\.id))
+        XCTAssertEqual(activeSessionIds, Set(allSongs.prefix(2).map(\.id)))
+        XCTAssertEqual(Set(player.allSongs.map(\.id)), Set(allSongs.map(\.id)))
+        XCTAssertTrue(player.hasPendingSessionChanges)
     }
 }
 

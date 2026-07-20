@@ -212,18 +212,17 @@ private struct PreviewPlaybackError: LocalizedError {
 }
 
 private final class PreviewMockMusicService: MusicService {
-    private var continuations: [AsyncStream<PlaybackState>.Continuation] = []
+    private var continuations: [AsyncStream<PlaybackEvent>.Continuation] = []
     private var currentState: PlaybackState = .empty
 
     var isAuthorized: Bool { true }
     var currentPlaybackTime: TimeInterval { 78 }
     var currentSongDuration: TimeInterval { 242 }
     var currentSongId: String? { currentState.currentSongId }
-    var transportQueueEntryCount: Int { currentState.currentSong == nil ? 0 : 1 }
-    var playbackStateStream: AsyncStream<PlaybackState> {
+    var playbackEvents: AsyncStream<PlaybackEvent> {
         AsyncStream { continuation in
             continuations.append(continuation)
-            continuation.yield(currentState)
+            continuation.yield(.stateChanged(currentState))
         }
     }
     func requestAuthorization() async -> Bool { true }
@@ -251,19 +250,18 @@ private final class PreviewMockMusicService: MusicService {
     func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
         LibraryPage(songs: [], hasMore: false)
     }
-    func setQueue(songs: [Song]) async throws {}
-    func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {}
+    func load(_ request: PlaybackLoadRequest) async throws {}
     func play() async throws {}
     func pause() async {}
-    func pauseImmediately() {}
     func skipToNext() async throws {}
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
     func seek(to time: TimeInterval) {}
+    func clear() async {}
 
     func emit(_ state: PlaybackState) {
         currentState = state
-        continuations.forEach { $0.yield(state) }
+        continuations.forEach { $0.yield(.stateChanged(state)) }
     }
 }
 

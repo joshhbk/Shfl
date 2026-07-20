@@ -45,7 +45,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
         )
 
         try await viewModel.addSong(song)
-        try await viewModel.playbackCoordinator.prepareQueue()
+        try await viewModel.player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
         await mockService.setMockPlaybackTime(42)
 
         viewModel.handleDidEnterBackground()

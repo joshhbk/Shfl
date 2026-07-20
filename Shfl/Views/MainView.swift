@@ -66,24 +66,12 @@ struct MainView: View {
         .onChange(of: viewModel.isAuthorized) { _, isAuthorized in
             guard isAuthorized,
                   !appSettings.hasCompletedOnboarding,
-                  viewModel.player.queueState.songPool.isEmpty else { return }
+                  viewModel.player.draftIsEmpty else { return }
             appSettings.hasCompletedOnboarding = true
             viewModel.isLoading = true
             viewModel.loadingMessage = "Finding songs in your library..."
             Task {
                 await viewModel.autofillLibrary()
-            }
-        }
-        .onChange(of: viewModel.player.playbackState) { oldState, newState in
-            switch newState {
-            case .empty, .stopped:
-                guard oldState.isActive,
-                      viewModel.player.songCount > 0,
-                      !viewModel.isShuffling else { break }
-                viewModel.isShuffling = true
-                Task { await viewModel.reshuffleFromLibrary() }
-            default:
-                break
             }
         }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
@@ -176,11 +164,11 @@ struct MainView: View {
                 onSkipForwardTapped: { Task { await viewModel.skipToNext() } },
                 onSkipBackTapped: { Task { await viewModel.restartOrSkipToPrevious() } },
                 onShuffle: { Task { await viewModel.shuffleAll() } },
-                isShuffling: viewModel.isShuffling
+                isShuffling: viewModel.isShuffling || viewModel.player.isLoadingSession
             )
             .transition(.opacity)
-            .task(id: viewModel.player.queueState.isEmpty) {
-                if viewModel.player.queueState.isEmpty {
+            .task(id: viewModel.player.draftIsEmpty) {
+                if viewModel.player.draftIsEmpty {
                     viewModel.prefetchLibraryIfNeeded()
                 }
             }

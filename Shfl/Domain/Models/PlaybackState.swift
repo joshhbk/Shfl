@@ -1,6 +1,6 @@
 import Foundation
 
-enum PlaybackState: Equatable, Sendable {
+nonisolated enum PlaybackState: Equatable, Sendable {
     case empty
     case stopped
     case loading(Song)
