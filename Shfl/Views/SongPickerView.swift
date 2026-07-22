@@ -1008,10 +1008,8 @@ private final class PreviewPickerMusicService: MusicService {
     var currentPlaybackTime: TimeInterval { 0 }
     var currentSongDuration: TimeInterval { 180 }
     var currentSongId: String? { nil }
-    var transportQueueEntryCount: Int { 0 }
-
-    var playbackStateStream: AsyncStream<PlaybackState> {
-        AsyncStream { $0.yield(.empty) }
+    var playbackEvents: AsyncStream<PlaybackEvent> {
+        AsyncStream { $0.yield(.stateChanged(.empty)) }
     }
 
     func requestAuthorization() async -> Bool { true }
@@ -1054,15 +1052,14 @@ private final class PreviewPickerMusicService: MusicService {
         LibraryPage(songs: Array(Self.sampleSongs.prefix(3)), hasMore: false)
     }
 
-    func setQueue(songs: [Song]) async throws {}
-    func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {}
+    func load(_ request: PlaybackLoadRequest) async throws {}
     func play() async throws {}
     func pause() async {}
-    func pauseImmediately() {}
     func skipToNext() async throws {}
     func skipToPrevious() async throws {}
     func restartOrSkipToPrevious() async throws {}
     func seek(to time: TimeInterval) {}
+    func clear() async {}
 }
 
 #Preview("Songs Tab") {

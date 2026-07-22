@@ -5,7 +5,6 @@ import SwiftUI
 @MainActor
 final class AppViewModel {
     let player: ShufflePlayer
-    let playbackCoordinator: PlaybackCoordinator
     @ObservationIgnored let musicService: MusicService
     @ObservationIgnored let lastFMTransport: LastFMTransport
 
@@ -55,9 +54,11 @@ final class AppViewModel {
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) {
         self.musicService = musicService
-        let player = ShufflePlayer(playbackTransport: musicService)
+        let player = ShufflePlayer(
+            playbackTransport: musicService,
+            initialAlgorithm: appSettings.shuffleAlgorithm
+        )
         self.player = player
-        self.playbackCoordinator = PlaybackCoordinator(player: player, appSettings: appSettings)
         self.appSettings = appSettings
 
         // Setup scrobbling
@@ -76,7 +77,6 @@ final class AppViewModel {
 
         self.sessionCoordinator = AppPlaybackSessionCoordinator(
             player: player,
-            playbackCoordinator: playbackCoordinator,
             authorizer: musicService,
             playbackTransport: musicService,
             sessionSnapshotService: sessionSnapshotService,
@@ -109,38 +109,13 @@ final class AppViewModel {
 				libraryCatalog: musicService,
                 algorithm: appSettings.autofillAlgorithm
             )
-            let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
-            loadingMessage = "Building your shuffle queue..."
-            try await playbackCoordinator.seedSongs(songs)
-            try await playbackCoordinator.prepareQueue()
+            let songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
+            try player.seedSongs(songs)
             sessionCoordinator.persistSongs()
         } catch {
             print("Failed to autofill library: \(error)")
         }
         isLoading = false
-    }
-
-    /// Auto-reshuffles from the library when the queue is exhausted.
-    /// Clears the current queue, fetches fresh songs, and starts playback.
-    func reshuffleFromLibrary() async {
-        isShuffling = true
-        prefetchedSongs = nil
-        prefetchTask?.cancel()
-        prefetchTask = nil
-        do {
-            await playbackCoordinator.removeAllSongs()
-            let source = LibraryAutofillSource(
-				libraryCatalog: musicService,
-                algorithm: appSettings.autofillAlgorithm
-            )
-            let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
-            try await playbackCoordinator.seedSongs(songs)
-            try await playbackCoordinator.play()
-            sessionCoordinator.persistSongs()
-        } catch {
-            print("Failed to reshuffle from library: \(error)")
-        }
-        isShuffling = false
     }
 
     func shuffleAll() async {
@@ -158,10 +133,12 @@ final class AppViewModel {
 				libraryCatalog: musicService,
                     algorithm: appSettings.autofillAlgorithm
                 )
-                songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
+                songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
             }
-            try await playbackCoordinator.seedSongs(songs)
-            try await playbackCoordinator.play()
+            try player.seedSongs(songs)
+            try await player.startFreshShuffle(
+                algorithm: appSettings.shuffleAlgorithm
+            )
             sessionCoordinator.persistSongs()
         } catch {
             print("Failed to shuffle all: \(error)")
@@ -175,7 +152,7 @@ final class AppViewModel {
     /// Safe to call multiple times — guards against redundant work.
     func prefetchLibraryIfNeeded() {
         guard isAuthorized,
-              player.queueState.isEmpty,
+              player.draftIsEmpty,
               prefetchedSongs == nil,
               prefetchTask == nil else { return }
 
@@ -185,7 +162,7 @@ final class AppViewModel {
                     libraryCatalog: musicService,
                     algorithm: appSettings.autofillAlgorithm
                 )
-                let songs = try await source.fetchSongs(excluding: Set(), limit: QueueState.maxSongs)
+                let songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
                 guard !Task.isCancelled else { return }
                 self.prefetchedSongs = songs
             } catch {
@@ -233,35 +210,38 @@ final class AppViewModel {
     // MARK: - Coordinator Commands
 
     func onShuffleAlgorithmChanged(_ algorithm: ShuffleAlgorithm) async {
-        await playbackCoordinator.reshuffleAlgorithm(algorithm)
+        player.stageAlgorithm(algorithm)
     }
 
     func togglePlayback() async {
-        try? await playbackCoordinator.togglePlayback()
+        try? await player.togglePlayback(algorithm: appSettings.shuffleAlgorithm)
     }
 
     func skipToNext() async {
-        try? await playbackCoordinator.skipToNext()
+        try? await player.skipToNext()
     }
 
     func restartOrSkipToPrevious() async {
-        try? await playbackCoordinator.restartOrSkipToPrevious()
+        try? await player.restartOrSkipToPrevious()
     }
 
     func addSong(_ song: Song) async throws {
-        try await playbackCoordinator.addSong(song)
+        try await player.addSong(song)
     }
 
     func addSongsWithQueueRebuild(_ songs: [Song]) async throws {
-        try await playbackCoordinator.addSongsWithQueueRebuild(songs)
+        try await player.addSongsWithQueueRebuild(
+            songs,
+            algorithm: appSettings.shuffleAlgorithm
+        )
     }
 
     func removeSong(id: String) async {
-        await playbackCoordinator.removeSong(id: id)
+        await player.removeSong(id: id)
     }
 
     func removeAllSongs() async {
-        await playbackCoordinator.removeAllSongs()
+        await player.removeAllSongs()
     }
 
     func persistPlaybackState() {

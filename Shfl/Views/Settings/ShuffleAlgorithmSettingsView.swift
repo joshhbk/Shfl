@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ShuffleAlgorithmSettingsView: View {
     @Environment(\.appSettings) private var appSettings
+    @Environment(\.shufflePlayer) private var player
+    @State private var isStartingNewShuffle = false
 
     private let columns = [
         GridItem(.flexible()),
@@ -13,10 +15,45 @@ struct ShuffleAlgorithmSettingsView: View {
             VStack(spacing: 24) {
                 algorithmGrid
                 descriptionSection
+                if player?.activeSession != nil {
+                    nextShuffleSection
+                }
             }
             .padding()
         }
         .navigationTitle("Shuffle Algorithm")
+    }
+
+    private var nextShuffleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Applies to the next shuffle", systemImage: "forward.end")
+                .font(.subheadline.weight(.semibold))
+            Text("The songs already playing keep their current order. Start a new shuffle now if you want to apply this setting immediately.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button {
+                guard let player else { return }
+                isStartingNewShuffle = true
+                Task {
+                    try? await player.startFreshShuffle(
+                        algorithm: appSettings?.shuffleAlgorithm
+                    )
+                    isStartingNewShuffle = false
+                }
+            } label: {
+                if isStartingNewShuffle {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("Start New Shuffle Now")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isStartingNewShuffle)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 
     private var algorithmGrid: some View {

@@ -2,132 +2,60 @@ import XCTest
 @testable import Shfl
 
 @MainActor
-final class PlaybackStateBroadcasterTests: XCTestCase {
-    func testMultipleSubscribersReceiveSamePublishedEvents() async {
-        let broadcaster = PlaybackStateBroadcaster()
-        let song = Song(
+final class PlaybackEventBroadcasterTests: XCTestCase {
+    func testMultipleSubscribersReceiveStateAndSessionEndEvents() async {
+        let broadcaster = PlaybackEventBroadcaster()
+        let song = makeSong()
+        let streamA = broadcaster.stream(replaying: .stateChanged(.empty))
+        let streamB = broadcaster.stream(replaying: .stateChanged(.empty))
+
+        broadcaster.publish(.stateChanged(.playing(song)))
+        broadcaster.publish(.sessionEnded)
+
+        let expected: [PlaybackEvent] = [
+            .stateChanged(.empty),
+            .stateChanged(.playing(song)),
+            .sessionEnded
+        ]
+        let eventsA = await collect(from: streamA, count: 3)
+        let eventsB = await collect(from: streamB, count: 3)
+        XCTAssertEqual(eventsA, expected)
+        XCTAssertEqual(eventsB, expected)
+    }
+
+    func testDuplicateEventsAreNotRepublished() async {
+        let broadcaster = PlaybackEventBroadcaster()
+        let song = makeSong()
+        let stream = broadcaster.stream(replaying: .stateChanged(.empty))
+
+        broadcaster.publish(.stateChanged(.empty))
+        broadcaster.publish(.stateChanged(.playing(song)))
+        broadcaster.publish(.stateChanged(.playing(song)))
+
+        let events = await collect(from: stream, count: 2)
+        XCTAssertEqual(events, [.stateChanged(.empty), .stateChanged(.playing(song))])
+    }
+
+    private func makeSong() -> Song {
+        Song(
             id: "song-1",
-            title: "Song 1",
+            title: "Song",
             artist: "Artist",
             albumTitle: "Album",
             artworkURL: nil
         )
-
-        let streamA = broadcaster.stream(replaying: .empty)
-        let streamB = broadcaster.stream(replaying: .empty)
-
-        broadcaster.publish(.playing(song))
-        broadcaster.publish(.paused(song))
-
-        let statesA = await collectStates(from: streamA, count: 3)
-        let statesB = await collectStates(from: streamB, count: 3)
-
-        XCTAssertEqual(statesA, [.empty, .playing(song), .paused(song)])
-        XCTAssertEqual(statesB, [.empty, .playing(song), .paused(song)])
     }
 
-    func testLateSubscriberReceivesLatestStateImmediately() async {
-        let broadcaster = PlaybackStateBroadcaster()
-        let song = Song(
-            id: "song-2",
-            title: "Song 2",
-            artist: "Artist",
-            albumTitle: "Album",
-            artworkURL: nil
-        )
-        broadcaster.publish(.playing(song))
-
-        let stream = broadcaster.stream(replaying: .playing(song))
-        let first = await firstState(from: stream)
-
-        XCTAssertEqual(first, .playing(song))
-    }
-
-    func testSubscriberCountTracksStreamLifecycle() async {
-        let broadcaster = PlaybackStateBroadcaster()
-        XCTAssertEqual(broadcaster.subscriberCount, 0)
-
-        var stream: AsyncStream<PlaybackState>? = broadcaster.stream(replaying: .empty)
-        XCTAssertEqual(broadcaster.subscriberCount, 1)
-
-        stream = nil
-        // Give AsyncStream a moment to run termination handler after stream deallocation.
-        try? await Task.sleep(nanoseconds: 50_000_000)
-
-        XCTAssertNil(stream)
-        XCTAssertEqual(broadcaster.subscriberCount, 0)
-    }
-
-    func testDuplicateStatesAreNotRepublished() async {
-        let broadcaster = PlaybackStateBroadcaster()
-        let song = Song(
-            id: "song-3",
-            title: "Song 3",
-            artist: "Artist",
-            albumTitle: "Album",
-            artworkURL: nil
-        )
-
-        let stream = broadcaster.stream(replaying: .empty)
-        broadcaster.publish(.empty) // duplicate of replayed state
-        broadcaster.publish(.playing(song))
-        broadcaster.publish(.playing(song)) // duplicate of previous publish
-
-        let states = await collectStates(from: stream, count: 2)
-        XCTAssertEqual(states, [.empty, .playing(song)])
-    }
-
-    private func firstState(
-        from stream: AsyncStream<PlaybackState>,
-        timeoutNanoseconds: UInt64 = 200_000_000
-    ) async -> PlaybackState? {
-        await withTaskGroup(of: PlaybackState?.self) { group in
-            group.addTask {
-                var iterator = stream.makeAsyncIterator()
-                return await iterator.next()
-            }
-
-            group.addTask {
-                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
-                return nil
-            }
-
-            let value = await group.next() ?? nil
-            group.cancelAll()
-            return value
-        }
-    }
-
-    private func collectStates(
-        from stream: AsyncStream<PlaybackState>,
-        count: Int,
-        timeoutNanoseconds: UInt64 = 200_000_000
-    ) async -> [PlaybackState] {
-        guard count > 0 else { return [] }
-
-        var collected: [PlaybackState] = []
+    private func collect(
+        from stream: AsyncStream<PlaybackEvent>,
+        count: Int
+    ) async -> [PlaybackEvent] {
+        var result: [PlaybackEvent] = []
         var iterator = stream.makeAsyncIterator()
-
         for _ in 0..<count {
-            let next = await withTaskGroup(of: PlaybackState?.self) { group in
-                group.addTask {
-                    await iterator.next()
-                }
-
-                group.addTask {
-                    try? await Task.sleep(nanoseconds: timeoutNanoseconds)
-                    return nil
-                }
-
-                let value = await group.next() ?? nil
-                group.cancelAll()
-                return value
-            }
-
-            guard let next else { break }
-            collected.append(next)
+            guard let event = await iterator.next() else { break }
+            result.append(event)
         }
-
-        return collected
+        return result
     }
 }

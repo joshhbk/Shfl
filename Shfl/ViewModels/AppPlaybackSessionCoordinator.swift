@@ -5,7 +5,6 @@ import UIKit
 @MainActor
 final class AppPlaybackSessionCoordinator {
     let player: ShufflePlayer
-    let playbackCoordinator: PlaybackCoordinator
 
     @ObservationIgnored private let authorizer: MusicAuthorizing
     @ObservationIgnored private let playbackTransport: PlaybackTransport
@@ -26,7 +25,6 @@ final class AppPlaybackSessionCoordinator {
 
     init(
         player: ShufflePlayer,
-        playbackCoordinator: PlaybackCoordinator,
         authorizer: MusicAuthorizing,
         playbackTransport: PlaybackTransport,
         sessionSnapshotService: SessionSnapshotService,
@@ -34,7 +32,6 @@ final class AppPlaybackSessionCoordinator {
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) {
         self.player = player
-        self.playbackCoordinator = playbackCoordinator
         self.authorizer = authorizer
         self.playbackTransport = playbackTransport
         self.sessionSnapshotService = sessionSnapshotService
@@ -66,7 +63,7 @@ final class AppPlaybackSessionCoordinator {
         print("📱 onAppear: Loaded \(songs.count) songs, playbackState=\(playbackState != nil ? "exists" : "nil")")
 
         if !songs.isEmpty {
-            try? await playbackCoordinator.seedSongs(songs)
+            try? player.seedSongs(songs)
         }
 
         if !player.allSongs.isEmpty {
@@ -74,11 +71,8 @@ final class AppPlaybackSessionCoordinator {
                 print("📱 onAppear: Attempting to restore playback state (song=\(state.currentSongId ?? "nil"), position=\(state.playbackPosition))")
                 let restored = await restorePlaybackState(state)
                 if !restored {
-                    try? await playbackCoordinator.prepareQueue()
+                    print("📱 onAppear: Saved session could not be restored; next play will create a fresh shuffle")
                 }
-            } else {
-                print("📱 onAppear: No saved playback state, preparing fresh queue")
-                try? await playbackCoordinator.prepareQueue()
             }
         } else {
             print("📱 onAppear: No songs loaded")
@@ -176,7 +170,7 @@ final class AppPlaybackSessionCoordinator {
     private func restorePlaybackState(_ state: PlaybackSessionSnapshot) async -> Bool {
         let success = await sessionSnapshotService.restorePlaybackState(
             state,
-            playbackCoordinator: playbackCoordinator
+            player: player
         )
         if success {
             didRestorePlaybackState = true

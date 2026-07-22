@@ -53,7 +53,9 @@ final class SessionSnapshotServiceTests: XCTestCase {
             playbackPosition: 42,
             savedAt: Date(timeIntervalSince1970: 1_700_000_000),
             queueOrder: ["1"],
-            playedSongIds: []
+            playedSongIds: [],
+            algorithm: .artistSpacing,
+            seed: 9_876
         )
 
         try service.save(

@@ -33,11 +33,31 @@ struct PlaylistPage: Sendable {
     let hasMore: Bool
 }
 
-enum QueueApplyPolicy: Sendable, Equatable {
-    /// Ensure queue mutation ends in a playing state.
-    case forcePlaying
-    /// Ensure queue mutation ends in paused state.
-    case forcePaused
+nonisolated struct PlaybackLoadRequest: Sendable, Equatable {
+    let sessionID: UUID
+    let queue: [Song]
+    let currentSongID: String
+    let playbackPosition: TimeInterval
+    let autoplay: Bool
+}
+
+nonisolated enum PlaybackLoadError: LocalizedError, Sendable, Equatable {
+    case emptyQueue
+    case currentSongMissing(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyQueue:
+            return "Cannot load an empty listening session."
+        case .currentSongMissing(let songID):
+            return "The selected song \(songID) is not in the listening session."
+        }
+    }
+}
+
+nonisolated enum PlaybackEvent: Sendable, Equatable {
+    case stateChanged(PlaybackState)
+    case sessionEnded
 }
 
 // MARK: - MusicAuthorizing
@@ -88,20 +108,14 @@ protocol LibraryCatalog: Sendable {
 
 /// Playback transport interface. Consumers that queue songs and control playback depend on this.
 protocol PlaybackTransport: Sendable {
-    /// Set the playback queue with songs and shuffle them
-    func setQueue(songs: [Song]) async throws
-
-    /// Replace queue entries with explicit playback behavior.
-    func replaceQueue(queue: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws
+    /// Atomically install one immutable listening session.
+    func load(_ request: PlaybackLoadRequest) async throws
 
     /// Start playback
     func play() async throws
 
     /// Pause playback
     func pause() async
-
-    /// Pause playback synchronously (no await). Used when immediate audio stop is critical.
-    func pauseImmediately()
 
     /// Skip to next song
     func skipToNext() async throws
@@ -115,8 +129,11 @@ protocol PlaybackTransport: Sendable {
     /// Seek to a specific time in the current song
     func seek(to time: TimeInterval)
 
-    /// Get current playback state (observable)
-    var playbackStateStream: AsyncStream<PlaybackState> { get }
+    /// Clear the installed session and stop playback.
+    func clear() async
+
+    /// Normalized transport events. Session completion is explicit.
+    var playbackEvents: AsyncStream<PlaybackEvent> { get }
 
     /// Current playback time in seconds
     var currentPlaybackTime: TimeInterval { get }
@@ -127,8 +144,6 @@ protocol PlaybackTransport: Sendable {
     /// ID of the currently playing song (nil if nothing playing)
     var currentSongId: String? { get }
 
-    /// Number of entries in the MusicKit transport queue (best-effort snapshot).
-    var transportQueueEntryCount: Int { get }
 }
 
 // MARK: - Combined typealias (backward compat)

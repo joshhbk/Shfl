@@ -2,15 +2,33 @@ import Combine
 import Foundation
 import MusicKit
 
+private enum AppleMusicServiceError: LocalizedError {
+    case incompleteQueueResolution(missingSongIds: [String])
+
+    var errorDescription: String? {
+        switch self {
+        case .incompleteQueueResolution(let missingSongIds):
+            return "Apple Music could not resolve every queued song: \(missingSongIds.joined(separator: ", "))."
+        }
+    }
+}
+
 final class AppleMusicService: MusicService {
     private let player = ApplicationMusicPlayer.shared
     private var stateObservationTask: Task<Void, Never>?
     private let observationTaskLock = NSLock()
-    private let playbackStateBroadcaster = PlaybackStateBroadcaster()
+    private let playbackEventBroadcaster = PlaybackEventBroadcaster()
+    private var loadedFinalSongID: String?
+    private var lastObservedSongID: String?
+    private var hasObservedPlaying = false
+    private var didPublishSessionEnd = false
+    private var sessionEndConfirmationTask: Task<Void, Never>?
 
-    var playbackStateStream: AsyncStream<PlaybackState> {
+    var playbackEvents: AsyncStream<PlaybackEvent> {
         let currentState = mapPlaybackState()
-        let stream = playbackStateBroadcaster.stream(replaying: currentState)
+        let stream = playbackEventBroadcaster.stream(
+            replaying: .stateChanged(currentState)
+        )
         startObservingPlaybackStateIfNeeded()
         return stream
     }
@@ -21,7 +39,8 @@ final class AppleMusicService: MusicService {
         stateObservationTask = nil
         observationTaskLock.unlock()
         task?.cancel()
-        playbackStateBroadcaster.finishAll()
+        sessionEndConfirmationTask?.cancel()
+        playbackEventBroadcaster.finishAll()
     }
 
     var currentPlaybackTime: TimeInterval {
@@ -44,8 +63,6 @@ final class AppleMusicService: MusicService {
         }
         return song.id.rawValue
     }
-
-    var transportQueueEntryCount: Int { player.queue.entries.count }
 
     var isAuthorized: Bool {
         get async {
@@ -275,98 +292,68 @@ final class AppleMusicService: MusicService {
         return PlaylistPage(playlists: playlists, hasMore: hasMore)
     }
 
-    func setQueue(songs: [Song]) async throws {
-        print("🎵 setQueue() called with \(songs.count) songs")
-        print("🎵 Song IDs requested: \(songs.map(\.id))")
-        let ids = songs.map { MusicItemID($0.id) }
-
-        // Use MusicLibraryRequest instead of MusicCatalogResourceRequest
-        var request = MusicLibraryRequest<MusicKit.Song>()
-        request.filter(matching: \.id, memberOf: ids)
-        print("🎵 Fetching songs from library...")
-        let response = try await request.response()
-        print("🎵 Got \(response.items.count) songs from library")
-        print("🎵 Song IDs found: \(response.items.map { $0.id.rawValue })")
-
-        guard !response.items.isEmpty else {
-            print("🎵 No songs found, returning")
-            return
-        }
-
-        // Reorder response items to match our desired order
-        let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
-        let orderedItems = songs.compactMap { itemsById[$0.id] }
-
-        // Log any missing songs
-        let missingSongs = songs.filter { itemsById[$0.id] == nil }
-        if !missingSongs.isEmpty {
-            print("⚠️ WARNING: \(missingSongs.count) songs NOT found in library:")
-            for song in missingSongs {
-                print("⚠️   - missing song ID: \(song.id)")
-            }
-        }
-
-        // Start from the first item in our ordered queue
-        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: orderedItems.first)
-        player.queue = queue
-        player.state.shuffleMode = .off  // We handle shuffling ourselves
-        print("🎵 setQueue() completed with \(orderedItems.count) items, starting at id=\(orderedItems.first?.id.rawValue ?? "nil")")
-    }
-
-    func replaceQueue(queue songs: [Song], startAtSongId: String?, policy: QueueApplyPolicy) async throws {
-        print("🎵 replaceQueue() called with queue=\(songs.count), startAtSongId=\(startAtSongId ?? "nil")")
-
-        let savedPlaybackTime = player.playbackTime
-
+    func load(_ request: PlaybackLoadRequest) async throws {
+        let songs = request.queue
         guard !songs.isEmpty else {
-            print("🎵 replaceQueue() no songs to queue, returning")
-            return
+            throw PlaybackLoadError.emptyQueue
+        }
+        guard songs.contains(where: { $0.id == request.currentSongID }) else {
+            throw PlaybackLoadError.currentSongMissing(request.currentSongID)
         }
 
         let ids = songs.map { MusicItemID($0.id) }
+        var libraryRequest = MusicLibraryRequest<MusicKit.Song>()
+        libraryRequest.limit = ids.count
+        libraryRequest.filter(matching: \.id, memberOf: ids)
+        let response = try await libraryRequest.response()
 
-        var request = MusicLibraryRequest<MusicKit.Song>()
-        request.filter(matching: \.id, memberOf: ids)
-        let response = try await request.response()
-
-        guard !response.items.isEmpty else {
-            print("🎵 No songs found, returning")
-            return
-        }
-
-        // Reorder response items to match our desired order
         let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
         let orderedItems = songs.compactMap { itemsById[$0.id] }
-
-        guard !orderedItems.isEmpty else {
-            print("🎵 replaceQueue() no resolved MusicKit items, returning")
-            return
+        let missingSongIds = songs.compactMap { itemsById[$0.id] == nil ? $0.id : nil }
+        guard missingSongIds.isEmpty else {
+            throw AppleMusicServiceError.incompleteQueueResolution(missingSongIds: missingSongIds)
         }
 
-        let startItem = startAtSongId.flatMap { id in
-            orderedItems.first(where: { $0.id.rawValue == id })
-        } ?? orderedItems.first
+        guard let startItem = orderedItems.first(where: {
+            $0.id.rawValue == request.currentSongID
+        }) else {
+            throw PlaybackLoadError.currentSongMissing(request.currentSongID)
+        }
 
-        // Install full queue while selecting the desired current entry.
         let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: startItem)
         player.queue = queue
         player.state.shuffleMode = .off
+        loadedFinalSongID = orderedItems.last?.id.rawValue
+        lastObservedSongID = startItem.id.rawValue
+        hasObservedPlaying = false
+        didPublishSessionEnd = false
+        sessionEndConfirmationTask?.cancel()
 
-        switch policy {
-        case .forcePlaying:
-            try await player.play()
-            player.playbackTime = savedPlaybackTime
-            print("🎵 Queue updated in playing state at \(savedPlaybackTime)")
-        case .forcePaused:
-            // Prime the entry so metadata (artwork/duration) is available without autoplay.
+        do {
             try? await player.prepareToPlay()
-            player.pause()
-            player.playbackTime = savedPlaybackTime
-            print("🎵 Queue updated in paused state at \(savedPlaybackTime)")
+            player.playbackTime = max(0, request.playbackPosition)
+            if request.autoplay {
+                try await player.play()
+                player.playbackTime = max(0, request.playbackPosition)
+            } else {
+                player.pause()
+            }
+        } catch {
+            await clear()
+            throw error
         }
-
         emitCurrentState()
-        print("🎵 replaceQueue() completed with \(orderedItems.count) items")
+    }
+
+    func clear() async {
+        loadedFinalSongID = nil
+        lastObservedSongID = nil
+        hasObservedPlaying = false
+        didPublishSessionEnd = false
+        sessionEndConfirmationTask?.cancel()
+        player.pause()
+        player.queue = []
+        emitCurrentState()
     }
 
     func play() async throws {
@@ -379,10 +366,6 @@ final class AppleMusicService: MusicService {
         print("⏸️ pause() called")
         player.pause()
         print("⏸️ pause() completed")
-    }
-
-    func pauseImmediately() {
-        player.pause()
     }
 
     func skipToNext() async throws {
@@ -438,12 +421,53 @@ final class AppleMusicService: MusicService {
 
     private func emitCurrentState() {
         let state = mapPlaybackState()
-        let didPublish = playbackStateBroadcaster.publish(state)
+        if let songID = state.currentSongId {
+            lastObservedSongID = songID
+        }
+        if state.isPlaying {
+            hasObservedPlaying = true
+            sessionEndConfirmationTask?.cancel()
+            sessionEndConfirmationTask = nil
+        }
+
+        let rawStopped = player.state.playbackStatus == .stopped
+        let reachedLoadedEnd = loadedFinalSongID != nil
+            && lastObservedSongID == loadedFinalSongID
+            && hasObservedPlaying
+            && (state == .empty || rawStopped)
+
+        let didPublish = playbackEventBroadcaster.publish(.stateChanged(state))
+        if reachedLoadedEnd && !didPublishSessionEnd {
+            scheduleSessionEndConfirmation()
+        }
         #if DEBUG
         if didPublish {
             print("📻 Emitting state: \(state)")
         }
         #endif
+    }
+
+    private func scheduleSessionEndConfirmation() {
+        guard sessionEndConfirmationTask == nil else { return }
+        let expectedFinalSongID = loadedFinalSongID
+        sessionEndConfirmationTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled, let self else { return }
+            self.sessionEndConfirmationTask = nil
+
+            let stillStopped = self.player.state.playbackStatus == .stopped
+                || self.player.queue.currentEntry == nil
+            guard stillStopped,
+                  self.loadedFinalSongID == expectedFinalSongID,
+                  self.lastObservedSongID == expectedFinalSongID,
+                  self.hasObservedPlaying,
+                  !self.didPublishSessionEnd else {
+                return
+            }
+
+            self.didPublishSessionEnd = true
+            self.playbackEventBroadcaster.publish(.sessionEnded)
+        }
     }
 
     private func mapPlaybackState() -> PlaybackState {
@@ -484,9 +508,9 @@ final class AppleMusicService: MusicService {
     }
 }
 
-final class PlaybackStateBroadcaster {
-    private var continuations: [UUID: AsyncStream<PlaybackState>.Continuation] = [:]
-    private var latestState: PlaybackState = .empty
+final class PlaybackEventBroadcaster {
+    private var continuations: [UUID: AsyncStream<PlaybackEvent>.Continuation] = [:]
+    private var latestEvent: PlaybackEvent = .stateChanged(.empty)
     private let lock = NSLock()
 
     var subscriberCount: Int {
@@ -495,7 +519,7 @@ final class PlaybackStateBroadcaster {
         return continuations.count
     }
 
-    func stream(replaying state: PlaybackState) -> AsyncStream<PlaybackState> {
+    func stream(replaying event: PlaybackEvent) -> AsyncStream<PlaybackEvent> {
         AsyncStream { [weak self] continuation in
             guard let self else {
                 continuation.finish()
@@ -503,17 +527,17 @@ final class PlaybackStateBroadcaster {
             }
 
             let id = UUID()
-            let replayState: PlaybackState
+            let replayEvent: PlaybackEvent
 
             lock.lock()
             if continuations.isEmpty {
-                latestState = state
+                latestEvent = event
             }
             continuations[id] = continuation
-            replayState = latestState
+            replayEvent = latestEvent
             lock.unlock()
 
-            continuation.yield(replayState)
+            continuation.yield(replayEvent)
             continuation.onTermination = { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.removeSubscriber(id: id)
@@ -523,26 +547,26 @@ final class PlaybackStateBroadcaster {
     }
 
     @discardableResult
-    func publish(_ state: PlaybackState) -> Bool {
-        let subscribers: [AsyncStream<PlaybackState>.Continuation]
+    func publish(_ event: PlaybackEvent) -> Bool {
+        let subscribers: [AsyncStream<PlaybackEvent>.Continuation]
 
         lock.lock()
-        if state == latestState {
+        if event == latestEvent {
             lock.unlock()
             return false
         }
-        latestState = state
+        latestEvent = event
         subscribers = Array(continuations.values)
         lock.unlock()
 
         for continuation in subscribers {
-            continuation.yield(state)
+            continuation.yield(event)
         }
         return true
     }
 
     func finishAll() {
-        let subscribers: [AsyncStream<PlaybackState>.Continuation]
+        let subscribers: [AsyncStream<PlaybackEvent>.Continuation]
 
         lock.lock()
         subscribers = Array(continuations.values)

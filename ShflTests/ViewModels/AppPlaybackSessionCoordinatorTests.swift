@@ -31,8 +31,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
 
     func testHandleDidEnterBackgroundPersistsSongsAndPlaybackState() async throws {
         let player = ShufflePlayer(playbackTransport: mockService)
-        let playbackCoordinator = PlaybackCoordinator(player: player, appSettings: appSettings)
-        let coordinator = makeCoordinator(player: player, playbackCoordinator: playbackCoordinator)
+        let coordinator = makeCoordinator(player: player)
 
         let song = Song(
             id: "1",
@@ -42,8 +41,8 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
             artworkURL: nil
         )
 
-        try await playbackCoordinator.addSong(song)
-        try await playbackCoordinator.prepareQueue()
+        try await player.addSong(song)
+        try await player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
         await mockService.setMockPlaybackTime(42)
 
         coordinator.handleDidEnterBackground()
@@ -61,12 +60,10 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
 
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
         let player = ShufflePlayer(playbackTransport: mockService)
-        let playbackCoordinator = PlaybackCoordinator(player: player, appSettings: appSettings)
 
         var persistCallCount = 0
         let coordinator = makeCoordinator(
             player: player,
-            playbackCoordinator: playbackCoordinator,
             lifecyclePersistenceHook: { persistCallCount += 1 }
         )
         _ = coordinator
@@ -83,7 +80,6 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
 
     private func makeCoordinator(
         player: ShufflePlayer,
-        playbackCoordinator: PlaybackCoordinator,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) -> AppPlaybackSessionCoordinator {
         let songRepository = SongRepository(modelContext: modelContext)
@@ -99,7 +95,6 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
 
         return AppPlaybackSessionCoordinator(
             player: player,
-            playbackCoordinator: playbackCoordinator,
             authorizer: mockService,
             playbackTransport: mockService,
             sessionSnapshotService: sessionSnapshotService,

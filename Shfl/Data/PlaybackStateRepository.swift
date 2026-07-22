@@ -63,7 +63,9 @@ final class PlaybackStateRepository {
                 playbackPosition: snapshot.playbackPosition,
                 savedAt: snapshot.savedAt,
                 queueOrderJSON: PersistedPlaybackState.queueOrderJSONString(from: snapshot.queueOrder),
-                playedSongIdsJSON: PersistedPlaybackState.playedSongIdsJSONString(from: snapshot.playedSongIds)
+                playedSongIdsJSON: PersistedPlaybackState.playedSongIdsJSONString(from: snapshot.playedSongIds),
+                shuffleAlgorithmRawValue: snapshot.algorithm.rawValue,
+                shuffleSeedString: snapshot.seed.map(String.init)
             )
         )
     }

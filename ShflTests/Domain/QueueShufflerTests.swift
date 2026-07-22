@@ -58,14 +58,15 @@ final class QueueShufflerTests: XCTestCase {
 
     func testNoRepeatShufflesOrder() {
         let songs = (1...20).map { makeSong(id: "\($0)") }
-        let shuffler = QueueShuffler(algorithm: .noRepeat)
+        let result = QueueShuffler(algorithm: .noRepeat, seed: 42)
+            .shuffle(songs)
+            .map(\.id)
 
-        // Run multiple times - at least one should differ from original
-        let results = (0..<10).map { _ in shuffler.shuffle(songs).map(\.id) }
-        let originalOrder = songs.map(\.id)
-
-        let anyDifferent = results.contains { $0 != originalOrder }
-        XCTAssertTrue(anyDifferent, "Shuffle should change order at least once in 10 tries")
+        XCTAssertNotEqual(result, songs.map(\.id))
+        XCTAssertEqual(
+            result,
+            QueueShuffler(algorithm: .noRepeat, seed: 42).shuffle(songs).map(\.id)
+        )
     }
 
     // MARK: - Weighted by Recency
@@ -77,22 +78,8 @@ final class QueueShufflerTests: XCTestCase {
             makeSong(id: "old", lastPlayedDate: now.addingTimeInterval(-86400 * 30)),
             makeSong(id: "never", lastPlayedDate: nil)
         ]
-        let shuffler = QueueShuffler(algorithm: .weightedByRecency)
-
-        // Run multiple times and track first position frequency
-        var firstPositionCounts: [String: Int] = [:]
-        for _ in 0..<100 {
-            let result = shuffler.shuffle(songs)
-            let firstId = result[0].id
-            firstPositionCounts[firstId, default: 0] += 1
-        }
-
-        // "never" and "old" should appear first more often than "recent"
-        let neverCount = firstPositionCounts["never"] ?? 0
-        let oldCount = firstPositionCounts["old"] ?? 0
-        let recentCount = firstPositionCounts["recent"] ?? 0
-
-        XCTAssertGreaterThan(neverCount + oldCount, recentCount)
+        let result = QueueShuffler(algorithm: .weightedByRecency, seed: 5).shuffle(songs)
+        XCTAssertEqual(result.map(\.id), ["never", "old", "recent"])
     }
 
     // MARK: - Weighted by Play Count
@@ -103,22 +90,27 @@ final class QueueShufflerTests: XCTestCase {
             makeSong(id: "played10", playCount: 10),
             makeSong(id: "played0", playCount: 0)
         ]
-        let shuffler = QueueShuffler(algorithm: .weightedByPlayCount)
+        let result = QueueShuffler(algorithm: .weightedByPlayCount, seed: 5).shuffle(songs)
+        XCTAssertEqual(result.map(\.id), ["played0", "played10", "played100"])
+    }
 
-        // Run multiple times and track first position frequency
-        var firstPositionCounts: [String: Int] = [:]
-        for _ in 0..<100 {
-            let result = shuffler.shuffle(songs)
-            let firstId = result[0].id
-            firstPositionCounts[firstId, default: 0] += 1
-        }
+    func testWeightedAlgorithmsDoNotFallBackToInsertionOrderForEqualMetadata() {
+        let songs = (1...10).map { makeSong(id: "\($0)") }
+        let insertionOrder = songs.map(\.id)
 
-        // Less played songs should appear first more often
-        let played0Count = firstPositionCounts["played0"] ?? 0
-        let played10Count = firstPositionCounts["played10"] ?? 0
-        let played100Count = firstPositionCounts["played100"] ?? 0
+        let byCount = QueueShuffler(
+            algorithm: .weightedByPlayCount,
+            seed: 123
+        ).shuffle(songs).map(\.id)
+        let byRecency = QueueShuffler(
+            algorithm: .weightedByRecency,
+            seed: 123
+        ).shuffle(songs).map(\.id)
 
-        XCTAssertGreaterThan(played0Count + played10Count, played100Count)
+        XCTAssertNotEqual(byCount, insertionOrder)
+        XCTAssertNotEqual(byRecency, insertionOrder)
+        XCTAssertEqual(Set(byCount), Set(insertionOrder))
+        XCTAssertEqual(Set(byRecency), Set(insertionOrder))
     }
 
     // MARK: - Artist Spacing

@@ -8,19 +8,25 @@ final class PersistedPlaybackState {
     var savedAt: Date
     var queueOrderJSON: String
     var playedSongIdsJSON: String
+    var shuffleAlgorithmRawValue: String?
+    var shuffleSeedString: String?
 
     init(
         currentSongId: String?,
         playbackPosition: Double,
         savedAt: Date,
         queueOrderJSON: String,
-        playedSongIdsJSON: String
+        playedSongIdsJSON: String,
+        shuffleAlgorithmRawValue: String? = nil,
+        shuffleSeedString: String? = nil
     ) {
         self.currentSongId = currentSongId
         self.playbackPosition = playbackPosition
         self.savedAt = savedAt
         self.queueOrderJSON = queueOrderJSON
         self.playedSongIdsJSON = playedSongIdsJSON
+        self.shuffleAlgorithmRawValue = shuffleAlgorithmRawValue
+        self.shuffleSeedString = shuffleSeedString
     }
 }
 
@@ -97,7 +103,9 @@ extension PersistedPlaybackState {
             playbackPosition: playbackPosition,
             savedAt: Date(),
             queueOrderJSON: Self.queueOrderJSONString(from: queueOrder),
-            playedSongIdsJSON: Self.playedSongIdsJSONString(from: playedSongIds)
+            playedSongIdsJSON: Self.playedSongIdsJSONString(from: playedSongIds),
+            shuffleAlgorithmRawValue: nil,
+            shuffleSeedString: nil
         )
     }
 }
@@ -109,5 +117,9 @@ extension PlaybackSessionSnapshot {
         self.savedAt = model.savedAt
         self.queueOrder = model.queueOrder
         self.playedSongIds = model.playedSongIds
+        self.algorithm = model.shuffleAlgorithmRawValue
+            .flatMap(ShuffleAlgorithm.init(rawValue:))
+            ?? .noRepeat
+        self.seed = model.shuffleSeedString.flatMap(UInt64.init)
     }
 }
