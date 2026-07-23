@@ -207,62 +207,8 @@ private enum PreviewPlayerState: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private struct PreviewPlaybackError: LocalizedError {
+private struct PreviewPlaybackError: LocalizedError, Sendable {
     let errorDescription: String?
-}
-
-private final class PreviewMockMusicService: MusicService {
-    private var continuations: [AsyncStream<PlaybackEvent>.Continuation] = []
-    private var currentState: PlaybackState = .empty
-
-    var isAuthorized: Bool { true }
-    var currentPlaybackTime: TimeInterval { 78 }
-    var currentSongDuration: TimeInterval { 242 }
-    var currentSongId: String? { currentState.currentSongId }
-    var playbackEvents: AsyncStream<PlaybackEvent> {
-        AsyncStream { continuation in
-            continuations.append(continuation)
-            continuation.yield(.stateChanged(currentState))
-        }
-    }
-    func requestAuthorization() async -> Bool { true }
-    func fetchLibrarySongs(sortedBy: SortOption, limit: Int, offset: Int) async throws -> LibraryPage {
-        LibraryPage(songs: [], hasMore: false)
-    }
-    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
-        LibraryPage(songs: [], hasMore: false)
-    }
-    func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
-        ArtistPage(artists: [], hasMore: false)
-    }
-    func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
-        PlaylistPage(playlists: [], hasMore: false)
-    }
-    func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
-        ArtistPage(artists: [], hasMore: false)
-    }
-    func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
-        PlaylistPage(playlists: [], hasMore: false)
-    }
-    func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
-        LibraryPage(songs: [], hasMore: false)
-    }
-    func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
-        LibraryPage(songs: [], hasMore: false)
-    }
-    func load(_ request: PlaybackLoadRequest) async throws {}
-    func play() async throws {}
-    func pause() async {}
-    func skipToNext() async throws {}
-    func skipToPrevious() async throws {}
-    func restartOrSkipToPrevious() async throws {}
-    func seek(to time: TimeInterval) {}
-    func clear() async {}
-
-    func emit(_ state: PlaybackState) {
-        currentState = state
-        continuations.forEach { $0.yield(.stateChanged(state)) }
-    }
 }
 
 private let previewSong = Song(
@@ -285,14 +231,28 @@ private let previewQueueSongs = [
 ]
 
 private struct PlayerViewPreviewHost: View {
-    private let musicService: PreviewMockMusicService
+    private let musicService: DeterministicMusicService
     private let player: ShufflePlayer
     private let themeId: String
 
     init(state: PreviewPlayerState, themeId: String) {
         self.themeId = themeId
 
-        let musicService = PreviewMockMusicService()
+        let initialPlaybackState: PlaybackState = switch state {
+        case .empty, .armed: .empty
+        case .loading: .loading(previewSong)
+        case .playing: .playing(previewSong)
+        case .paused: .paused(previewSong)
+        case .error: .error(PreviewPlaybackError(errorDescription: "Preview playback failed."))
+        }
+        let musicService = DeterministicMusicService(
+            configuration: .init(
+                librarySongs: previewQueueSongs,
+                playbackDuration: 242,
+                playbackTime: 78,
+                playbackState: initialPlaybackState
+            )
+        )
         let player = ShufflePlayer(playbackTransport: musicService)
 
         switch state {
@@ -300,18 +260,8 @@ private struct PlayerViewPreviewHost: View {
             break
         case .armed:
             try? player.seedSongs(previewQueueSongs)
-        case .loading:
+        case .loading, .playing, .paused, .error:
             try? player.seedSongs(previewQueueSongs)
-            musicService.emit(.loading(previewSong))
-        case .playing:
-            try? player.seedSongs(previewQueueSongs)
-            musicService.emit(.playing(previewSong))
-        case .paused:
-            try? player.seedSongs(previewQueueSongs)
-            musicService.emit(.paused(previewSong))
-        case .error:
-            try? player.seedSongs(previewQueueSongs)
-            musicService.emit(.error(PreviewPlaybackError(errorDescription: "Preview playback failed.")))
         }
 
         self.musicService = musicService

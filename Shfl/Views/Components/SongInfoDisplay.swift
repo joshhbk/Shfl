@@ -83,12 +83,14 @@ struct SongInfoDisplay: View {
                 .lineLimit(1)
                 .contentTransition(.opacity)
                 .animation(.easeOut(duration: 0.3), value: song.title)
+                .accessibilityIdentifier("player.songTitle")
             Text(song.artist)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(theme.secondaryTextColor)
                 .lineLimit(1)
                 .contentTransition(.opacity)
                 .animation(.easeOut(duration: 0.3), value: song.artist)
+                .accessibilityIdentifier("player.songArtist")
 
             if let progressState {
                 LivePlaybackProgressBar(

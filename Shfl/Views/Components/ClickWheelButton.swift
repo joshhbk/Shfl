@@ -16,6 +16,26 @@ struct ClickWheelButton: View {
         }
     }
 
+    private var accessibilityLabel: String {
+        switch systemName {
+        case "plus": "Volume up"
+        case "minus": "Volume down"
+        case "backward.end.fill": "Previous track"
+        case "forward.end.fill": "Next track"
+        default: systemName
+        }
+    }
+
+    private var accessibilityIdentifier: String {
+        switch systemName {
+        case "plus": "player.volumeUp"
+        case "minus": "player.volumeDown"
+        case "backward.end.fill": "player.skipBack"
+        case "forward.end.fill": "player.skipForward"
+        default: "player.\(systemName)"
+        }
+    }
+
     var body: some View {
         Image(systemName: systemName)
             .font(.system(size: 18, weight: .semibold))
@@ -43,6 +63,13 @@ struct ClickWheelButton: View {
                         }
                     }
             )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityIdentifier(accessibilityIdentifier)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                action()
+            }
     }
 }
 

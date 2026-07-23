@@ -1,7 +1,7 @@
 import Foundation
 
 /// AutofillSource implementation that fetches songs from the user's Apple Music library
-struct LibraryAutofillSource: AutofillSource {
+nonisolated struct LibraryAutofillSource: AutofillSource {
     private let libraryCatalog: LibraryCatalog
     private let algorithm: AutofillAlgorithm
 

@@ -9,6 +9,17 @@ struct MainView: View {
     @State private var hasCompletedSplashTimeline = false
     @State private var hasDismissedStartupSplash = false
 
+    init(
+        viewModel: AppViewModel,
+        appSettings: AppSettings,
+        showsStartupSplash: Bool = true
+    ) {
+        self.viewModel = viewModel
+        self.appSettings = appSettings
+        _hasCompletedSplashTimeline = State(initialValue: !showsStartupSplash)
+        _hasDismissedStartupSplash = State(initialValue: !showsStartupSplash)
+    }
+
     private enum LaunchPhase: Int {
         case loading
         case unauthorized

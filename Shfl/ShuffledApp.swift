@@ -13,33 +13,14 @@ struct ShuffledApp: App {
     @State private var appSettings: AppSettings
     @State private var appViewModel: AppViewModel
 
-    private let sharedModelContainer: ModelContainer
-
-    private var isRunningTests: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-    }
+    private let composition: AppComposition
 
     init() {
-        let schema = Schema([
-            PersistedSong.self,
-            PersistedPlaybackState.self
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
         do {
-            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
-            self.sharedModelContainer = container
-
-            let settings = AppSettings()
-            let musicService = AppleMusicService()
-            _appSettings = State(wrappedValue: settings)
-            _appViewModel = State(
-                wrappedValue: AppViewModel(
-                    musicService: musicService,
-                    modelContext: container.mainContext,
-                    appSettings: settings
-                )
-            )
+            let composition = try AppComposition.make()
+            self.composition = composition
+            _appSettings = State(wrappedValue: composition.appSettings)
+            _appViewModel = State(wrappedValue: composition.appViewModel)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
@@ -47,12 +28,12 @@ struct ShuffledApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if isRunningTests {
-                Color.clear
-            } else {
-                MainView(viewModel: appViewModel, appSettings: appSettings)
-            }
+            MainView(
+                viewModel: appViewModel,
+                appSettings: appSettings,
+                showsStartupSplash: composition.showsStartupSplash
+            )
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(composition.modelContainer)
     }
 }

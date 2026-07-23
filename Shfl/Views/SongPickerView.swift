@@ -977,7 +977,7 @@ struct SongPickerView: View {
 
 // MARK: - Previews
 
-private final class PreviewPickerMusicService: MusicService {
+private enum PreviewPickerLibrary {
     static let sampleSongs: [Song] = [
         Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil, playCount: 142),
         Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil, playCount: 98),
@@ -991,79 +991,29 @@ private final class PreviewPickerMusicService: MusicService {
         Song(id: "10", title: "Smells Like Teen Spirit", artist: "Nirvana", albumTitle: "Nevermind", artworkURL: nil, playCount: 25),
     ]
 
-    static let sampleArtists: [Artist] = [
-        Artist(id: "a1", name: "Queen"),
-        Artist(id: "a2", name: "Led Zeppelin"),
-        Artist(id: "a3", name: "Pink Floyd"),
-        Artist(id: "a4", name: "Eagles"),
-    ]
-
     static let samplePlaylists: [Playlist] = [
         Playlist(id: "p1", name: "Classic Rock Hits"),
         Playlist(id: "p2", name: "Road Trip Mix"),
         Playlist(id: "p3", name: "Chill Vibes"),
     ]
 
-    var isAuthorized: Bool { true }
-    var currentPlaybackTime: TimeInterval { 0 }
-    var currentSongDuration: TimeInterval { 180 }
-    var currentSongId: String? { nil }
-    var playbackEvents: AsyncStream<PlaybackEvent> {
-        AsyncStream { $0.yield(.stateChanged(.empty)) }
+    static func makeService() -> DeterministicMusicService {
+        DeterministicMusicService(
+            configuration: .init(
+                librarySongs: sampleSongs,
+                libraryPlaylists: samplePlaylists,
+                playlistSongs: [
+                    "p1": Array(sampleSongs.prefix(3)),
+                    "p2": Array(sampleSongs.dropFirst(3).prefix(3)),
+                    "p3": Array(sampleSongs.dropFirst(6).prefix(3))
+                ]
+            )
+        )
     }
-
-    func requestAuthorization() async -> Bool { true }
-
-    func fetchLibrarySongs(sortedBy: SortOption, limit: Int, offset: Int) async throws -> LibraryPage {
-        let end = min(offset + limit, Self.sampleSongs.count)
-        guard offset < Self.sampleSongs.count else { return LibraryPage(songs: [], hasMore: false) }
-        return LibraryPage(songs: Array(Self.sampleSongs[offset..<end]), hasMore: end < Self.sampleSongs.count)
-    }
-
-    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
-        let filtered = Self.sampleSongs.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query) }
-        return LibraryPage(songs: filtered, hasMore: false)
-    }
-
-    func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
-        let filtered = Self.sampleArtists.filter { $0.name.localizedCaseInsensitiveContains(query) }
-        return ArtistPage(artists: filtered, hasMore: false)
-    }
-
-    func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
-        let filtered = Self.samplePlaylists.filter { $0.name.localizedCaseInsensitiveContains(query) }
-        return PlaylistPage(playlists: filtered, hasMore: false)
-    }
-
-    func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
-        ArtistPage(artists: Self.sampleArtists, hasMore: false)
-    }
-
-    func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
-        PlaylistPage(playlists: Self.samplePlaylists, hasMore: false)
-    }
-
-    func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
-        let filtered = Self.sampleSongs.filter { $0.artist == artistName }
-        return LibraryPage(songs: filtered, hasMore: false)
-    }
-
-    func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
-        LibraryPage(songs: Array(Self.sampleSongs.prefix(3)), hasMore: false)
-    }
-
-    func load(_ request: PlaybackLoadRequest) async throws {}
-    func play() async throws {}
-    func pause() async {}
-    func skipToNext() async throws {}
-    func skipToPrevious() async throws {}
-    func restartOrSkipToPrevious() async throws {}
-    func seek(to time: TimeInterval) {}
-    func clear() async {}
 }
 
 #Preview("Songs Tab") {
-    let service = PreviewPickerMusicService()
+    let service = PreviewPickerLibrary.makeService()
     let player = ShufflePlayer(playbackTransport: service)
 
     SongPickerView(
@@ -1081,7 +1031,7 @@ private final class PreviewPickerMusicService: MusicService {
 
 #Preview("With Selected Songs") {
     struct Wrapper: View {
-        let service = PreviewPickerMusicService()
+        let service = PreviewPickerLibrary.makeService()
         @State private var player: ShufflePlayer?
 
         var body: some View {
@@ -1101,7 +1051,7 @@ private final class PreviewPickerMusicService: MusicService {
                 ProgressView()
                     .task {
                         let p = ShufflePlayer(playbackTransport: service)
-                        for song in PreviewPickerMusicService.sampleSongs.prefix(5) {
+                        for song in PreviewPickerLibrary.sampleSongs.prefix(5) {
                             try? await p.addSong(song)
                         }
                         player = p
@@ -1114,7 +1064,7 @@ private final class PreviewPickerMusicService: MusicService {
 }
 
 #Preview("Empty Library") {
-    let service = MockMusicService()
+    let service = DeterministicMusicService()
     let player = ShufflePlayer(playbackTransport: service)
 
     SongPickerView(

@@ -140,6 +140,6 @@ private struct DebugListeningSessionContent: View {
 #Preview {
     NavigationStack {
         DebugQueueView()
-            .environment(\.shufflePlayer, ShufflePlayer(playbackTransport: MockMusicService()))
+            .environment(\.shufflePlayer, ShufflePlayer(playbackTransport: DeterministicMusicService()))
     }
 }

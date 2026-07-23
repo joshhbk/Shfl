@@ -6,7 +6,7 @@ import SwiftUI
 final class AppViewModel {
     let player: ShufflePlayer
     @ObservationIgnored let musicService: MusicService
-    @ObservationIgnored let lastFMTransport: LastFMTransport
+    @ObservationIgnored let lastFMTransport: LastFMTransport?
 
     @ObservationIgnored private let appSettings: AppSettings
     @ObservationIgnored private let sessionCoordinator: AppPlaybackSessionCoordinator
@@ -51,7 +51,8 @@ final class AppViewModel {
         musicService: MusicService,
         modelContext: ModelContext,
         appSettings: AppSettings,
-        lifecyclePersistenceHook: (() -> Void)? = nil
+        lifecyclePersistenceHook: (() -> Void)? = nil,
+        scrobblingEnabled: Bool = true
     ) {
         self.musicService = musicService
         let player = ShufflePlayer(
@@ -61,12 +62,19 @@ final class AppViewModel {
         self.player = player
         self.appSettings = appSettings
 
-        // Setup scrobbling
-        self.lastFMTransport = LastFMTransport(
-            apiKey: LastFMConfig.apiKey,
-            sharedSecret: LastFMConfig.sharedSecret
-        )
-        let scrobbleManager = ScrobbleManager(transports: [lastFMTransport])
+        let scrobbleTransports: [any ScrobbleTransport]
+        if scrobblingEnabled {
+            let lastFMTransport = LastFMTransport(
+                apiKey: LastFMConfig.apiKey,
+                sharedSecret: LastFMConfig.sharedSecret
+            )
+            self.lastFMTransport = lastFMTransport
+            scrobbleTransports = [lastFMTransport]
+        } else {
+            self.lastFMTransport = nil
+            scrobbleTransports = []
+        }
+        let scrobbleManager = ScrobbleManager(transports: scrobbleTransports)
         let scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, playbackTransport: musicService)
         let songRepository = SongRepository(modelContext: modelContext)
         let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)

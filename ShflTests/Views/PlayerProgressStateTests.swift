@@ -46,7 +46,7 @@ struct PlayerProgressStateTests {
 
     @Test("Transitions from boosted polling to steady polling after boost window")
     func transitionsBoostedToSteady() async {
-        let musicService = MockMusicService()
+        let musicService = DeterministicMusicService()
         let state = PlayerProgressState(
             musicService: musicService,
             boostedUpdateInterval: 0.05,
@@ -68,8 +68,8 @@ struct PlayerProgressStateTests {
 
     @Test("Pausing disables polling and user seek re-enables boost while playing")
     func seekAndPauseTransitions() async {
-        let musicService = MockMusicService()
-        musicService.mockDuration = 240
+        let musicService = DeterministicMusicService()
+        await musicService.setPlaybackDuration(240)
         let state = PlayerProgressState(
             musicService: musicService,
             boostedUpdateInterval: 0.05,
