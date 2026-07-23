@@ -51,12 +51,28 @@ Shfl/
 
 ## Testing
 
+The unit suite and deterministic playback scenarios run without an Apple Music
+account or network connection:
+
 ```bash
 xcodebuild test \
   -scheme Shfl \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -only-testing:ShflTests
 ```
+
+Run the real app root against the deterministic catalog and transport:
+
+```bash
+xcodebuild test \
+  -scheme Shfl \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:ShflUITests
+```
+
+The UI scenario launches Shfl with `--deterministic`. App composition then uses
+in-memory persistence, isolated settings, a seeded catalog, virtual playback,
+and no external scrobbling while rendering the same `MainView` as production.
 
 ## License
 

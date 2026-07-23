@@ -32,6 +32,10 @@ _Avoid_: Queue engine, shuffle manager
 The module that hides MusicKit-specific queue loading, identifier mapping, playback timing, and event observation behind Shfl's playback interface.
 _Avoid_: Music service, queue sync
 
+**App composition**:
+The single module that chooses Shfl's concrete catalog, transport, persistence, settings, and external-effect adapters for one launch. Live and deterministic launches render the same app root.
+_Avoid_: Test app, mock mode
+
 **Playback scenario**:
 A user-visible sequence of actions and outcomes that can run unchanged against the deterministic transport and the real MusicKit transport.
 _Avoid_: Unit test case, mock expectation

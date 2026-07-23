@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class ShufflePlayerTests: XCTestCase {
     func test_firstPlayLoadsOneExactSessionAtBeginning() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         let songs = makeSongs(5)
         try player.seedSongs(songs)
@@ -31,7 +31,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_activeEditsOnlyChangeNextSessionDraft() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         let original = makeSongs(4)
         try player.seedSongs(original)
@@ -57,7 +57,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_algorithmChangeDoesNotReloadActiveSession() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         try player.seedSongs(makeSongs(5))
         try await player.startFreshShuffle(algorithm: .noRepeat, seed: 1)
@@ -72,12 +72,12 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_pauseAndResumePreserveSessionPositionWithoutReload() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         try player.seedSongs(makeSongs(3))
         try await player.startFreshShuffle(seed: 6)
         let sessionID = player.activeSession?.id
-        await transport.setMockPlaybackTime(42)
+        await transport.setPlaybackTime(42)
 
         await player.pause()
         try await player.play()
@@ -90,7 +90,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_nextAndPreviousFollowSessionOrderWithoutReload() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         try player.seedSongs(makeSongs(4))
         try await player.startFreshShuffle(seed: 11)
@@ -98,7 +98,7 @@ final class ShufflePlayerTests: XCTestCase {
 
         try await player.skipToNext()
         await waitUntil { player.playbackState.currentSongId == order[1] }
-        await transport.setMockPlaybackTime(0)
+        await transport.setPlaybackTime(0)
         try await player.restartOrSkipToPrevious()
         await waitUntil { player.playbackState.currentSongId == order[0] }
 
@@ -107,7 +107,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_virtualTimeAdvancesFiveSongsWithoutReloadingOrWrapping() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         try player.seedSongs(makeSongs(5))
         try await player.startFreshShuffle(seed: 99)
@@ -135,7 +135,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_transientEmptyDoesNotEndOrReloadSession() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         try player.seedSongs(makeSongs(3))
         try await player.startFreshShuffle(seed: 4)
@@ -152,7 +152,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_sessionEndBuildsNextSessionFromStagedDraft() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         let original = makeSongs(3)
         let added = Song(
@@ -182,7 +182,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_restoreUsesOnePausedAtomicLoadWithExactOrderAndPosition() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         let songs = makeSongs(4)
         try player.seedSongs(songs)
@@ -208,7 +208,7 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_clearIsTheOnlyDraftEditThatClearsActiveSession() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         try player.seedSongs(makeSongs(3))
         try await player.startFreshShuffle(seed: 2)
@@ -222,10 +222,10 @@ final class ShufflePlayerTests: XCTestCase {
     }
 
     func test_failedFreshLoadLeavesNoFalseActiveSession() async throws {
-        let transport = MockMusicService()
+        let transport = DeterministicMusicService()
         let player = ShufflePlayer(playbackTransport: transport)
         try player.seedSongs(makeSongs(3))
-        await transport.setShouldThrowOnLoad(
+        await transport.failNextLoad(with:
             NSError(domain: "test-load", code: 1)
         )
 

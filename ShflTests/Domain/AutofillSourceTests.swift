@@ -15,7 +15,7 @@ struct AutofillSourceTests {
 struct LibraryAutofillSourceTests {
     @Test("Fetches songs from library up to limit")
     func fetchesSongsFromLibrary() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let songs = (1...10).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
@@ -27,7 +27,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Excludes songs already in shuffle")
     func excludesSongsAlreadyInShuffle() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let songs = (1...10).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
@@ -42,7 +42,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Returns empty when all songs excluded")
     func returnsEmptyWhenAllExcluded() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let songs = [makeSong(id: "1"), makeSong(id: "2")]
         await mockService.setLibrarySongs(songs)
 
@@ -54,7 +54,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Respects the limit parameter")
     func respectsLimit() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let songs = (1...100).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
@@ -66,7 +66,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Returns less than limit when library is small")
     func returnsLessThanLimitWhenLibrarySmall() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let songs = (1...5).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
@@ -78,7 +78,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Random algorithm shuffles results")
     func randomAlgorithmShufflesResults() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         // Create songs with sequential IDs
         let songs = (1...20).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
@@ -102,7 +102,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Recently added algorithm returns songs from pool")
     func recentlyAddedReturnsSongs() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let songs = (1...10).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 
@@ -118,7 +118,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Random algorithm paginates across full library")
     func randomAlgorithmPaginatesFullLibrary() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         // Create 750 songs — exceeds the 500-song page size
         let songs = (1...750).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
@@ -135,7 +135,7 @@ struct LibraryAutofillSourceTests {
 
     @Test("Default algorithm is random")
     func defaultAlgorithmIsRandom() async throws {
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let songs = (1...5).map { makeSong(id: "\($0)") }
         await mockService.setLibrarySongs(songs)
 

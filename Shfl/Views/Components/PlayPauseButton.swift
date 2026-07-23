@@ -75,6 +75,7 @@ struct PlayPauseButton: View {
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isPlaying ? "Pause" : "Play")
+        .accessibilityIdentifier("player.playPause")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
             action()

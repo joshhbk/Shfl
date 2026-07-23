@@ -45,7 +45,7 @@ struct ScrobbleTrackerTests {
     func scrobbleOnThreshold() async throws {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
@@ -57,7 +57,7 @@ struct ScrobbleTrackerTests {
         )
 
         // Simulate playing for threshold duration (song is 60 seconds, threshold is 30)
-        mockService.mockDuration = 60
+        await mockService.setPlaybackDuration(60)
         await tracker.onPlaybackStateChanged(.playing(song))
 
         // Simulate time passing (threshold is 30 seconds for 60-second song)
@@ -75,7 +75,7 @@ struct ScrobbleTrackerTests {
     func nowPlayingOnStart() async throws {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
@@ -86,7 +86,7 @@ struct ScrobbleTrackerTests {
             artworkURL: nil
         )
 
-        mockService.mockDuration = 180
+        await mockService.setPlaybackDuration(180)
         await tracker.onPlaybackStateChanged(.playing(song))
 
         // Allow async work to complete
@@ -100,7 +100,7 @@ struct ScrobbleTrackerTests {
     func pauseStopsTracking() async throws {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
@@ -111,7 +111,7 @@ struct ScrobbleTrackerTests {
             artworkURL: nil
         )
 
-        mockService.mockDuration = 60
+        await mockService.setPlaybackDuration(60)
         await tracker.onPlaybackStateChanged(.playing(song))
         await tracker.simulateTimeElapsed(seconds: 20)
         await tracker.onPlaybackStateChanged(.paused(song))
@@ -127,7 +127,7 @@ struct ScrobbleTrackerTests {
     func scrobbleOnlyOnce() async throws {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song = Song(
@@ -138,7 +138,7 @@ struct ScrobbleTrackerTests {
             artworkURL: nil
         )
 
-        mockService.mockDuration = 60
+        await mockService.setPlaybackDuration(60)
         await tracker.onPlaybackStateChanged(.playing(song))
         await tracker.simulateTimeElapsed(seconds: 35)  // Past threshold
         try await Task.sleep(for: .milliseconds(50))
@@ -154,13 +154,13 @@ struct ScrobbleTrackerTests {
     func songChangeResets() async throws {
         let transport = MockScrobbleTransport()
         let manager = ScrobbleManager(transports: [transport])
-        let mockService = MockMusicService()
+        let mockService = DeterministicMusicService()
         let tracker = await ScrobbleTracker(scrobbleManager: manager, playbackTransport: mockService)
 
         let song1 = Song(id: "1", title: "Song 1", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
 
-        mockService.mockDuration = 60
+        await mockService.setPlaybackDuration(60)
         await tracker.onPlaybackStateChanged(.playing(song1))
         await tracker.simulateTimeElapsed(seconds: 20)
 

@@ -38,7 +38,7 @@ nonisolated enum PlaybackState: Equatable, Sendable {
     }
 }
 
-extension PlaybackState {
+nonisolated extension PlaybackState {
     var isActive: Bool {
         switch self {
         case .playing, .paused, .loading:

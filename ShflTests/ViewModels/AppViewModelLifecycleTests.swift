@@ -7,7 +7,7 @@ import XCTest
 final class AppViewModelLifecycleTests: XCTestCase {
     private var container: ModelContainer!
     private var modelContext: ModelContext!
-    private var mockService: MockMusicService!
+    private var mockService: DeterministicMusicService!
     private var appSettings: AppSettings!
 
     override func setUp() async throws {
@@ -18,7 +18,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
             configurations: config
         )
         modelContext = container.mainContext
-        mockService = MockMusicService()
+        mockService = DeterministicMusicService()
         appSettings = AppSettings()
     }
 
@@ -46,7 +46,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
 
         try await viewModel.addSong(song)
         try await viewModel.player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
-        await mockService.setMockPlaybackTime(42)
+        await mockService.setPlaybackTime(42)
 
         viewModel.handleDidEnterBackground()
 

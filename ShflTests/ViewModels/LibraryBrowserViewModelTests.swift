@@ -3,11 +3,11 @@ import XCTest
 
 @MainActor
 final class LibraryBrowserViewModelTests: XCTestCase {
-    private var mockService: MockMusicService!
+    private var mockService: DeterministicMusicService!
     private var viewModel: LibraryBrowserViewModel!
 
     override func setUp() async throws {
-        mockService = MockMusicService()
+        mockService = DeterministicMusicService()
         viewModel = LibraryBrowserViewModel(libraryCatalog: mockService)
     }
 
@@ -200,7 +200,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
-        await mockService.resetQueueTracking()
+        await mockService.resetPlaybackRecording()
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
         await viewModel.autofill(into: player, using: source) { songs in
@@ -211,8 +211,8 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         XCTAssertEqual(player.songCount, 5)
 
         // Transport sync is deferred to avoid playback interruption
-        let replaceCallCount = await mockService.replaceQueueCallCount
-        XCTAssertEqual(replaceCallCount, 0, "Autofill while active should defer transport sync")
+        let loadCallCount = await mockService.loadCallCount
+        XCTAssertEqual(loadCallCount, 0, "Autofill while active should defer transport sync")
 
         // Active session stays immutable; the draft contains the next shuffle.
         let activeSessionIds = Set(player.lastShuffledQueue.map(\.id))

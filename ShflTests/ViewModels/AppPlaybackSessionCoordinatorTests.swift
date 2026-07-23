@@ -7,7 +7,7 @@ import XCTest
 final class AppPlaybackSessionCoordinatorTests: XCTestCase {
     private var container: ModelContainer!
     private var modelContext: ModelContext!
-    private var mockService: MockMusicService!
+    private var mockService: DeterministicMusicService!
     private var appSettings: AppSettings!
 
     override func setUp() async throws {
@@ -18,7 +18,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
             configurations: config
         )
         modelContext = container.mainContext
-        mockService = MockMusicService()
+        mockService = DeterministicMusicService()
         appSettings = AppSettings()
     }
 
@@ -43,7 +43,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
 
         try await player.addSong(song)
         try await player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
-        await mockService.setMockPlaybackTime(42)
+        await mockService.setPlaybackTime(42)
 
         coordinator.handleDidEnterBackground()
 
