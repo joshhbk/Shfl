@@ -46,19 +46,26 @@ final class LibraryBrowserViewModel {
 
     // MARK: - Browse mode
 
-    @ObservationIgnored var browseMode: BrowseMode = .songs {
+    var browseMode: BrowseMode = .songs {
         didSet {
-            guard browseMode != oldValue, !searchText.isEmpty else { return }
-            handleSearchTextChanged()
+            guard browseMode != oldValue else { return }
+            if searchText.isEmpty {
+                loadBrowseData(for: browseMode)
+            } else {
+                handleSearchTextChanged()
+            }
         }
     }
 
     // MARK: - Search text (single source of truth)
 
-    @ObservationIgnored var searchText = "" {
+    var searchText = "" {
         didSet {
             guard searchText != oldValue else { return }
             handleSearchTextChanged()
+            if searchText.isEmpty {
+                loadBrowseData(for: browseMode)
+            }
         }
     }
 
@@ -215,6 +222,17 @@ final class LibraryBrowserViewModel {
 
     func loadInitialPage() async {
         await songsLane.loadInitial(force: false)
+    }
+
+    /// Loads a mode's browse page when it has not been loaded yet.
+    func loadBrowseData(for mode: BrowseMode) {
+        Task { @MainActor in
+            switch mode {
+            case .songs: await songsLane.loadInitial(force: false)
+            case .artists: await artistsLane.loadInitial(force: false)
+            case .playlists: await playlistsLane.loadInitial(force: false)
+            }
+        }
     }
 
     func loadNextPageIfNeeded(currentSong: Song) async {

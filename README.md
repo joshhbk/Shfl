@@ -15,7 +15,7 @@ An iOS music player that connects to your Apple Music library and offers advance
 
 ## Requirements
 
-- iOS 18.6+
+- iOS 26+
 - Xcode 16+
 - An Apple Music subscription (for library access)
 
