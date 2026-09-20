@@ -50,14 +50,6 @@ final class ShufflePlayer {
     var lastUsedAlgorithm: ShuffleAlgorithm { activeSession?.algorithm ?? draft.algorithm }
     var transportCurrentSongId: String? { playbackTransport.currentSongId }
     var currentQueueOrder: [String] { activeSession?.songIDs ?? [] }
-    var currentPlayedSongIds: Set<String> {
-        guard let activeSession,
-              let currentID = playbackState.currentSongId,
-              let index = activeSession.songIDs.firstIndex(of: currentID) else {
-            return []
-        }
-        return Set(activeSession.songIDs.prefix(index))
-    }
     var hasRestorableState: Bool { activeSession != nil }
     var activeSessionSeed: UInt64? { activeSession?.seed }
     var hasPendingSessionChanges: Bool {

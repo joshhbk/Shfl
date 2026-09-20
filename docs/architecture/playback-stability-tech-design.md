@@ -45,10 +45,11 @@ The app coordinator forwards each transition to `ScrobbleTracker` and
 `SessionSnapshotService`. Neither consumer compares successive player states.
 Persistence uses the transition's captured session, song and observed transport
 position, together with the latest editable song pool. Explicit lifecycle saves
-still capture the current player and transport position. Scrobbling retains its
+still capture the current player and transport position. Observation timestamps
+prevent buffered transitions from overwriting a newer lifecycle save. Scrobbling retains its
 existing elapsed-time threshold policy.
 
-Transport reports during an atomic load are not published as committed changes;
+Transport reports received while an atomic load is in progress are suppressed;
 the successful load commits the new session and playback state together. The
 transport continues to own playback time and natural advancement. Independent
 subscribers receive all edges, and cancellation or owner release ends observation

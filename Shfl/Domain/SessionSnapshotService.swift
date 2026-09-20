@@ -4,6 +4,7 @@ import Foundation
 final class SessionSnapshotService {
     private let songRepository: SongRepository
     private let playbackStateRepository: PlaybackStateRepository
+    private var latestSaveTime: Date?
 
     /// Number of days after which saved state is considered stale
     private static let staleThresholdDays: Int = 7
@@ -78,7 +79,8 @@ final class SessionSnapshotService {
             songs: songs,
             session: transition.session,
             state: transition.state,
-            playbackTime: transition.playbackTime
+            playbackTime: transition.playbackTime,
+            savedAt: transition.observedAt
         )
     }
 
@@ -86,14 +88,18 @@ final class SessionSnapshotService {
         songs: [Song],
         session: ListeningSession?,
         state: PlaybackState,
-        playbackTime: TimeInterval
+        playbackTime: TimeInterval,
+        savedAt: Date = Date()
     ) throws {
+        // A background save can run before an already-buffered transition is
+        // consumed. Never let that older observation roll persistence back.
+        if let latestSaveTime, savedAt < latestSaveTime { return }
         let playback = session.map { session in
             let currentIndex = session.songIDs.firstIndex(of: state.currentSongId ?? "") ?? 0
             return PlaybackSessionSnapshot(
                 currentSongId: state.currentSongId,
                 playbackPosition: playbackTime,
-                savedAt: Date(),
+                savedAt: savedAt,
                 queueOrder: session.songIDs,
                 playedSongIds: Set(session.songIDs.prefix(currentIndex)),
                 algorithm: session.algorithm,
@@ -101,6 +107,7 @@ final class SessionSnapshotService {
             )
         }
         try save(AppSessionSnapshot(songs: songs, playback: playback))
+        latestSaveTime = savedAt
     }
 
     /// Attempts to restore a saved playback session. Returns true if restoration succeeded.

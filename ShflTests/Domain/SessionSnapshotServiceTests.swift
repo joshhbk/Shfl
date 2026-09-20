@@ -52,6 +52,22 @@ final class SessionSnapshotServiceTests: XCTestCase {
         XCTAssertEqual(saved.playback?.playbackPosition, captured.playbackTime)
     }
 
+    func testDelayedTransitionCannotOverwriteNewerLifecycleSave() async throws {
+        let transport = DeterministicMusicService()
+        let player = ShufflePlayer(playbackTransport: transport)
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try player.seedSongs([song])
+        try await player.startFreshShuffle(seed: 42)
+        var iterator = player.playbackTransitions.makeAsyncIterator()
+        let next = await iterator.next()
+        let delayed = try XCTUnwrap(next)
+
+        await transport.setPlaybackTime(42)
+        try service.saveCurrentSession(from: player, playbackTime: transport.currentPlaybackTime)
+        try service.savePlaybackTransition(delayed, songs: player.allSongs)
+        XCTAssertEqual(try service.loadCurrent().playback?.playbackPosition, 42)
+    }
+
     func testPauseAndResumeTransitionsDoNotOverwriteSavedPosition() async throws {
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 42)
