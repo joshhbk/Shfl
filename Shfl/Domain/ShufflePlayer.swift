@@ -7,6 +7,31 @@ final class ShufflePlayer {
     @ObservationIgnored private let composer = SessionComposer()
     @ObservationIgnored private var observationTask: Task<Void, Never>?
 
+    @ObservationIgnored private var transitionContinuations: [UUID: AsyncStream<PlaybackTransition>.Continuation] = [:]
+    @ObservationIgnored private var publishedSessionID: UUID?
+    @ObservationIgnored private var hasStartedSong = false
+
+    /// Each access creates an independent subscription, replaying the current
+    /// state before future changes. Buffer all edges, including rapid bursts.
+    var playbackTransitions: AsyncStream<PlaybackTransition> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            transitionContinuations[id] = continuation
+            continuation.yield(PlaybackTransition(
+                state: playbackState,
+                session: activeSession,
+                playbackTime: playbackTransport.currentPlaybackTime,
+                songChanged: playbackState.currentSongId != nil,
+                startsSong: playbackState.isPlaying
+            ))
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.transitionContinuations.removeValue(forKey: id)
+                }
+            }
+        }
+    }
+
     private(set) var draft: SessionDraft
     private(set) var activeSession: ListeningSession?
     private(set) var playbackState: PlaybackState = .empty
@@ -54,6 +79,9 @@ final class ShufflePlayer {
 
     deinit {
         observationTask?.cancel()
+        for continuation in transitionContinuations.values {
+            continuation.finish()
+        }
     }
 
     func clearOperationNotice() {
@@ -107,7 +135,7 @@ final class ShufflePlayer {
     func removeAllSongs() async {
         draft = draft.removingAll()
         activeSession = nil
-        playbackState = .empty
+        updatePlaybackState(.empty)
         operationNotice = nil
         await playbackTransport.clear()
         record("all-songs-cleared")
@@ -278,44 +306,71 @@ final class ShufflePlayer {
             activeSession = session
             let currentSong = session.song(id: currentSongID)
             if let currentSong {
-                playbackState = autoplay ? .playing(currentSong) : .paused(currentSong)
+                updatePlaybackState(autoplay ? .playing(currentSong) : .paused(currentSong))
             }
         } catch {
             await playbackTransport.clear()
             activeSession = nil
-            playbackState = .error(error)
+            updatePlaybackState(.error(error))
             throw report("Couldn't load the listening session", error: error)
         }
     }
 
+    private func updatePlaybackState(_ state: PlaybackState) {
+        let sessionChanged = publishedSessionID != activeSession?.id
+        guard state != playbackState || sessionChanged else { return }
+        let songChanged = state.currentSongId != playbackState.currentSongId || sessionChanged
+        if songChanged { hasStartedSong = false }
+        let startsSong = state.isPlaying && !hasStartedSong
+        if startsSong { hasStartedSong = true }
+        playbackState = state
+        publishedSessionID = activeSession?.id
+        let transition = PlaybackTransition(
+            state: state,
+            session: activeSession,
+            playbackTime: playbackTransport.currentPlaybackTime,
+            songChanged: songChanged,
+            startsSong: startsSong
+        )
+        for continuation in transitionContinuations.values {
+            continuation.yield(transition)
+        }
+    }
+
     private func startObserving() {
+        let events = playbackTransport.playbackEvents
         observationTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            for await event in playbackTransport.playbackEvents {
-                guard !Task.isCancelled else { return }
-                switch event {
-                case .stateChanged(let state):
-                    // MusicKit may briefly report empty while changing entries. The
-                    // transport's explicit sessionEnded event owns completion.
-                    if activeSession != nil,
-                       (state == .empty || state == .stopped) {
-                        continue
-                    }
-                    playbackState = normalized(state)
-                    record("transport-state", detail: state.label)
-                case .sessionEnded:
-                    guard activeSession != nil else { continue }
-                    activeSession = nil
-                    playbackState = .stopped
-                    sessionEndCount &+= 1
-                    record("session-ended")
-                    guard !draft.songs.isEmpty else { continue }
-                    do {
-                        try await installFreshSession(autoplay: true)
-                    } catch {
-                        // `installFreshSession` records and exposes the failure.
-                    }
-                }
+            for await event in events {
+                guard !Task.isCancelled, let self else { return }
+                await self.handlePlaybackEvent(event)
+            }
+        }
+    }
+
+    private func handlePlaybackEvent(_ event: PlaybackEvent) async {
+        // A load commits its state only after the atomic transport operation
+        // succeeds. Intermediate transport reports must not escape that boundary.
+        guard !isLoadingSession else { return }
+        switch event {
+        case .stateChanged(let state):
+            // MusicKit may briefly report empty while changing entries. The
+            // transport's explicit sessionEnded event owns completion.
+            if activeSession != nil, (state == .empty || state == .stopped) {
+                return
+            }
+            updatePlaybackState(normalized(state))
+            record("transport-state", detail: state.label)
+        case .sessionEnded:
+            guard activeSession != nil else { return }
+            activeSession = nil
+            updatePlaybackState(.stopped)
+            sessionEndCount &+= 1
+            record("session-ended")
+            guard !draft.songs.isEmpty else { return }
+            do {
+                try await installFreshSession(autoplay: true)
+            } catch {
+                // `installFreshSession` records and exposes the failure.
             }
         }
     }

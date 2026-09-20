@@ -31,6 +31,29 @@ The deletion-first architecture was implemented on 2026-07-19.
 
 The remaining release gate is the small signed-device MusicKit contract suite described below. The simulator suite deliberately proves Shfl's behavior without claiming to prove Apple's runtime behavior.
 
+### Playback transition seam (2026-09-20)
+
+`ShufflePlayer.playbackTransitions` is the shared seam for derived playback
+changes. Each subscription immediately receives the current state, then every
+committed change in order. Identical state reports are suppressed; a fresh
+listening session still produces a transition even if its first song is unchanged.
+The player detects song changes and first playback of a song once. A paused
+restore or loading state can precede that first playback; pause/resume does not
+count as another song start.
+
+The app coordinator forwards each transition to `ScrobbleTracker` and
+`SessionSnapshotService`. Neither consumer compares successive player states.
+Persistence uses the transition's captured session, song and observed transport
+position, together with the latest editable song pool. Explicit lifecycle saves
+still capture the current player and transport position. Scrobbling retains its
+existing elapsed-time threshold policy.
+
+Transport reports during an atomic load are not published as committed changes;
+the successful load commits the new session and playback state together. The
+transport continues to own playback time and natural advancement. Independent
+subscribers receive all edges, and cancellation or owner release ends observation
+without an observation-tracking continuation or a polling loop.
+
 ## Why the answer kept becoming “more code”
 
 The codebase encoded an increasingly difficult promise:

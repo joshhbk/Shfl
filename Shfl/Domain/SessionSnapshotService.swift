@@ -62,51 +62,45 @@ final class SessionSnapshotService {
         from player: ShufflePlayer,
         playbackTime: TimeInterval
     ) throws {
-        let playbackSnapshot: PlaybackSessionSnapshot? = {
-            guard player.hasRestorableState else { return nil }
-            let currentState = player.playbackState
+        try saveSession(
+            songs: player.allSongs,
+            session: player.activeSession,
+            state: player.playbackState,
+            playbackTime: playbackTime
+        )
+    }
+
+    /// Playback edges are detected by ShufflePlayer. Persist the captured
+    /// session when a song starts, rather than reading a later player state.
+    func savePlaybackTransition(_ transition: PlaybackTransition, songs: [Song]) throws {
+        guard transition.startsSong else { return }
+        try saveSession(
+            songs: songs,
+            session: transition.session,
+            state: transition.state,
+            playbackTime: transition.playbackTime
+        )
+    }
+
+    private func saveSession(
+        songs: [Song],
+        session: ListeningSession?,
+        state: PlaybackState,
+        playbackTime: TimeInterval
+    ) throws {
+        let playback = session.map { session in
+            let currentIndex = session.songIDs.firstIndex(of: state.currentSongId ?? "") ?? 0
             return PlaybackSessionSnapshot(
-                currentSongId: currentState.currentSongId,
+                currentSongId: state.currentSongId,
                 playbackPosition: playbackTime,
                 savedAt: Date(),
-                queueOrder: player.currentQueueOrder,
-                playedSongIds: player.currentPlayedSongIds,
-                algorithm: player.lastUsedAlgorithm,
-                seed: player.activeSessionSeed
+                queueOrder: session.songIDs,
+                playedSongIds: Set(session.songIDs.prefix(currentIndex)),
+                algorithm: session.algorithm,
+                seed: session.seed
             )
-        }()
-
-        let snapshot = AppSessionSnapshot(
-            songs: player.allSongs,
-            playback: playbackSnapshot
-        )
-
-        if !player.hasRestorableState {
-            print("💾 No restorable playback state to save; persisting songs and clearing playback snapshot")
         }
-
-        #if DEBUG
-        let currentSongId = playbackSnapshot?.currentSongId
-        let currentSongTitle = player.playbackState.currentSong?.title ?? "nil"
-        let queueOrder = playbackSnapshot?.queueOrder ?? []
-        let playedIds = playbackSnapshot?.playedSongIds ?? []
-        print("💾 Persisting state:")
-        print("💾   currentSongId: \(currentSongId ?? "nil")")
-        print("💾   currentSongTitle: \(currentSongTitle)")
-        print("💾   playbackTime: \(playbackTime)")
-        print("💾   queueOrder: \(queueOrder.count) songs, first=\(queueOrder.first ?? "nil")")
-        print("💾   playedIds: \(playedIds.count)")
-        #endif
-
-        try save(snapshot)
-
-        #if DEBUG
-        if let playbackSnapshot {
-            print("💾 Saved playback state: song=\(playbackSnapshot.currentSongId ?? "nil"), position=\(playbackSnapshot.playbackPosition), queueOrder=\(queueOrder.count)")
-        } else {
-            print("💾 Cleared playback state while saving song snapshot")
-        }
-        #endif
+        try save(AppSessionSnapshot(songs: songs, playback: playback))
     }
 
     /// Attempts to restore a saved playback session. Returns true if restoration succeeded.

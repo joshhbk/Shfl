@@ -36,13 +36,14 @@ final class ScrobbleTracker {
 
     // MARK: - Playback Tracking
 
-    func onPlaybackStateChanged(_ state: PlaybackState) {
-        switch state {
+    func onPlaybackTransition(_ transition: PlaybackTransition) {
+        if transition.songChanged {
+            resetTracking()
+        }
+        switch transition.state {
         case .playing(let song):
-            if song.id != currentSong?.id {
-                // New song
-                resetTracking()
-                currentSong = song
+            currentSong = song
+            if transition.startsSong {
                 sendNowPlaying(song)
             }
             startTracking()

@@ -78,8 +78,48 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         XCTAssertEqual(persistCallCount, 1)
     }
 
+    func testTransitionsDriveScrobblingAndPersistenceAcrossRestoreResumeAndFreshShuffle() async throws {
+        let player = ShufflePlayer(playbackTransport: mockService)
+        let nowPlaying = expectation(description: "Now playing for each listening session")
+        nowPlaying.expectedFulfillmentCount = 2
+        let scrobbleTransport = RecordingScrobbleTransport(nowPlaying: nowPlaying)
+        let tracker = ScrobbleTracker(
+            scrobbleManager: ScrobbleManager(transports: [scrobbleTransport]),
+            playbackTransport: mockService
+        )
+        let coordinator = makeCoordinator(player: player, scrobbleTracker: tracker)
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try player.seedSongs([song])
+        let restored = await player.restoreSession(
+            queueOrder: [song.id], currentSongId: song.id,
+            playedIds: [], playbackPosition: 42, seed: 1
+        )
+        XCTAssertTrue(restored)
+        try await player.play()
+        await player.pause()
+        try await player.play()
+        try await player.startFreshShuffle(seed: 2)
+        await fulfillment(of: [nowPlaying], timeout: 2)
+
+        let saved = try PlaybackStateRepository(modelContext: modelContext).loadPlaybackState()
+        XCTAssertEqual(saved?.currentSongId, song.id)
+        XCTAssertEqual(saved?.seed, 2)
+        XCTAssertEqual(saved?.playbackPosition, 0)
+        withExtendedLifetime(coordinator) {}
+    }
+
+    func testCoordinatorCanBeReleasedWhileWaitingForTransitions() async {
+        let player = ShufflePlayer(playbackTransport: mockService)
+        var coordinator: AppPlaybackSessionCoordinator? = makeCoordinator(player: player)
+        weak var releasedCoordinator = coordinator
+        await Task.yield()
+        coordinator = nil
+        XCTAssertNil(releasedCoordinator)
+    }
+
     private func makeCoordinator(
         player: ShufflePlayer,
+        scrobbleTracker: ScrobbleTracker? = nil,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) -> AppPlaybackSessionCoordinator {
         let songRepository = SongRepository(modelContext: modelContext)
@@ -88,7 +128,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
             songRepository: songRepository,
             playbackStateRepository: playbackStateRepository
         )
-        let scrobbleTracker = ScrobbleTracker(
+        let scrobbleTracker = scrobbleTracker ?? ScrobbleTracker(
             scrobbleManager: ScrobbleManager(transports: []),
             playbackTransport: mockService
         )
@@ -102,4 +142,19 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
     }
+}
+
+private actor RecordingScrobbleTransport: ScrobbleTransport {
+    let isAuthenticated = true
+    private let nowPlaying: XCTestExpectation
+
+    init(nowPlaying: XCTestExpectation) {
+        self.nowPlaying = nowPlaying
+    }
+
+    func sendNowPlaying(_ event: ScrobbleEvent) async {
+        nowPlaying.fulfill()
+    }
+
+    func scrobble(_ event: ScrobbleEvent) async {}
 }

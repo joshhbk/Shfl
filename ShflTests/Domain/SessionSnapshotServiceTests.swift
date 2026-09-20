@@ -34,6 +34,40 @@ final class SessionSnapshotServiceTests: XCTestCase {
         service = nil
     }
 
+    func testTransitionPersistsCapturedSessionAfterPlayerHasMovedOn() async throws {
+        let transport = DeterministicMusicService()
+        let player = ShufflePlayer(playbackTransport: transport)
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        try player.seedSongs([song])
+        try await player.startFreshShuffle(seed: 42)
+        var iterator = player.playbackTransitions.makeAsyncIterator()
+        let next = await iterator.next()
+        let captured = try XCTUnwrap(next)
+        try await player.startFreshShuffle(seed: 99)
+
+        try service.savePlaybackTransition(captured, songs: player.allSongs)
+        let saved = try service.loadCurrent()
+        XCTAssertEqual(saved.playback?.seed, 42)
+        XCTAssertEqual(saved.playback?.currentSongId, song.id)
+        XCTAssertEqual(saved.playback?.playbackPosition, captured.playbackTime)
+    }
+
+    func testPauseAndResumeTransitionsDoNotOverwriteSavedPosition() async throws {
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 42)
+        try service.savePlaybackTransition(PlaybackTransition(
+            state: .playing(song), session: session, playbackTime: 12,
+            songChanged: true, startsSong: true
+        ), songs: [song])
+        for state in [PlaybackState.paused(song), .playing(song)] {
+            try service.savePlaybackTransition(PlaybackTransition(
+                state: state, session: session, playbackTime: 50,
+                songChanged: false, startsSong: false
+            ), songs: [song])
+        }
+        XCTAssertEqual(try service.loadCurrent().playback?.playbackPosition, 12)
+    }
+
     func testLoadReturnsEmptySnapshotWhenNothingPersisted() async throws {
         let snapshot = try await service.load()
 

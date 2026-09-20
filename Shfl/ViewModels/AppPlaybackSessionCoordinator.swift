@@ -19,9 +19,8 @@ final class AppPlaybackSessionCoordinator {
 
     private(set) var didRestorePlaybackState = false
 
-    @ObservationIgnored private var scrobbleObservationTask: Task<Void, Never>?
+    @ObservationIgnored private var playbackTransitionTask: Task<Void, Never>?
     @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
-    @ObservationIgnored private var lastPersistedSongId: String?
 
     init(
         player: ShufflePlayer,
@@ -38,12 +37,12 @@ final class AppPlaybackSessionCoordinator {
         self.scrobbleTracker = scrobbleTracker
         self.lifecyclePersistenceHook = lifecyclePersistenceHook
 
-        startObservingPlaybackState()
+        startObservingPlaybackTransitions()
         subscribeToBackgroundNotification()
     }
 
     deinit {
-        scrobbleObservationTask?.cancel()
+        playbackTransitionTask?.cancel()
         if let observer = backgroundObserver {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -109,7 +108,6 @@ final class AppPlaybackSessionCoordinator {
                 from: player,
                 playbackTime: playbackTransport.currentPlaybackTime
             )
-            lastPersistedSongId = player.playbackState.currentSongId
         } catch {
             print("💾 Failed to save session snapshot: \(error)")
         }
@@ -127,45 +125,23 @@ final class AppPlaybackSessionCoordinator {
         }
     }
 
-    private func startObservingPlaybackState() {
-        scrobbleObservationTask = Task { @MainActor [weak self] in
-            var previousSongId: String?
-            var previousIsPlaying = false
-            var previousIsActive = false
-
-            while !Task.isCancelled {
-                guard let self else { return }
-
-                let state = self.player.playbackState
-                let currentSongId = state.currentSongId
-                let songChanged = currentSongId != previousSongId
-                let playStateChanged = state.isPlaying != previousIsPlaying
-                let activeStatusChanged = state.isActive != previousIsActive
-
-                if songChanged || playStateChanged || activeStatusChanged {
-                    self.scrobbleTracker.onPlaybackStateChanged(state)
-
-                    if songChanged, state.isPlaying, currentSongId != self.lastPersistedSongId {
-                        self.persistPlaybackState()
-                        self.lastPersistedSongId = currentSongId
-                    }
-
-                    previousSongId = currentSongId
-                    previousIsPlaying = state.isPlaying
-                    previousIsActive = state.isActive
-                }
-
-                await withCheckedContinuation { continuation in
-                    withObservationTracking {
-                        _ = self.player.playbackState
-                    } onChange: {
-                        continuation.resume()
-                    }
+    private func startObservingPlaybackTransitions() {
+        let transitions = player.playbackTransitions
+        playbackTransitionTask = Task { @MainActor [weak self] in
+            for await transition in transitions {
+                guard !Task.isCancelled, let self else { return }
+                self.scrobbleTracker.onPlaybackTransition(transition)
+                do {
+                    try self.sessionSnapshotService.savePlaybackTransition(
+                        transition,
+                        songs: self.player.allSongs
+                    )
+                } catch {
+                    print("💾 Failed to save session snapshot: \(error)")
                 }
             }
         }
     }
-
 
     private func restorePlaybackState(_ state: PlaybackSessionSnapshot) async -> Bool {
         let success = await sessionSnapshotService.restorePlaybackState(
