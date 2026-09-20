@@ -76,7 +76,7 @@ final class ShflLaunchUITests: XCTestCase {
         XCTAssertTrue(element("songPicker.close", in: app).exists)
 
         element("songPicker.clear", in: app).tap()
-        XCTAssertFalse(element("songPicker.clear", in: app).exists)
+        XCTAssertTrue(element("songPicker.clear", in: app).waitForNonExistence(timeout: 5))
         XCTAssertTrue(element("songPicker.autofill", in: app).exists)
     }
 

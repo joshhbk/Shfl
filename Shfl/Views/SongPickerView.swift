@@ -271,6 +271,7 @@ struct SongPickerView: View {
                             .font(.body.weight(.semibold))
                             .foregroundStyle(pickerAccentColor)
                             .frame(width: 44, height: 44)
+                            .contentShape(Circle())
                             .glassEffect(.regular.interactive(), in: .circle)
                     }
                     .buttonStyle(.plain)
