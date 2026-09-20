@@ -51,16 +51,11 @@ struct PlayerTopBar: View {
 
 // MARK: - Glass Container Modifier
 
-/// Wraps content in GlassEffectContainer on iOS 26+, applies shadow on older versions
+/// Wraps content in a GlassEffectContainer
 private struct GlassContainerModifier: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 26, macOS 26, *) {
-            GlassEffectContainer {
-                content
-            }
-        } else {
+        GlassEffectContainer {
             content
-                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
         }
     }
 }
@@ -70,21 +65,12 @@ private struct GlassContainerModifier: ViewModifier {
 /// Wraps grouped buttons in a single capsule container
 private struct CapsuleButtonGroupStyle: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 26, macOS 26, *) {
-            content
-                .background(.black.opacity(0.85), in: Capsule())
-                .overlay(
-                    Capsule()
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
-                )
-                .glassEffect(.regular.interactive(), in: .capsule)
-        } else {
-            content
-                .background(.black.opacity(0.85), in: Capsule())
-                .overlay(
-                    Capsule()
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
-                )
-        }
+        content
+            .background(.black.opacity(0.85), in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+            )
+            .glassEffect(.regular.interactive(), in: .capsule)
     }
 }

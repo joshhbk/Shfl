@@ -27,8 +27,6 @@ struct SongPickerView: View {
     @State private var undoManager = SongUndoManager()
     // Local copy of pool IDs — trades possible staleness for isolation from player observation churn
     @State private var selectedSongIds: Set<String> = []
-    @State private var searchText = ""
-    @State private var searchScope: BrowseMode = .songs
     @State private var actionErrorMessage: String?
     @State private var navigationPath = NavigationPath()
     @State private var autofillIsExhausted = false
@@ -67,26 +65,12 @@ struct SongPickerView: View {
     }
 
     var body: some View {
-        Group {
-            if #available(iOS 26, *) {
-                modernBody
-            } else {
-                legacyBody
-            }
-        }
-
-    }
-
-    // MARK: - iOS 26+ Picker
-
-    @available(iOS 26, *)
-    private var modernBody: some View {
         NavigationStack(path: $navigationPath) {
             Group {
-                if searchText.isEmpty {
-                    browseContentFor(searchScope)
+                if viewModel.searchText.isEmpty {
+                    browseContentFor(viewModel.browseMode)
                 } else {
-                    searchContentFor(searchScope)
+                    searchContentFor(viewModel.browseMode)
                 }
             }
             .accessibilityHidden(!navigationPath.isEmpty)
@@ -113,18 +97,12 @@ struct SongPickerView: View {
             VStack(spacing: 0) {
                 overlayPills
 
-                if !isSearchFieldFocused && searchText.isEmpty {
+                if !isSearchFieldFocused && viewModel.searchText.isEmpty {
                     modernCompletionBar
                 }
             }
             .accessibilityElement(children: .contain)
             .accessibilitySortPriority(-1)
-        }
-        .onChange(of: searchScope) { _, newMode in
-            viewModel.browseMode = newMode
-            if searchText.isEmpty {
-                loadBrowseData(for: newMode)
-            }
         }
         .onChange(of: appSettings?.librarySortOption) { _, newOption in
             if let newOption {
@@ -147,7 +125,6 @@ struct SongPickerView: View {
         .tint(pickerAccentColor)
     }
 
-    @available(iOS 26, *)
     private var modernDiscoveryHeader: some View {
         let style = PickerHeaderStyle.systemDefault
 
@@ -155,7 +132,7 @@ struct SongPickerView: View {
             modernSearchField
 
             HStack(spacing: 10) {
-                Picker("Browse", selection: $searchScope) {
+                Picker("Browse", selection: $viewModel.browseMode) {
                     ForEach(BrowseMode.allCases, id: \.self) { mode in
                         Text(mode.rawValue).tag(mode)
                     }
@@ -173,22 +150,21 @@ struct SongPickerView: View {
         }
     }
 
-    @available(iOS 26, *)
     private var modernSearchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Search your library", text: searchTextBinding)
+            TextField("Search your library", text: $viewModel.searchText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .focused($isSearchFieldFocused)
                 .accessibilityIdentifier("songPicker.search")
 
-            if !searchText.isEmpty {
+            if !viewModel.searchText.isEmpty {
                 Button {
-                    searchTextBinding.wrappedValue = ""
+                    viewModel.searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -206,7 +182,6 @@ struct SongPickerView: View {
         )
     }
 
-    @available(iOS 26, *)
     private func modernSortMenu(style: PickerHeaderStyle) -> some View {
         Menu {
             Picker("Sort", selection: sortSelection) {
@@ -224,7 +199,6 @@ struct SongPickerView: View {
         .accessibilityIdentifier("songPicker.sort")
     }
 
-    @available(iOS 26, *)
     private var modernCompletionBar: some View {
         GlassEffectContainer(spacing: 12) {
             HStack(spacing: 12) {
@@ -348,201 +322,10 @@ struct SongPickerView: View {
         }
     }
 
-    // MARK: - Legacy Body (pre-iOS 26)
-
-    private var legacyBody: some View {
-        NavigationStack {
-            ZStack(alignment: .bottom) {
-                Group {
-                    if searchText.isEmpty {
-                        legacyBrowseContent
-                    } else {
-                        legacySearchList
-                    }
-                }
-
-                overlayPills
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 6) {
-                    headerActionRow
-                    legacyBrowseModePickerBar
-                }
-                .padding(.top, 6)
-                .padding(.bottom, 10)
-                .background(
-                    Color(.systemGroupedBackground)
-                        .shadow(.drop(color: .black.opacity(0.08), radius: 3, y: 2))
-                )
-            }
-            .searchable(text: $searchText, prompt: "Search your library")
-            .task {
-                await viewModel.loadInitialPage()
-            }
-            .onChange(of: searchText) { _, newValue in
-                viewModel.searchText = newValue
-            }
-            .onChange(of: searchScope) { _, newMode in
-                viewModel.browseMode = newMode
-                Task { @MainActor in
-                    switch newMode {
-                    case .songs: await viewModel.loadInitialPage()
-                    case .artists: await viewModel.loadInitialArtists()
-                    case .playlists: await viewModel.loadInitialPlaylists()
-                    }
-                }
-            }
-            .onChange(of: appSettings?.librarySortOption) { _, newOption in
-                if let newOption {
-                    viewModel.handleSortOptionChanged(newOption)
-                }
-            }
-            .alert("Error", isPresented: .init(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.clearError() } }
-            )) {
-                Button("OK") { viewModel.clearError() }
-            } message: {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                }
-            }
-        }
-    }
-
-    private var legacyBrowseModePickerBar: some View {
-        Picker("Browse", selection: $searchScope) {
-            ForEach(BrowseMode.allCases, id: \.self) { mode in
-                Text(mode.rawValue).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    @ViewBuilder
-    private var legacyBrowseContent: some View {
-        switch searchScope {
-        case .songs: browseList
-        case .artists:
-            ArtistListView(
-                viewModel: viewModel,
-                musicService: musicService,
-                selectedSongIds: $selectedSongIds,
-                isAtCapacity: selectedSongIds.count >= player.capacity,
-                onToggleSong: { toggleSong($0) }
-            )
-        case .playlists:
-            PlaylistListView(
-                viewModel: viewModel,
-                musicService: musicService,
-                selectedSongIds: $selectedSongIds,
-                isAtCapacity: selectedSongIds.count >= player.capacity,
-                onToggleSong: { toggleSong($0) }
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var legacySearchList: some View {
-        switch searchScope {
-        case .songs: songSearchList
-        case .artists: artistSearchList
-        case .playlists: playlistSearchList
-        }
-    }
-
-    // MARK: - Header
-
-    private var headerActionRow: some View {
-        HStack(alignment: .center, spacing: 16) {
-            CapacityRing(
-                current: selectedSongIds.count,
-                maximum: player.capacity
-            )
-
-            Spacer()
-
-            HStack(spacing: 18) {
-                autofillButton
-                clearButton
-
-                if showSortButton {
-                    sortButton
-                }
-            }
-        }
-        .frame(minHeight: 52)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 2)
-    }
-
-    private var searchScopePicker: some View {
-        Picker("Browse", selection: $searchScope) {
-            ForEach(BrowseMode.allCases, id: \.self) { mode in
-                Text(mode.rawValue).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .onChange(of: searchScope) { _, newScope in
-            viewModel.browseMode = newScope
-            if searchText.isEmpty {
-                loadBrowseData(for: newScope)
-            } else {
-                viewModel.handleSearchTextChanged()
-            }
-        }
-    }
-
-    private var sortButton: some View {
-        Menu {
-            Picker("Sort", selection: Binding(
-                get: { appSettings?.librarySortOption ?? .mostPlayed },
-                set: { appSettings?.librarySortOption = $0 }
-            )) {
-                ForEach(SortOption.allCases, id: \.self) { option in
-                    Text(option.displayName).tag(option)
-                }
-            }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-        }
-    }
-
-    private var autofillButton: some View {
-        Button {
-            performAutofill()
-        } label: {
-            Text("Autofill")
-                .font(.system(size: 14, weight: .semibold))
-        }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .controlSize(.small)
-        .disabled(isAutofillDisabled)
-    }
-
-    private var clearButton: some View {
-        Button {
-            clearSelectedSongs()
-        } label: {
-            Text("Clear")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(selectedSongIds.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
-        }
-        .buttonStyle(.plain)
-        .disabled(selectedSongIds.isEmpty)
-    }
-
-    private var isAutofillDisabled: Bool {
-        selectedSongIds.count >= player.capacity || viewModel.autofillState == .loading
-    }
+    // MARK: - Sort
 
     private var showSortButton: Bool {
-        searchScope == .songs && searchText.isEmpty
+        viewModel.browseMode == .songs && viewModel.searchText.isEmpty
     }
 
     // MARK: - Song Browse List
@@ -571,7 +354,7 @@ struct SongPickerView: View {
         } else if viewModel.searchLoading || !viewModel.hasSearchedOnce {
             skeletonList
         } else {
-            ContentUnavailableView.search(text: searchText)
+            ContentUnavailableView.search(text: viewModel.searchText)
         }
     }
 
@@ -612,7 +395,7 @@ struct SongPickerView: View {
         } else if viewModel.artistSearchLoading || !viewModel.hasArtistSearchedOnce {
             skeletonList
         } else {
-            ContentUnavailableView.search(text: searchText)
+            ContentUnavailableView.search(text: viewModel.searchText)
         }
     }
 
@@ -636,7 +419,7 @@ struct SongPickerView: View {
         } else if viewModel.playlistSearchLoading || !viewModel.hasPlaylistSearchedOnce {
             skeletonList
         } else {
-            ContentUnavailableView.search(text: searchText)
+            ContentUnavailableView.search(text: viewModel.searchText)
         }
     }
 
@@ -741,29 +524,6 @@ struct SongPickerView: View {
     }
 
     // MARK: - Helpers
-
-    private var searchTextBinding: Binding<String> {
-        Binding(
-            get: { searchText },
-            set: { newValue in
-                searchText = newValue
-                viewModel.searchText = newValue
-                if newValue.isEmpty {
-                    loadBrowseData(for: searchScope)
-                }
-            }
-        )
-    }
-
-    private func loadBrowseData(for mode: BrowseMode) {
-        Task { @MainActor in
-            switch mode {
-            case .songs: await viewModel.loadInitialPage()
-            case .artists: await viewModel.loadInitialArtists()
-            case .playlists: await viewModel.loadInitialPlaylists()
-            }
-        }
-    }
 
     private func performAutofill() {
         autofillTapCount += 1

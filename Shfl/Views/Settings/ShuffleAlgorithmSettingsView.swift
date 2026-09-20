@@ -129,35 +129,11 @@ private struct SelectionCardGlassStyle: ViewModifier {
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
-        if #available(iOS 26, macOS 26, *) {
-            glassContent(content)
-        } else {
-            fallbackContent(content)
-        }
-    }
-
-    @available(iOS 26, macOS 26, *)
-    @ViewBuilder
-    private func glassContent(_ content: Content) -> some View {
         content
             .glassEffect(
                 isSelected ? .regular.interactive() : .regular,
                 in: .rect(cornerRadius: cornerRadius)
             )
-    }
-
-    @ViewBuilder
-    private func fallbackContent(_ content: Content) -> some View {
-        content
-            .background(.background, in: .rect(cornerRadius: cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(
-                        isSelected ? Color.accentColor : Color.secondary.opacity(0.2),
-                        lineWidth: isSelected ? 2 : 1
-                    )
-            )
-            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
     }
 }
 
