@@ -2,14 +2,14 @@ import SwiftUI
 
 struct ArtistDetailView: View {
     @State private var viewModel: ArtistDetailViewModel
-    @Binding var selectedSongIds: Set<String>
+    let selectedSongIds: Set<String>
     let isAtCapacity: Bool
     let onToggleSong: (Song) -> Void
 
     init(
         artistName: String,
         musicService: MusicService,
-        selectedSongIds: Binding<Set<String>>,
+        selectedSongIds: Set<String>,
         isAtCapacity: Bool,
         onToggleSong: @escaping (Song) -> Void
     ) {
@@ -17,7 +17,7 @@ struct ArtistDetailView: View {
             artistName: artistName,
             libraryCatalog: musicService
         ))
-        self._selectedSongIds = selectedSongIds
+        self.selectedSongIds = selectedSongIds
         self.isAtCapacity = isAtCapacity
         self.onToggleSong = onToggleSong
     }

@@ -17,19 +17,11 @@ enum BrowseMode: String, CaseIterable {
 struct SongPickerView: View {
     var player: ShufflePlayer
     let musicService: MusicService
-    let onAddSong: @MainActor (Song) async throws -> Void
-    let onAddSongsWithQueueRebuild: @MainActor ([Song]) async throws -> Void
-    let onRemoveSong: @MainActor (String) async -> Void
-    let onRemoveAllSongs: @MainActor () async -> Void
     let onDismiss: () -> Void
 
     @State private var viewModel: LibraryBrowserViewModel
-    @State private var undoManager = SongUndoManager()
-    // Local copy of pool IDs — trades possible staleness for isolation from player observation churn
-    @State private var selectedSongIds: Set<String> = []
-    @State private var actionErrorMessage: String?
+    @State private var editor: SessionDraftEditor
     @State private var navigationPath = NavigationPath()
-    @State private var autofillIsExhausted = false
     @State private var showingAutofillCompletion = false
     @State private var autofillTapCount = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -42,18 +34,13 @@ struct SongPickerView: View {
         player: ShufflePlayer,
         musicService: MusicService,
         initialSortOption: SortOption,
-        onAddSong: @escaping @MainActor (Song) async throws -> Void,
-        onAddSongsWithQueueRebuild: @escaping @MainActor ([Song]) async throws -> Void,
+        onAddSongs: @escaping @MainActor ([Song]) async throws -> Void,
         onRemoveSong: @escaping @MainActor (String) async -> Void,
         onRemoveAllSongs: @escaping @MainActor () async -> Void,
         onDismiss: @escaping () -> Void
     ) {
         self.player = player
         self.musicService = musicService
-        self.onAddSong = onAddSong
-        self.onAddSongsWithQueueRebuild = onAddSongsWithQueueRebuild
-        self.onRemoveSong = onRemoveSong
-        self.onRemoveAllSongs = onRemoveAllSongs
         self.onDismiss = onDismiss
         self._viewModel = State(
             wrappedValue: LibraryBrowserViewModel(
@@ -61,7 +48,14 @@ struct SongPickerView: View {
                 initialSortOption: initialSortOption
             )
         )
-        self._selectedSongIds = State(wrappedValue: Set(player.allSongs.map(\.id)))
+        self._editor = State(
+            wrappedValue: SessionDraftEditor(
+                player: player,
+                addSongs: onAddSongs,
+                removeSong: onRemoveSong,
+                removeAllSongs: onRemoveAllSongs
+            )
+        )
     }
 
     var body: some View {
@@ -239,8 +233,11 @@ struct SongPickerView: View {
                     .accessibilityIdentifier("songPicker.autofill")
                 }
 
-                if !selectedSongIds.isEmpty {
-                    Button(role: .destructive, action: clearSelectedSongs) {
+                if !editor.selectedSongIds.isEmpty {
+                    Button(role: .destructive) {
+                        showingAutofillCompletion = false
+                        editor.clearAll()
+                    } label: {
                         Image(systemName: "trash")
                             .font(.body.weight(.semibold))
                             .foregroundStyle(pickerAccentColor)
@@ -275,16 +272,12 @@ struct SongPickerView: View {
         )
     }
 
-    private var remainingCapacity: Int {
-        max(player.capacity - selectedSongIds.count, 0)
-    }
-
     private var shouldOfferAutofill: Bool {
-        remainingCapacity > 0 && !autofillIsExhausted
+        editor.remainingCapacity > 0 && !editor.autofillIsExhausted
     }
 
     private var completionActionHint: String {
-        "Adds available songs up to \(player.capacity) total"
+        "Adds available songs up to \(editor.capacity) total"
     }
 
     // MARK: - Library Content
@@ -298,17 +291,17 @@ struct SongPickerView: View {
             ArtistListView(
                 viewModel: viewModel,
                 musicService: musicService,
-                selectedSongIds: $selectedSongIds,
-                isAtCapacity: selectedSongIds.count >= player.capacity,
-                onToggleSong: { toggleSong($0) }
+                selectedSongIds: editor.selectedSongIds,
+                isAtCapacity: editor.isAtCapacity,
+                onToggleSong: { editor.toggle($0) }
             )
         case .playlists:
             PlaylistListView(
                 viewModel: viewModel,
                 musicService: musicService,
-                selectedSongIds: $selectedSongIds,
-                isAtCapacity: selectedSongIds.count >= player.capacity,
-                onToggleSong: { toggleSong($0) }
+                selectedSongIds: editor.selectedSongIds,
+                isAtCapacity: editor.isAtCapacity,
+                onToggleSong: { editor.toggle($0) }
             )
         }
     }
@@ -359,7 +352,8 @@ struct SongPickerView: View {
     }
 
     private var songSearchResultsList: some View {
-        let isAtCapacity = selectedSongIds.count >= player.capacity
+        let selectedSongIds = editor.selectedSongIds
+        let isAtCapacity = editor.isAtCapacity
 
         return ScrollView {
             LazyVStack(spacing: 0) {
@@ -368,7 +362,7 @@ struct SongPickerView: View {
                         song: song,
                         isSelected: selectedSongIds.contains(song.id),
                         isAtCapacity: isAtCapacity,
-                        onToggle: { toggleSong(song) }
+                        onToggle: { editor.toggle(song) }
                     )
                     .equatable()
                     Divider().padding(.leading, 72)
@@ -403,9 +397,9 @@ struct SongPickerView: View {
         ArtistListView(
             viewModel: viewModel,
             musicService: musicService,
-            selectedSongIds: $selectedSongIds,
-            isAtCapacity: selectedSongIds.count >= player.capacity,
-            onToggleSong: { toggleSong($0) },
+            selectedSongIds: editor.selectedSongIds,
+            isAtCapacity: editor.isAtCapacity,
+            onToggleSong: { editor.toggle($0) },
             searchResults: viewModel.artistSearchResults,
             hasMoreSearchResults: viewModel.hasMoreArtistSearchResults,
             onLoadMore: { Task { @MainActor in await viewModel.loadMoreArtistSearchResults() } }
@@ -427,9 +421,9 @@ struct SongPickerView: View {
         PlaylistListView(
             viewModel: viewModel,
             musicService: musicService,
-            selectedSongIds: $selectedSongIds,
-            isAtCapacity: selectedSongIds.count >= player.capacity,
-            onToggleSong: { toggleSong($0) },
+            selectedSongIds: editor.selectedSongIds,
+            isAtCapacity: editor.isAtCapacity,
+            onToggleSong: { editor.toggle($0) },
             searchResults: viewModel.playlistSearchResults,
             hasMoreSearchResults: viewModel.hasMorePlaylistSearchResults,
             onLoadMore: { Task { @MainActor in await viewModel.loadMorePlaylistSearchResults() } }
@@ -441,7 +435,8 @@ struct SongPickerView: View {
     private var skeletonList: some View { SkeletonList() }
 
     private func songList(songs: [Song], isPaginated: Bool) -> some View {
-        let isAtCapacity = selectedSongIds.count >= player.capacity
+        let selectedSongIds = editor.selectedSongIds
+        let isAtCapacity = editor.isAtCapacity
 
         return ScrollView {
             LazyVStack(spacing: 0) {
@@ -450,7 +445,7 @@ struct SongPickerView: View {
                         song: song,
                         isSelected: selectedSongIds.contains(song.id),
                         isAtCapacity: isAtCapacity,
-                        onToggle: { toggleSong(song) }
+                        onToggle: { editor.toggle(song) }
                     )
                     .equatable()
                     Divider().padding(.leading, 72)
@@ -475,16 +470,16 @@ struct SongPickerView: View {
     private var overlayPills: some View {
         if hasOverlayMessage {
             VStack(spacing: 8) {
-                if let undoState = undoManager.currentState {
+                if let undoState = editor.undoState {
                     UndoPill(
                         state: undoState,
-                        onUndo: { handleUndo(undoState) },
-                        onDismiss: { undoManager.dismiss() }
+                        onUndo: { editor.undo(undoState) },
+                        onDismiss: { editor.dismissUndo() }
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                if let actionErrorMessage {
+                if let actionErrorMessage = editor.actionErrorMessage {
                     Text(actionErrorMessage)
                         .font(.subheadline)
                         .fontWeight(.medium)
@@ -520,7 +515,7 @@ struct SongPickerView: View {
     }
 
     private var hasOverlayMessage: Bool {
-        undoManager.currentState != nil || actionErrorMessage != nil || showAutofillBanner
+        editor.undoState != nil || editor.actionErrorMessage != nil || showAutofillBanner
     }
 
     // MARK: - Helpers
@@ -529,82 +524,22 @@ struct SongPickerView: View {
         autofillTapCount += 1
         HapticFeedback.light.trigger()
         Task { @MainActor in
-            let requestedCount = remainingCapacity
+            let requestedCount = editor.remainingCapacity
             let algorithm = appSettings?.autofillAlgorithm ?? .random
             let source = LibraryAutofillSource(libraryCatalog: musicService, algorithm: algorithm)
             await viewModel.autofill(
                 into: player,
                 using: source,
                 addSongs: { songs in
-                    try await onAddSongsWithQueueRebuild(songs)
+                    try await editor.add(songs)
                 }
             )
-            let updatedSongIds = Set(player.allSongs.map(\.id))
-            selectedSongIds = updatedSongIds
 
             if case .completed(let count) = viewModel.autofillState {
                 showingAutofillCompletion = count > 0
-                autofillIsExhausted = count < requestedCount && updatedSongIds.count < player.capacity
+                editor.noteAutofillCompleted(addedCount: count, requestedCount: requestedCount)
             }
         }
-    }
-
-    private func clearSelectedSongs() {
-        showingAutofillCompletion = false
-        autofillIsExhausted = false
-        undoManager.dismiss()
-        Task { @MainActor in await onRemoveAllSongs() }
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            selectedSongIds.removeAll()
-        }
-    }
-
-    // MARK: - Actions
-
-    private func toggleSong(_ song: Song) {
-        autofillIsExhausted = false
-
-        if selectedSongIds.contains(song.id) {
-            Task { @MainActor in await onRemoveSong(song.id) }
-            selectedSongIds.remove(song.id)
-            undoManager.recordAction(.removed, song: song)
-        } else {
-            Task { @MainActor in
-                do {
-                    try await onAddSong(song)
-                    selectedSongIds.insert(song.id)
-                    undoManager.recordAction(.added, song: song)
-
-                    if CapacityProgressBar.isMilestone(selectedSongIds.count) {
-                        HapticFeedback.milestone.trigger()
-                    }
-                } catch ShufflePlayerError.capacityReached {
-                    // Handled by SongRow's nope animation
-                } catch {
-                    showActionError(error.localizedDescription)
-                }
-            }
-        }
-    }
-
-    private func handleUndo(_ state: UndoState) {
-        autofillIsExhausted = false
-
-        switch state.action {
-        case .added:
-            Task { @MainActor in await onRemoveSong(state.song.id) }
-            selectedSongIds.remove(state.song.id)
-            HapticFeedback.light.trigger()
-        case .removed:
-            Task { @MainActor in
-                try? await onAddSong(state.song)
-                selectedSongIds.insert(state.song.id)
-                HapticFeedback.medium.trigger()
-            }
-        }
-        undoManager.dismiss()
     }
 
     private var showAutofillBanner: Bool {
@@ -634,21 +569,6 @@ struct SongPickerView: View {
             return true
         }
         return false
-    }
-
-    private func showActionError(_ message: String) {
-        withAnimation {
-            actionErrorMessage = message
-        }
-
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
-            withAnimation {
-                if actionErrorMessage == message {
-                    actionErrorMessage = nil
-                }
-            }
-        }
     }
 }
 
@@ -697,8 +617,7 @@ private enum PreviewPickerLibrary {
         player: player,
         musicService: service,
         initialSortOption: .mostPlayed,
-        onAddSong: { _ in },
-        onAddSongsWithQueueRebuild: { _ in },
+        onAddSongs: { _ in },
         onRemoveSong: { _ in },
         onRemoveAllSongs: {},
         onDismiss: {}
@@ -717,8 +636,7 @@ private enum PreviewPickerLibrary {
                     player: player,
                     musicService: service,
                     initialSortOption: .mostPlayed,
-                    onAddSong: { _ in },
-                    onAddSongsWithQueueRebuild: { _ in },
+                    onAddSongs: { _ in },
                     onRemoveSong: { _ in },
                     onRemoveAllSongs: {},
                     onDismiss: {}
@@ -748,8 +666,7 @@ private enum PreviewPickerLibrary {
         player: player,
         musicService: service,
         initialSortOption: .mostPlayed,
-        onAddSong: { _ in },
-        onAddSongsWithQueueRebuild: { _ in },
+        onAddSongs: { _ in },
         onRemoveSong: { _ in },
         onRemoveAllSongs: {},
         onDismiss: {}

@@ -3,7 +3,7 @@ import SwiftUI
 struct ArtistListView: View {
     @Bindable var viewModel: LibraryBrowserViewModel
     let musicService: MusicService
-    @Binding var selectedSongIds: Set<String>
+    let selectedSongIds: Set<String>
     let isAtCapacity: Bool
     let onToggleSong: (Song) -> Void
 
@@ -63,7 +63,7 @@ struct ArtistListView: View {
             ArtistDetailView(
                 artistName: artist.name,
                 musicService: musicService,
-                selectedSongIds: $selectedSongIds,
+                selectedSongIds: selectedSongIds,
                 isAtCapacity: isAtCapacity,
                 onToggleSong: onToggleSong
             )
