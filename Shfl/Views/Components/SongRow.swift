@@ -15,6 +15,10 @@ struct SongRow: View, Equatable {
     @State private var glowTask: Task<Void, Never>?
     @State private var bounceTask: Task<Void, Never>?
 
+    private var interactionColor: Color {
+        theme.interactionColor
+    }
+
     // Equatable - ignore closure, compare only data that affects rendering
     static func == (lhs: SongRow, rhs: SongRow) -> Bool {
         lhs.song.id == rhs.song.id &&
@@ -43,18 +47,17 @@ struct SongRow: View, Equatable {
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundStyle(isSelected ? theme.accentColor : .gray.opacity(0.3))
+                    .foregroundStyle(isSelected ? interactionColor : .gray.opacity(0.3))
                     .scaleEffect(checkmarkBounce ? 1.2 : 1.0)
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
-            .background(isSelected ? theme.accentColor.opacity(0.15) : Color.clear)
+            .background(isSelected ? interactionColor.opacity(0.06) : Color.clear)
             .overlay(
-                theme.accentColor.opacity(showGlow ? 0.15 : 0)
+                interactionColor.opacity(showGlow ? 0.15 : 0)
                     .animation(.easeOut(duration: 0.4), value: showGlow)
             )
             .contentShape(Rectangle())
-            .opacity(Self.rowOpacity(isSelected: isSelected, isAtCapacity: isAtCapacity))
             .offset(x: showNope ? -8 : 0)
         }
         .buttonStyle(.plain)
@@ -108,15 +111,6 @@ struct SongRow: View, Equatable {
         }
 
         onToggle()
-    }
-
-    // MARK: - Static Helpers (for testing)
-
-    static func rowOpacity(isSelected: Bool, isAtCapacity: Bool) -> Double {
-        if isAtCapacity && !isSelected {
-            return 0.5
-        }
-        return 1.0
     }
 }
 

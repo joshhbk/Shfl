@@ -30,11 +30,68 @@ final class ShflLaunchUITests: XCTestCase {
         assertLabel("Second Wind", for: songTitle)
     }
 
+    func testSongPickerAutofillStopsWhenLibraryIsExhausted() {
+        let app = makeDeterministicApp()
+        openSongPicker(in: app)
+
+        element("songPicker.autofill", in: app).tap()
+
+        XCTAssertTrue(element("songPicker.autofill", in: app).waitForNonExistence(timeout: 5))
+
+        app.buttons["Afterglow, Paper Satellites"].tap()
+        XCTAssertTrue(element("songPicker.autofill", in: app).waitForExistence(timeout: 5))
+    }
+
+    func testSongPickerSearchPrioritizesResultsOverAutofill() {
+        let app = makeDeterministicApp()
+        openSongPicker(in: app)
+
+        let searchField = element("songPicker.search", in: app)
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+        searchField.tap()
+        searchField.typeText("Low")
+
+        XCTAssertTrue(app.buttons["Low Tide, Harbour Lights"].waitForExistence(timeout: 5))
+        XCTAssertFalse(element("songPicker.autofill", in: app).exists)
+    }
+
+    func testSongPickerDetailKeepsCompletionAndHidesRootControls() {
+        let app = makeDeterministicApp()
+        openSongPicker(in: app)
+
+        let scope = element("songPicker.scope", in: app)
+        XCTAssertTrue(scope.waitForExistence(timeout: 5))
+        scope.buttons["Artists"].tap()
+        app.buttons["Paper Satellites"].tap()
+
+        XCTAssertTrue(app.navigationBars["Paper Satellites"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("songPicker.autofill", in: app).exists)
+        XCTAssertFalse(element("songPicker.search", in: app).exists)
+    }
+
+    func testSongPickerClearImmediatelyRemovesSelection() {
+        let app = makeDeterministicApp()
+        openSongPicker(in: app)
+
+        XCTAssertTrue(element("songPicker.close", in: app).exists)
+
+        element("songPicker.clear", in: app).tap()
+        XCTAssertTrue(element("songPicker.clear", in: app).waitForNonExistence(timeout: 5))
+        XCTAssertTrue(element("songPicker.autofill", in: app).exists)
+    }
+
     private func makeDeterministicApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--deterministic"]
         app.launch()
         return app
+    }
+
+    private func openSongPicker(in app: XCUIApplication) {
+        let pickerButton = app.buttons["Playlist"]
+        XCTAssertTrue(pickerButton.waitForExistence(timeout: 10))
+        pickerButton.tap()
+        XCTAssertTrue(app.navigationBars["Pick Your Songs"].waitForExistence(timeout: 5))
     }
 
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {

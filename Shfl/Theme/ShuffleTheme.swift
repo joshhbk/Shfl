@@ -45,6 +45,24 @@ struct ShuffleTheme: Identifiable, Equatable {
     var accentColor: Color {
         bodyGradientTop
     }
+
+    /// A darker companion to each device color keeps picker controls and selection marks legible.
+    var interactionColor: Color {
+        switch id {
+        case "silver":
+            Color(red: 0.00, green: 0.35, blue: 0.75)
+        case "blue":
+            Color(red: 0.00, green: 0.36, blue: 0.62)
+        case "green":
+            Color(red: 0.20, green: 0.43, blue: 0.05)
+        case "orange":
+            Color(red: 0.58, green: 0.29, blue: 0.00)
+        case "pink":
+            Color(red: 0.68, green: 0.09, blue: 0.35)
+        default:
+            accentColor
+        }
+    }
 }
 
 // MARK: - Theme Definitions
