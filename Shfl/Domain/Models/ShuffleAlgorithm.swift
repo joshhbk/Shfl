@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum ShuffleAlgorithm: String, CaseIterable, Sendable, Hashable {
+nonisolated enum ShuffleAlgorithm: String, Codable, CaseIterable, Sendable, Hashable {
     case pureRandom = "pureRandom"
     case noRepeat = "noRepeat"
     case weightedByRecency = "weightedByRecency"
