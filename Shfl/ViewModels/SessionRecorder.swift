@@ -11,8 +11,7 @@ final class SessionRecorder {
     private let player: ShufflePlayer
     private let now: () -> Date
 
-    private var latestSession: ListeningSessionRecord?
-    private var latestCommitTime: Date?
+    private var latestSessionSaveTime: Date?
     private var task: Task<Void, Never>?
 
     init(
@@ -41,17 +40,22 @@ final class SessionRecorder {
 
     /// The editable song pool changed; persist it without touching the session.
     func poolDidChange() {
-        commit(session: latestSession, savedAt: now())
+        do {
+            // A draft write neither changes the durable session nor supersedes
+            // a song-start transition that is still buffered in the stream.
+            let session = try archive.load().session
+            try archive.commit(pool: player.allSongs, session: session)
+        } catch {
+            print("💾 Failed to save session draft: \(error)")
+        }
     }
 
     /// A lifecycle checkpoint captures the live position on the active session.
     func checkpoint(position: TimeInterval) {
         let date = now()
         let record: ListeningSessionRecord?
-        if let latestSession {
-            record = latestSession.checkpointed(position: position, at: date)
-        } else if let session = player.activeSession,
-                  let currentSongID = player.playbackState.currentSongId {
+        if let session = player.activeSession,
+           let currentSongID = player.playbackState.currentSongId {
             record = ListeningSessionRecord.make(
                 session: session,
                 currentSongID: currentSongID,
@@ -61,15 +65,18 @@ final class SessionRecorder {
         } else {
             record = nil
         }
-        guard let record else { return }
-        commit(session: record, savedAt: record.savedAt)
+        // Nil is an explicit cleared session, not a reason to retain an older one.
+        commit(session: record, savedAt: date)
     }
 
     private func record(_ transition: PlaybackTransition) {
         switch transition.songTransition {
         case .started, .selectedAndStarted:
             break
-        case .selected, .cleared, nil:
+        case .cleared:
+            commit(session: nil, savedAt: transition.observedAt)
+            return
+        case .selected, nil:
             return
         }
 
@@ -83,12 +90,11 @@ final class SessionRecorder {
 
     private func commit(session: ListeningSessionRecord?, savedAt: Date) {
         // A buffered transition must not roll back a newer lifecycle save.
-        if let latestCommitTime, savedAt < latestCommitTime { return }
+        if let latestSessionSaveTime, savedAt < latestSessionSaveTime { return }
 
         do {
             try archive.commit(pool: player.allSongs, session: session)
-            latestSession = session
-            latestCommitTime = savedAt
+            latestSessionSaveTime = savedAt
         } catch {
             print("💾 Failed to commit session: \(error)")
         }

@@ -54,6 +54,86 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         withExtendedLifetime(coordinator) {}
     }
 
+    func testFreshShuffleFollowedByDraftSaveRestoresOnNextLaunch() async throws {
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let player = ShufflePlayer(playbackTransport: mockService)
+        let coordinator = makeCoordinator(player: player)
+        try player.seedSongs([song])
+
+        // Same ordering as AppViewModel.shuffleAll: no yield between start and draft save.
+        try await player.startFreshShuffle(seed: 7)
+        coordinator.poolDidChange()
+        await waitUntil { (try? self.archive.load().session?.seed) == 7 }
+
+        let nextTransport = DeterministicMusicService()
+        let nextPlayer = ShufflePlayer(playbackTransport: nextTransport)
+        let nextCoordinator = AppPlaybackSessionCoordinator(
+            player: nextPlayer,
+            authorizer: nextTransport,
+            playbackTransport: nextTransport,
+            archive: SessionArchive(modelContext: ModelContext(container)),
+            scrobbleTracker: ScrobbleTracker(
+                scrobbleManager: ScrobbleManager(transports: []), playbackTransport: nextTransport
+            )
+        )
+        await nextCoordinator.onAppear()
+        XCTAssertTrue(nextCoordinator.didRestorePlaybackState)
+        XCTAssertEqual(nextPlayer.playbackState, .paused(song))
+        XCTAssertEqual(nextPlayer.activeSession?.seed, 7)
+        withExtendedLifetime(coordinator) {}
+    }
+
+    func testDraftSavePreservesPausedRestoredSession() async throws {
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 7)
+        let record = try XCTUnwrap(ListeningSessionRecord.make(
+            session: session, currentSongID: song.id, playbackPosition: 42, savedAt: Date()
+        ))
+        try archive.commit(pool: [song], session: record)
+        let player = ShufflePlayer(playbackTransport: mockService)
+        let coordinator = makeCoordinator(player: player)
+        await coordinator.onAppear()
+        coordinator.poolDidChange()
+        XCTAssertEqual(try archive.load().session, record)
+    }
+
+    func testRemoveAllThenCheckpointDoesNotReviveSession() async throws {
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let player = ShufflePlayer(playbackTransport: mockService)
+        let coordinator = makeCoordinator(player: player)
+        try player.seedSongs([song])
+        try await player.startFreshShuffle(seed: 7)
+        await waitUntil { (try? self.archive.load().session) != nil }
+
+        await player.removeAllSongs()
+        await waitUntil { (try? self.archive.load().session) == nil }
+        coordinator.poolDidChange()
+        coordinator.handleDidEnterBackground()
+        let saved = try archive.load()
+        XCTAssertTrue(saved.pool.isEmpty)
+        XCTAssertNil(saved.session)
+    }
+
+    func testCheckpointCapturesNewSelectionInsteadOfLastStartedSong() async throws {
+        let songs = ["one", "two"].map {
+            Song(id: $0, title: $0, artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        let player = ShufflePlayer(playbackTransport: mockService)
+        let coordinator = makeCoordinator(player: player)
+        try player.seedSongs(songs)
+        try await player.startFreshShuffle(seed: 7)
+        await waitUntil { (try? self.archive.load().session) != nil }
+        let previousID = try XCTUnwrap(archive.load().session?.currentSongID)
+        let selectedID = try XCTUnwrap(songs.first { $0.id != previousID }?.id)
+        let session = try XCTUnwrap(player.activeSession)
+        let restored = await player.restore(session, currentSongID: selectedID, playbackPosition: 23)
+        XCTAssertTrue(restored)
+        coordinator.handleDidEnterBackground()
+        let saved = try archive.load()
+        XCTAssertEqual(saved.session?.currentSongID, selectedID)
+        XCTAssertEqual(saved.session?.playbackPosition, 23)
+    }
+
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
         let player = ShufflePlayer(playbackTransport: mockService)
 
