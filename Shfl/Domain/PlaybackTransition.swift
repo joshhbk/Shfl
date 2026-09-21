@@ -7,8 +7,15 @@ nonisolated struct PlaybackTransition: Sendable {
     let state: PlaybackState
     let session: ListeningSession?
     let playbackTime: TimeInterval
-    let songChanged: Bool
-    /// First playing state for this song in this session, including after a
-    /// paused restore or loading state. Pause/resume does not start a new song.
-    let startsSong: Bool
+    /// Nil for status-only changes such as pausing or resuming the same song.
+    let songTransition: SongTransition?
+}
+
+/// Song selection and first playback are separate lifecycle events: a paused
+/// restore or loading state can select a song before it starts playing.
+nonisolated enum SongTransition: Equatable, Sendable {
+    case selected(Song)
+    case started(Song)
+    case selectedAndStarted(Song)
+    case cleared
 }

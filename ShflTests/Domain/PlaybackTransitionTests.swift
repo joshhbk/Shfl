@@ -19,8 +19,7 @@ final class PlaybackTransitionTests: XCTestCase {
         for stream in [first, second] {
             let transitions = await collect(stream, count: 5)
             XCTAssertEqual(transitions.map(\.state), [.empty, .playing(song), .paused(song), .playing(song), .paused(song)])
-            XCTAssertEqual(transitions.map(\.startsSong), [false, true, false, false, false])
-            XCTAssertEqual(transitions.map(\.songChanged), [false, true, false, false, false])
+            XCTAssertEqual(transitions.map(\.songTransition), [nil, .selectedAndStarted(song), nil, nil, nil])
         }
     }
 
@@ -39,19 +38,18 @@ final class PlaybackTransitionTests: XCTestCase {
         let restoredEvents = await collect(stream, count: 2)
         XCTAssertEqual(restoredEvents.last?.state, .paused(song))
         XCTAssertEqual(restoredEvents.last?.playbackTime, 42)
-        XCTAssertEqual(restoredEvents.last?.startsSong, false)
+        XCTAssertEqual(restoredEvents.last?.songTransition, .selected(song))
 
         let resumed = player.playbackTransitions
         try await player.play()
         let resumedEvents = await collect(resumed, count: 2)
-        XCTAssertEqual(resumedEvents.last?.startsSong, true)
+        XCTAssertEqual(resumedEvents.last?.songTransition, .started(song))
         let oldSession = player.activeSession?.id
 
         let fresh = player.playbackTransitions
         try await player.startFreshShuffle(seed: 2)
         let freshEvents = await collect(fresh, count: 2)
-        XCTAssertEqual(freshEvents.last?.startsSong, true)
-        XCTAssertEqual(freshEvents.last?.songChanged, true)
+        XCTAssertEqual(freshEvents.last?.songTransition, .selectedAndStarted(song))
         XCTAssertNotEqual(freshEvents.last?.session?.id, oldSession)
     }
 
@@ -69,8 +67,7 @@ final class PlaybackTransitionTests: XCTestCase {
         await transport.simulatePlaybackState(.paused(next))
         let events = await collect(stream, count: 4)
         XCTAssertEqual(events.map(\.state), [.playing(song), .loading(next), .playing(next), .paused(next)])
-        XCTAssertEqual(events.map(\.startsSong), [true, false, true, false])
-        XCTAssertEqual(events.map(\.songChanged), [true, true, false, false])
+        XCTAssertEqual(events.map(\.songTransition), [.selectedAndStarted(song), .selected(next), .started(next), nil])
     }
 
     func test_transientEmptyIsSuppressedAndClearPublishesEmpty() async throws {
@@ -90,6 +87,7 @@ final class PlaybackTransitionTests: XCTestCase {
         let clearEvents = await collect(cleared, count: 2)
         XCTAssertEqual(clearEvents.last?.state, .empty)
         XCTAssertNil(clearEvents.last?.session)
+        XCTAssertEqual(clearEvents.last?.songTransition, .cleared)
     }
 
     func test_sessionExhaustionPublishesStopThenOneFreshSession() async throws {
@@ -104,8 +102,9 @@ final class PlaybackTransitionTests: XCTestCase {
         let events = await collect(stream, count: 3)
         XCTAssertEqual(events.map(\.state), [.playing(song), .stopped, .playing(song)])
         XCTAssertNil(events[1].session)
+        XCTAssertEqual(events[1].songTransition, .cleared)
         XCTAssertNotEqual(events.last?.session?.id, oldSession)
-        XCTAssertEqual(events.last?.startsSong, true)
+        XCTAssertEqual(events.last?.songTransition, .selectedAndStarted(song))
         let loads = await transport.loadCallCount
         XCTAssertEqual(loads, 2)
     }
@@ -125,7 +124,7 @@ final class PlaybackTransitionTests: XCTestCase {
             return XCTFail("Expected an error transition")
         }
         XCTAssertNil(events.last?.session)
-        XCTAssertFalse(events.contains(where: \.startsSong))
+        XCTAssertEqual(events.map(\.songTransition), [nil, nil])
     }
 
     func test_cancellingOneSubscriberDoesNotStopAnother() async throws {

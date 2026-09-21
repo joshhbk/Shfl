@@ -73,12 +73,12 @@ final class SessionSnapshotServiceTests: XCTestCase {
         let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 42)
         try service.savePlaybackTransition(PlaybackTransition(
             state: .playing(song), session: session, playbackTime: 12,
-            songChanged: true, startsSong: true
+            songTransition: .selectedAndStarted(song)
         ), songs: [song])
         for state in [PlaybackState.paused(song), .playing(song)] {
             try service.savePlaybackTransition(PlaybackTransition(
                 state: state, session: session, playbackTime: 50,
-                songChanged: false, startsSong: false
+                songTransition: nil
             ), songs: [song])
         }
         XCTAssertEqual(try service.loadCurrent().playback?.playbackPosition, 12)

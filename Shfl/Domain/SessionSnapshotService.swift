@@ -74,7 +74,12 @@ final class SessionSnapshotService {
     /// Playback edges are detected by ShufflePlayer. Persist the captured
     /// session when a song starts, rather than reading a later player state.
     func savePlaybackTransition(_ transition: PlaybackTransition, songs: [Song]) throws {
-        guard transition.startsSong else { return }
+        switch transition.songTransition {
+        case .started, .selectedAndStarted:
+            break
+        case .selected, .cleared, nil:
+            return
+        }
         try saveSession(
             songs: songs,
             session: transition.session,

@@ -21,8 +21,9 @@ final class ShufflePlayer {
                 state: playbackState,
                 session: activeSession,
                 playbackTime: playbackTransport.currentPlaybackTime,
-                songChanged: playbackState.currentSongId != nil,
-                startsSong: playbackState.isPlaying
+                songTransition: playbackState.currentSong.map {
+                    playbackState.isPlaying ? .selectedAndStarted($0) : .selected($0)
+                }
             ))
             continuation.onTermination = { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -313,16 +314,24 @@ final class ShufflePlayer {
         guard state != playbackState || sessionChanged else { return }
         let songChanged = state.currentSongId != playbackState.currentSongId || sessionChanged
         if songChanged { hasStartedSong = false }
-        let startsSong = state.isPlaying && !hasStartedSong
-        if startsSong { hasStartedSong = true }
+        let songTransition: SongTransition?
+        if let song = state.currentSong {
+            if state.isPlaying && !hasStartedSong {
+                songTransition = songChanged ? .selectedAndStarted(song) : .started(song)
+                hasStartedSong = true
+            } else {
+                songTransition = songChanged ? .selected(song) : nil
+            }
+        } else {
+            songTransition = songChanged ? .cleared : nil
+        }
         playbackState = state
         publishedSessionID = activeSession?.id
         let transition = PlaybackTransition(
             state: state,
             session: activeSession,
             playbackTime: playbackTransport.currentPlaybackTime,
-            songChanged: songChanged,
-            startsSong: startsSong
+            songTransition: songTransition
         )
         for continuation in transitionContinuations.values {
             continuation.yield(transition)
