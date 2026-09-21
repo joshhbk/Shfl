@@ -29,9 +29,11 @@ final class PlaybackTransitionTests: XCTestCase {
         let song = makeSong("one")
         try player.seedSongs([song])
         let stream = player.playbackTransitions
-        let restored = await player.restoreSession(
-            queueOrder: [song.id], currentSongId: song.id,
-            playedIds: [], playbackPosition: 42, seed: 1
+        let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 1)
+        let restored = await player.restore(
+            session,
+            currentSongID: song.id,
+            playbackPosition: 42
         )
         XCTAssertTrue(restored)
         // Wait for the restored state through the real seam before resuming.

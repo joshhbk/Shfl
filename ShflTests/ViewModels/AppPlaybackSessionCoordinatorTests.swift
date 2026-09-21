@@ -7,29 +7,28 @@ import XCTest
 final class AppPlaybackSessionCoordinatorTests: XCTestCase {
     private var container: ModelContainer!
     private var modelContext: ModelContext!
+    private var archive: SessionArchive!
     private var mockService: DeterministicMusicService!
-    private var appSettings: AppSettings!
 
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
-            for: PersistedSong.self,
-            PersistedPlaybackState.self,
+            for: PersistedSession.self,
             configurations: config
         )
         modelContext = container.mainContext
+        archive = SessionArchive(modelContext: modelContext)
         mockService = DeterministicMusicService()
-        appSettings = AppSettings()
     }
 
     override func tearDown() {
         container = nil
         modelContext = nil
+        archive = nil
         mockService = nil
-        appSettings = nil
     }
 
-    func testHandleDidEnterBackgroundPersistsSongsAndPlaybackState() async throws {
+    func testHandleDidEnterBackgroundCheckpointsSession() async throws {
         let player = ShufflePlayer(playbackTransport: mockService)
         let coordinator = makeCoordinator(player: player)
 
@@ -42,20 +41,17 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         )
 
         try await player.addSong(song)
-        try await player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
-        await mockService.setPlaybackTime(42)
+        try await player.startFreshShuffle(seed: 5)
+        await waitUntil { (try? self.archive.load().session) != nil }
 
+        await mockService.setPlaybackTime(42)
         coordinator.handleDidEnterBackground()
 
-        let songRepository = SongRepository(modelContext: modelContext)
-        let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
-        let persistedSongs = try songRepository.loadSongs()
-        let persistedPlaybackState = try await playbackStateRepository.loadPlaybackStateAsync()
-
-        XCTAssertEqual(persistedSongs.map(\.id), ["1"])
-        XCTAssertNotNil(persistedPlaybackState)
-        XCTAssertEqual(persistedPlaybackState?.queueOrder, ["1"])
-        XCTAssertEqual(persistedPlaybackState?.playbackPosition, 42)
+        let saved = try archive.load()
+        XCTAssertEqual(saved.pool.map(\.id), ["1"])
+        XCTAssertEqual(saved.session?.currentSongID, "1")
+        XCTAssertEqual(saved.session?.playbackPosition, 42)
+        withExtendedLifetime(coordinator) {}
     }
 
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
@@ -90,10 +86,9 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         let coordinator = makeCoordinator(player: player, scrobbleTracker: tracker)
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try player.seedSongs([song])
-        let restored = await player.restoreSession(
-            queueOrder: [song.id], currentSongId: song.id,
-            playedIds: [], playbackPosition: 42, seed: 1
-        )
+
+        let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 1)
+        let restored = await player.restore(session, currentSongID: song.id, playbackPosition: 42)
         XCTAssertTrue(restored)
         try await player.play()
         await player.pause()
@@ -101,8 +96,9 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         try await player.startFreshShuffle(seed: 2)
         await fulfillment(of: [nowPlaying], timeout: 2)
 
-        let saved = try PlaybackStateRepository(modelContext: modelContext).loadPlaybackState()
-        XCTAssertEqual(saved?.currentSongId, song.id)
+        await waitUntil { (try? self.archive.load().session?.seed) == 2 }
+        let saved = try archive.load().session
+        XCTAssertEqual(saved?.currentSongID, song.id)
         XCTAssertEqual(saved?.seed, 2)
         XCTAssertEqual(saved?.playbackPosition, 0)
         withExtendedLifetime(coordinator) {}
@@ -122,12 +118,6 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         scrobbleTracker: ScrobbleTracker? = nil,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) -> AppPlaybackSessionCoordinator {
-        let songRepository = SongRepository(modelContext: modelContext)
-        let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
-        let sessionSnapshotService = SessionSnapshotService(
-            songRepository: songRepository,
-            playbackStateRepository: playbackStateRepository
-        )
         let scrobbleTracker = scrobbleTracker ?? ScrobbleTracker(
             scrobbleManager: ScrobbleManager(transports: []),
             playbackTransport: mockService
@@ -137,10 +127,18 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
             player: player,
             authorizer: mockService,
             playbackTransport: mockService,
-            sessionSnapshotService: sessionSnapshotService,
+            archive: archive,
             scrobbleTracker: scrobbleTracker,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
+    }
+
+    private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async {
+        for _ in 0..<500 {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        XCTFail("Timed out waiting for persistence")
     }
 }
 

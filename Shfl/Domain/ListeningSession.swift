@@ -104,14 +104,11 @@ nonisolated struct PlaybackTraceEntry: Equatable, Sendable, Identifiable {
 
 nonisolated enum SessionComposerError: LocalizedError, Equatable {
     case emptyDraft
-    case invalidRestoredOrder
 
     var errorDescription: String? {
         switch self {
         case .emptyDraft:
             return "Add at least one song before starting a shuffle."
-        case .invalidRestoredOrder:
-            return "The saved listening session no longer matches the selected songs."
         }
     }
 }
@@ -134,28 +131,6 @@ nonisolated struct SessionComposer: Sendable {
             songOrder: order,
             algorithm: draft.algorithm,
             seed: seed
-        )
-    }
-
-    func restore(
-        draft: SessionDraft,
-        songOrderIDs: [String],
-        algorithm: ShuffleAlgorithm,
-        seed: UInt64?
-    ) throws -> ListeningSession {
-        let songByID = Dictionary(uniqueKeysWithValues: draft.songs.map { ($0.id, $0) })
-        let uniqueOrderIDs = Set(songOrderIDs)
-
-        guard !songOrderIDs.isEmpty,
-              uniqueOrderIDs.count == songOrderIDs.count,
-              uniqueOrderIDs == Set(songByID.keys) else {
-            throw SessionComposerError.invalidRestoredOrder
-        }
-
-        return ListeningSession(
-            songOrder: songOrderIDs.compactMap { songByID[$0] },
-            algorithm: algorithm,
-            seed: seed ?? 0
         )
     }
 }

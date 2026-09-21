@@ -2,17 +2,6 @@ import Combine
 import Foundation
 import MusicKit
 
-private enum AppleMusicServiceError: LocalizedError {
-    case incompleteQueueResolution(missingSongIds: [String])
-
-    var errorDescription: String? {
-        switch self {
-        case .incompleteQueueResolution(let missingSongIds):
-            return "Apple Music could not resolve every queued song: \(missingSongIds.joined(separator: ", "))."
-        }
-    }
-}
-
 final class AppleMusicService: MusicService {
     private let player = ApplicationMusicPlayer.shared
     private var stateObservationTask: Task<Void, Never>?
@@ -308,16 +297,13 @@ final class AppleMusicService: MusicService {
         let response = try await libraryRequest.response()
 
         let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
+        // Songs that no longer resolve in the library are dropped rather than
+        // failing the whole restore.
         let orderedItems = songs.compactMap { itemsById[$0.id] }
-        let missingSongIds = songs.compactMap { itemsById[$0.id] == nil ? $0.id : nil }
-        guard missingSongIds.isEmpty else {
-            throw AppleMusicServiceError.incompleteQueueResolution(missingSongIds: missingSongIds)
-        }
-
         guard let startItem = orderedItems.first(where: {
             $0.id.rawValue == request.currentSongID
-        }) else {
-            throw PlaybackLoadError.currentSongMissing(request.currentSongID)
+        }) ?? orderedItems.first else {
+            throw PlaybackLoadError.emptyQueue
         }
 
         let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: startItem)

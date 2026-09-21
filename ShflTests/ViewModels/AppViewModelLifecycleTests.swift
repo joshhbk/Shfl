@@ -13,8 +13,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
-            for: PersistedSong.self,
-            PersistedPlaybackState.self,
+            for: PersistedSession.self,
             configurations: config
         )
         modelContext = container.mainContext
@@ -50,16 +49,13 @@ final class AppViewModelLifecycleTests: XCTestCase {
 
         viewModel.handleDidEnterBackground()
 
-        let songRepository = SongRepository(modelContext: modelContext)
-        let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
+        let archive = SessionArchive(modelContext: modelContext)
+        let saved = try await archive.loadAsync()
 
-        let persistedSongs = try songRepository.loadSongs()
-        let persistedPlaybackState = try await playbackStateRepository.loadPlaybackStateAsync()
-
-        XCTAssertEqual(persistedSongs.map(\.id), ["1"])
-        XCTAssertNotNil(persistedPlaybackState)
-        XCTAssertEqual(persistedPlaybackState?.queueOrder, ["1"])
-        XCTAssertEqual(persistedPlaybackState?.playbackPosition, 42)
+        XCTAssertEqual(saved.pool.map(\.id), ["1"])
+        XCTAssertNotNil(saved.session)
+        XCTAssertEqual(saved.session?.songOrder.map(\.id), ["1"])
+        XCTAssertEqual(saved.session?.playbackPosition, 42)
     }
 
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {

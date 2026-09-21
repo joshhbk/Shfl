@@ -33,8 +33,7 @@ struct AppComposition {
 
     static func make(mode: Mode) throws -> AppComposition {
         let schema = Schema([
-            PersistedSong.self,
-            PersistedPlaybackState.self
+            PersistedSession.self
         ])
 
         switch mode {
