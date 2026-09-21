@@ -58,7 +58,7 @@ struct ScrobbleTrackerTests {
 
         // Simulate playing for threshold duration (song is 60 seconds, threshold is 30)
         await mockService.setPlaybackDuration(60)
-        await tracker.onPlaybackStateChanged(.playing(song))
+        await tracker.onPlaybackTransition(transition(.playing(song), songTransition: .selectedAndStarted(song)))
 
         // Simulate time passing (threshold is 30 seconds for 60-second song)
         await tracker.simulateTimeElapsed(seconds: 31)
@@ -87,7 +87,7 @@ struct ScrobbleTrackerTests {
         )
 
         await mockService.setPlaybackDuration(180)
-        await tracker.onPlaybackStateChanged(.playing(song))
+        await tracker.onPlaybackTransition(transition(.playing(song), songTransition: .selectedAndStarted(song)))
 
         // Allow async work to complete
         try await Task.sleep(for: .milliseconds(50))
@@ -112,9 +112,9 @@ struct ScrobbleTrackerTests {
         )
 
         await mockService.setPlaybackDuration(60)
-        await tracker.onPlaybackStateChanged(.playing(song))
+        await tracker.onPlaybackTransition(transition(.playing(song), songTransition: .selectedAndStarted(song)))
         await tracker.simulateTimeElapsed(seconds: 20)
-        await tracker.onPlaybackStateChanged(.paused(song))
+        await tracker.onPlaybackTransition(transition(.paused(song)))
         await tracker.simulateTimeElapsed(seconds: 20)  // This shouldn't count
 
         try await Task.sleep(for: .milliseconds(50))
@@ -139,7 +139,7 @@ struct ScrobbleTrackerTests {
         )
 
         await mockService.setPlaybackDuration(60)
-        await tracker.onPlaybackStateChanged(.playing(song))
+        await tracker.onPlaybackTransition(transition(.playing(song), songTransition: .selectedAndStarted(song)))
         await tracker.simulateTimeElapsed(seconds: 35)  // Past threshold
         try await Task.sleep(for: .milliseconds(50))
 
@@ -161,11 +161,11 @@ struct ScrobbleTrackerTests {
         let song2 = Song(id: "2", title: "Song 2", artist: "Artist", albumTitle: "Album", artworkURL: nil)
 
         await mockService.setPlaybackDuration(60)
-        await tracker.onPlaybackStateChanged(.playing(song1))
+        await tracker.onPlaybackTransition(transition(.playing(song1), songTransition: .selectedAndStarted(song1)))
         await tracker.simulateTimeElapsed(seconds: 20)
 
         // Change song before threshold
-        await tracker.onPlaybackStateChanged(.playing(song2))
+        await tracker.onPlaybackTransition(transition(.playing(song2), songTransition: .selectedAndStarted(song2)))
         await tracker.simulateTimeElapsed(seconds: 35)
 
         try await Task.sleep(for: .milliseconds(50))
@@ -174,4 +174,44 @@ struct ScrobbleTrackerTests {
         #expect(scrobbled.count == 1)
         #expect(scrobbled.first?.track == "Song 2")
     }
+    @Test("Selecting a paused song resets tracking; start and resume remain distinct")
+    @MainActor
+    func selectedSongStartsLaterAndResumesWithoutAnotherNowPlaying() async throws {
+        let transport = MockScrobbleTransport()
+        let service = DeterministicMusicService()
+        let tracker = ScrobbleTracker(
+            scrobbleManager: ScrobbleManager(transports: [transport]),
+            playbackTransport: service
+        )
+        let first = Song(id: "1", title: "First", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let second = Song(id: "2", title: "Second", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        await service.setPlaybackDuration(60)
+
+        tracker.onPlaybackTransition(transition(.playing(first), songTransition: .selectedAndStarted(first)))
+        tracker.simulateTimeElapsed(seconds: 20)
+        tracker.onPlaybackTransition(transition(.paused(second), songTransition: .selected(second)))
+        tracker.simulateTimeElapsed(seconds: 20)
+        tracker.onPlaybackTransition(transition(.playing(second), songTransition: .started(second)))
+        tracker.simulateTimeElapsed(seconds: 15)
+        tracker.onPlaybackTransition(transition(.paused(second)))
+        tracker.simulateTimeElapsed(seconds: 20)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(await transport.scrobbledEvents.isEmpty)
+
+        tracker.onPlaybackTransition(transition(.playing(second)))
+        tracker.simulateTimeElapsed(seconds: 16)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(await transport.scrobbledEvents.map(\.track) == ["Second"])
+        #expect(await transport.nowPlayingEvents.map(\.track).sorted() == ["First", "Second"])
+    }
+
+    private func transition(_ state: PlaybackState, songTransition: SongTransition? = nil) -> PlaybackTransition {
+        PlaybackTransition(
+            state: state,
+            session: nil,
+            playbackTime: 0,
+            songTransition: songTransition
+        )
+    }
+
 }
