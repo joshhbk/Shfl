@@ -48,11 +48,7 @@ final class ShufflePlayer {
     var draftIsEmpty: Bool { draft.songs.isEmpty }
 
     var lastShuffledQueue: [Song] { activeSession?.songOrder ?? [] }
-    var lastUsedAlgorithm: ShuffleAlgorithm { activeSession?.algorithm ?? draft.algorithm }
     var transportCurrentSongId: String? { playbackTransport.currentSongId }
-    var currentQueueOrder: [String] { activeSession?.songIDs ?? [] }
-    var hasRestorableState: Bool { activeSession != nil }
-    var activeSessionSeed: UInt64? { activeSession?.seed }
     var hasPendingSessionChanges: Bool {
         guard let activeSession else { return !draft.songs.isEmpty }
         return activeSession.songIDs.count != draft.songs.count
@@ -213,26 +209,17 @@ final class ShufflePlayer {
         }
     }
 
-    func restoreSession(
-        queueOrder: [String],
-        currentSongId: String?,
-        playedIds: Set<String>,
-        playbackPosition: TimeInterval,
-        algorithm: ShuffleAlgorithm? = nil,
-        seed: UInt64? = nil
+    /// Reinstates a self-contained listening session without autoplay.
+    func restore(
+        _ session: ListeningSession,
+        currentSongID: String,
+        playbackPosition: TimeInterval
     ) async -> Bool {
-        let effectiveAlgorithm = algorithm ?? draft.algorithm
+        guard session.songIDs.contains(currentSongID) else {
+            record("session-restore-failed", detail: "current song not in session")
+            return false
+        }
         do {
-            let session = try composer.restore(
-                draft: draft,
-                songOrderIDs: queueOrder,
-                algorithm: effectiveAlgorithm,
-                seed: seed
-            )
-            guard let currentSongID = currentSongId ?? session.songIDs.first,
-                  session.songIDs.contains(currentSongID) else {
-                return false
-            }
             try await install(
                 session,
                 currentSongID: currentSongID,

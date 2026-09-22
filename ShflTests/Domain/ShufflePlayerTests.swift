@@ -186,20 +186,22 @@ final class ShufflePlayerTests: XCTestCase {
         let player = ShufflePlayer(playbackTransport: transport)
         let songs = makeSongs(4)
         try player.seedSongs(songs)
-        let order = [songs[2].id, songs[0].id, songs[3].id, songs[1].id]
-
-        let restored = await player.restoreSession(
-            queueOrder: order,
-            currentSongId: songs[3].id,
-            playedIds: [songs[2].id, songs[0].id],
-            playbackPosition: 61,
+        let order = [songs[2], songs[0], songs[3], songs[1]]
+        let session = ListeningSession(
+            songOrder: order,
             algorithm: .artistSpacing,
             seed: 88
         )
 
+        let restored = await player.restore(
+            session,
+            currentSongID: songs[3].id,
+            playbackPosition: 61
+        )
+
         let request = await transport.lastLoadRequest
         XCTAssertTrue(restored)
-        XCTAssertEqual(request?.queue.map(\.id), order)
+        XCTAssertEqual(request?.queue.map(\.id), order.map(\.id))
         XCTAssertEqual(request?.currentSongID, songs[3].id)
         XCTAssertEqual(request?.playbackPosition, 61)
         XCTAssertEqual(request?.autoplay, false)

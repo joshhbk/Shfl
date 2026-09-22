@@ -76,18 +76,13 @@ final class AppViewModel {
         }
         let scrobbleManager = ScrobbleManager(transports: scrobbleTransports)
         let scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, playbackTransport: musicService)
-        let songRepository = SongRepository(modelContext: modelContext)
-        let playbackStateRepository = PlaybackStateRepository(modelContext: modelContext)
-        let sessionSnapshotService = SessionSnapshotService(
-            songRepository: songRepository,
-            playbackStateRepository: playbackStateRepository
-        )
+        let sessionArchive = SessionArchive(modelContext: modelContext)
 
         self.sessionCoordinator = AppPlaybackSessionCoordinator(
             player: player,
             authorizer: musicService,
             playbackTransport: musicService,
-            sessionSnapshotService: sessionSnapshotService,
+            archive: sessionArchive,
             scrobbleTracker: scrobbleTracker,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
@@ -105,8 +100,8 @@ final class AppViewModel {
         sessionCoordinator.handleDidEnterBackground()
     }
 
-    func persistSongs() {
-        sessionCoordinator.persistSongs()
+    func poolDidChange() {
+        sessionCoordinator.poolDidChange()
     }
 
     func autofillLibrary() async {
@@ -119,7 +114,7 @@ final class AppViewModel {
             )
             let songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
             try player.seedSongs(songs)
-            sessionCoordinator.persistSongs()
+            sessionCoordinator.poolDidChange()
         } catch {
             print("Failed to autofill library: \(error)")
         }
@@ -147,7 +142,7 @@ final class AppViewModel {
             try await player.startFreshShuffle(
                 algorithm: appSettings.shuffleAlgorithm
             )
-            sessionCoordinator.persistSongs()
+            sessionCoordinator.poolDidChange()
         } catch {
             print("Failed to shuffle all: \(error)")
         }
@@ -186,7 +181,7 @@ final class AppViewModel {
 
     func closeManage() {
         showingManage = false
-        sessionCoordinator.persistSongs()
+        sessionCoordinator.poolDidChange()
     }
 
     func openPicker() {
@@ -195,7 +190,7 @@ final class AppViewModel {
 
     func closePicker() {
         showingPicker = false
-        sessionCoordinator.persistSongs()
+        sessionCoordinator.poolDidChange()
     }
 
     func openPickerDirect() {
@@ -204,7 +199,7 @@ final class AppViewModel {
 
     func closePickerDirect() {
         showingPickerDirect = false
-        sessionCoordinator.persistSongs()
+        sessionCoordinator.poolDidChange()
     }
 
     func openSettings() {
@@ -250,9 +245,5 @@ final class AppViewModel {
 
     func removeAllSongs() async {
         await player.removeAllSongs()
-    }
-
-    func persistPlaybackState() {
-        sessionCoordinator.persistPlaybackState()
     }
 }

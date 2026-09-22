@@ -11,6 +11,7 @@ final class ScrobbleTracker {
     private var hasScrobbledCurrentSong = false
     private var isPlaying = false
     private var timerTask: Task<Void, Never>?
+    private var subscriptionTask: Task<Void, Never>?
 
     init(scrobbleManager: ScrobbleManager, playbackTransport: PlaybackTransport) {
         self.scrobbleManager = scrobbleManager
@@ -19,6 +20,18 @@ final class ScrobbleTracker {
 
     deinit {
         timerTask?.cancel()
+        subscriptionTask?.cancel()
+    }
+
+    /// Subscribes to the shared playback seam as an independent consumer.
+    func start(consuming transitions: AsyncStream<PlaybackTransition>) {
+        subscriptionTask?.cancel()
+        subscriptionTask = Task { @MainActor [weak self] in
+            for await transition in transitions {
+                guard !Task.isCancelled, let self else { return }
+                self.onPlaybackTransition(transition)
+            }
+        }
     }
 
     // MARK: - Threshold Calculation (nonisolated static for testability)

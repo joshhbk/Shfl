@@ -2,22 +2,14 @@ import Combine
 import Foundation
 import MusicKit
 
-private enum AppleMusicServiceError: LocalizedError {
-    case incompleteQueueResolution(missingSongIds: [String])
-
-    var errorDescription: String? {
-        switch self {
-        case .incompleteQueueResolution(let missingSongIds):
-            return "Apple Music could not resolve every queued song: \(missingSongIds.joined(separator: ", "))."
-        }
-    }
-}
-
 final class AppleMusicService: MusicService {
     private let player = ApplicationMusicPlayer.shared
     private var stateObservationTask: Task<Void, Never>?
     private let observationTaskLock = NSLock()
     private let playbackEventBroadcaster = PlaybackEventBroadcaster()
+    // MusicKit can replace library Song and Entry IDs when it starts playback.
+    // Preserve the session's ordered songs for lookup against the live queue.
+    private var sessionSongOrder: [Song] = []
     private var loadedFinalSongID: String?
     private var lastObservedSongID: String?
     private var hasObservedPlaying = false
@@ -61,7 +53,7 @@ final class AppleMusicService: MusicService {
               case .song(let song) = entry.item else {
             return nil
         }
-        return song.id.rawValue
+        return sessionSong(for: entry)?.id ?? song.id.rawValue
     }
 
     var isAuthorized: Bool {
@@ -308,23 +300,23 @@ final class AppleMusicService: MusicService {
         let response = try await libraryRequest.response()
 
         let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
-        let orderedItems = songs.compactMap { itemsById[$0.id] }
-        let missingSongIds = songs.compactMap { itemsById[$0.id] == nil ? $0.id : nil }
-        guard missingSongIds.isEmpty else {
-            throw AppleMusicServiceError.incompleteQueueResolution(missingSongIds: missingSongIds)
-        }
-
-        guard let startItem = orderedItems.first(where: {
-            $0.id.rawValue == request.currentSongID
+        // Songs that no longer resolve in the library are dropped rather than
+        // failing the whole restore.
+        let resolvedSongs = songs.filter { itemsById[$0.id] != nil }
+        let orderedItems = resolvedSongs.compactMap { itemsById[$0.id] }
+        guard let startIndex = resolvedSongs.firstIndex(where: {
+            $0.id == request.currentSongID
         }) else {
             throw PlaybackLoadError.currentSongMissing(request.currentSongID)
         }
 
-        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: startItem)
+        let entries = orderedItems.map { MusicPlayer.Queue.Entry($0) }
+        let queue = ApplicationMusicPlayer.Queue(entries, startingAt: entries[startIndex])
+        sessionSongOrder = resolvedSongs
         player.queue = queue
         player.state.shuffleMode = .off
-        loadedFinalSongID = orderedItems.last?.id.rawValue
-        lastObservedSongID = startItem.id.rawValue
+        loadedFinalSongID = resolvedSongs.last?.id
+        lastObservedSongID = request.currentSongID
         hasObservedPlaying = false
         didPublishSessionEnd = false
         sessionEndConfirmationTask?.cancel()
@@ -346,6 +338,7 @@ final class AppleMusicService: MusicService {
     }
 
     func clear() async {
+        sessionSongOrder = []
         loadedFinalSongID = nil
         lastObservedSongID = nil
         hasObservedPlaying = false
@@ -470,6 +463,22 @@ final class AppleMusicService: MusicService {
         }
     }
 
+    private func sessionSong(for entry: MusicPlayer.Queue.Entry) -> Song? {
+        let liveEntries = player.queue.entries
+        // Resolve against the queue MusicKit is currently exposing. The Entry
+        // IDs made before assigning player.queue may be replaced at playback.
+        let index = liveEntries.firstIndex(where: { $0.id == entry.id })
+        guard liveEntries.count == sessionSongOrder.count,
+              let index,
+              sessionSongOrder.indices.contains(index) else {
+            #if DEBUG
+            print("📻 Session song lookup missed: queue=\(liveEntries.count), session=\(sessionSongOrder.count), found=\(index != nil)")
+            #endif
+            return nil
+        }
+        return sessionSongOrder[index]
+    }
+
     private func mapPlaybackState() -> PlaybackState {
         guard let currentEntry = player.queue.currentEntry else {
             return .empty
@@ -479,7 +488,7 @@ final class AppleMusicService: MusicService {
             return .stopped
         }
 
-        let song = Song(
+        let song = sessionSong(for: currentEntry) ?? Song(
             id: musicKitSong.id.rawValue,
             title: musicKitSong.title,
             artist: musicKitSong.artistName,
