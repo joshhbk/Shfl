@@ -134,6 +134,24 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         XCTAssertEqual(saved.session?.playbackPosition, 23)
     }
 
+    func testUnrecognizedTransportSongDoesNotEraseLastValidSession() async throws {
+        let librarySong = Song(id: "i.library", title: "Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let catalogSong = Song(id: "123456", title: "Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let player = ShufflePlayer(playbackTransport: mockService)
+        let coordinator = makeCoordinator(player: player)
+        try player.seedSongs([librarySong])
+        try await player.startFreshShuffle(seed: 7)
+        await waitUntil { (try? self.archive.load().session) != nil }
+        let validRecord = try XCTUnwrap(archive.load().session)
+
+        // MusicKit can surface the catalog representation of a library song.
+        // An unrecognized report must not be interpreted as an explicit clear.
+        await mockService.simulatePlaybackState(.playing(catalogSong))
+        await waitUntil { player.playbackState.currentSongId == catalogSong.id }
+        coordinator.handleDidEnterBackground()
+        XCTAssertEqual(try archive.load().session, validRecord)
+    }
+
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
         let player = ShufflePlayer(playbackTransport: mockService)
 

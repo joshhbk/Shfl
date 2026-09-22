@@ -7,6 +7,9 @@ final class AppleMusicService: MusicService {
     private var stateObservationTask: Task<Void, Never>?
     private let observationTaskLock = NSLock()
     private let playbackEventBroadcaster = PlaybackEventBroadcaster()
+    // Queue entry identity survives MusicKit replacing a library Song with its
+    // catalog representation. Keep the session's Song at this adapter boundary.
+    private var sessionSongsByEntryID: [String: Song] = [:]
     private var loadedFinalSongID: String?
     private var lastObservedSongID: String?
     private var hasObservedPlaying = false
@@ -50,7 +53,7 @@ final class AppleMusicService: MusicService {
               case .song(let song) = entry.item else {
             return nil
         }
-        return song.id.rawValue
+        return sessionSongsByEntryID[entry.id]?.id ?? song.id.rawValue
     }
 
     var isAuthorized: Bool {
@@ -299,18 +302,23 @@ final class AppleMusicService: MusicService {
         let itemsById = Dictionary(uniqueKeysWithValues: response.items.map { ($0.id.rawValue, $0) })
         // Songs that no longer resolve in the library are dropped rather than
         // failing the whole restore.
-        let orderedItems = songs.compactMap { itemsById[$0.id] }
-        guard let startItem = orderedItems.first(where: {
-            $0.id.rawValue == request.currentSongID
-        }) ?? orderedItems.first else {
-            throw PlaybackLoadError.emptyQueue
+        let resolvedSongs = songs.filter { itemsById[$0.id] != nil }
+        let orderedItems = resolvedSongs.compactMap { itemsById[$0.id] }
+        guard let startIndex = resolvedSongs.firstIndex(where: {
+            $0.id == request.currentSongID
+        }) else {
+            throw PlaybackLoadError.currentSongMissing(request.currentSongID)
         }
 
-        let queue = ApplicationMusicPlayer.Queue(for: orderedItems, startingAt: startItem)
+        let entries = orderedItems.map { MusicPlayer.Queue.Entry($0) }
+        let queue = ApplicationMusicPlayer.Queue(entries, startingAt: entries[startIndex])
+        sessionSongsByEntryID = Dictionary(uniqueKeysWithValues:
+            zip(entries, resolvedSongs).map { ($0.id, $1) }
+        )
         player.queue = queue
         player.state.shuffleMode = .off
-        loadedFinalSongID = orderedItems.last?.id.rawValue
-        lastObservedSongID = startItem.id.rawValue
+        loadedFinalSongID = resolvedSongs.last?.id
+        lastObservedSongID = request.currentSongID
         hasObservedPlaying = false
         didPublishSessionEnd = false
         sessionEndConfirmationTask?.cancel()
@@ -332,6 +340,7 @@ final class AppleMusicService: MusicService {
     }
 
     func clear() async {
+        sessionSongsByEntryID = [:]
         loadedFinalSongID = nil
         lastObservedSongID = nil
         hasObservedPlaying = false
@@ -465,7 +474,7 @@ final class AppleMusicService: MusicService {
             return .stopped
         }
 
-        let song = Song(
+        let song = sessionSongsByEntryID[currentEntry.id] ?? Song(
             id: musicKitSong.id.rawValue,
             title: musicKitSong.title,
             artist: musicKitSong.artistName,

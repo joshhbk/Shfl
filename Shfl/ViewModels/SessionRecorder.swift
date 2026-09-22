@@ -53,15 +53,24 @@ final class SessionRecorder {
     /// A lifecycle checkpoint captures the live position on the active session.
     func checkpoint(position: TimeInterval) {
         let date = now()
+        #if DEBUG
+        print("💾 Checkpoint: active=\(player.activeSession != nil), current=\(player.playbackState.currentSongId ?? "nil"), position=\(position)")
+        #endif
         let record: ListeningSessionRecord?
-        if let session = player.activeSession,
-           let currentSongID = player.playbackState.currentSongId {
-            record = ListeningSessionRecord.make(
-                session: session,
-                currentSongID: currentSongID,
-                playbackPosition: position,
-                savedAt: date
-            )
+        if let session = player.activeSession {
+            guard let currentSongID = player.playbackState.currentSongId,
+                  let checkpoint = ListeningSessionRecord.make(
+                    session: session,
+                    currentSongID: currentSongID,
+                    playbackPosition: position,
+                    savedAt: date
+                  ) else {
+                // An incomplete transport report is not an explicit session clear.
+                // Keep the last valid record until a coherent snapshot is available.
+                print("💾 Skipped checkpoint: current song does not match the active session")
+                return
+            }
+            record = checkpoint
         } else {
             record = nil
         }
@@ -83,7 +92,12 @@ final class SessionRecorder {
         guard let record = ListeningSessionRecord.make(
             from: transition,
             savedAt: transition.observedAt
-        ) else { return }
+        ) else {
+            #if DEBUG
+            print("💾 Cannot record song start: active=\(transition.session != nil), current=\(transition.state.currentSongId ?? "nil"), inSession=\(transition.session?.songIDs.contains(transition.state.currentSongId ?? "") == true)")
+            #endif
+            return
+        }
 
         commit(session: record, savedAt: record.savedAt)
     }
@@ -95,6 +109,9 @@ final class SessionRecorder {
         do {
             try archive.commit(pool: player.allSongs, session: session)
             latestSessionSaveTime = savedAt
+            #if DEBUG
+            print("💾 Saved: pool=\(player.allSongs.count), current=\(session?.currentSongID ?? "nil"), position=\(session?.playbackPosition ?? 0)")
+            #endif
         } catch {
             print("💾 Failed to commit session: \(error)")
         }
