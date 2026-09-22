@@ -7,7 +7,7 @@ struct AlbumArtCard: View {
     let songId: String?
     var size: CGFloat = 280
 
-    @State private var resolvedURL: URL?
+    @State private var artwork: Artwork?
 
     init(artworkURL: URL?, songId: String? = nil, size: CGFloat = 280) {
         self.artworkURL = artworkURL
@@ -15,14 +15,12 @@ struct AlbumArtCard: View {
         self.size = size
     }
 
-    private var displayURL: URL? {
-        resolvedURL ?? artworkURL
-    }
-
     var body: some View {
         Group {
-            if let url = displayURL {
-                AsyncImage(url: url) { phase in
+            if let artwork {
+                ArtworkImage(artwork, width: size, height: size)
+            } else if let artworkURL, artworkURL.scheme == "https" || artworkURL.scheme == "http" {
+                AsyncImage(url: artworkURL) { phase in
                     switch phase {
                     case .empty:
                         placeholderView
@@ -52,18 +50,18 @@ struct AlbumArtCard: View {
         .shadow(color: .black.opacity(0.20), radius: 8, x: 0, y: 4)
         .shadow(color: .black.opacity(0.10), radius: 20, x: 0, y: 10)
         .task(id: songId) {
-            resolvedURL = nil
+            artwork = nil
             guard let songId else { return }
 
-            if let url = ArtworkCache.shared.artworkURL(for: songId) {
-                resolvedURL = url
+            if let cachedArtwork = ArtworkCache.shared.artwork(for: songId) {
+                artwork = cachedArtwork
                 return
             }
 
             ArtworkCache.shared.requestArtwork(for: songId)
 
-            for await artwork in ArtworkCache.shared.artworkUpdates(for: songId) {
-                resolvedURL = artwork.url(width: 1200, height: 1200)
+            for await loadedArtwork in ArtworkCache.shared.artworkUpdates(for: songId) {
+                artwork = loadedArtwork
                 break
             }
         }
