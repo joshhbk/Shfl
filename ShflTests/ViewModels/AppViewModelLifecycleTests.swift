@@ -47,7 +47,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
         try await viewModel.player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
         await mockService.setPlaybackTime(42)
 
-        viewModel.handleDidEnterBackground()
+        viewModel.sessionHost.handleDidEnterBackground()
 
         let archive = SessionArchive(modelContext: modelContext)
         let saved = try await archive.loadAsync()

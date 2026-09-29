@@ -8,6 +8,7 @@ final class ShufflePlayer {
     @ObservationIgnored private var observationTask: Task<Void, Never>?
 
     @ObservationIgnored private var transitionContinuations: [UUID: AsyncStream<PlaybackTransition>.Continuation] = [:]
+    @ObservationIgnored private var draftContinuations: [UUID: AsyncStream<SessionDraft>.Continuation] = [:]
     @ObservationIgnored private var publishedSessionID: UUID?
     @ObservationIgnored private var hasStartedSong = false
 
@@ -33,7 +34,29 @@ final class ShufflePlayer {
         }
     }
 
-    private(set) var draft: SessionDraft
+    /// Each access creates an independent subscription to song-pool membership
+    /// changes. Unlike `playbackTransitions`, the current draft is not replayed:
+    /// subscribers hear only edits made after they subscribe.
+    var draftChanges: AsyncStream<SessionDraft> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            draftContinuations[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.draftContinuations.removeValue(forKey: id)
+                }
+            }
+        }
+    }
+
+    private(set) var draft: SessionDraft {
+        didSet {
+            guard draft.songs != oldValue.songs else { return }
+            for continuation in draftContinuations.values {
+                continuation.yield(draft)
+            }
+        }
+    }
     private(set) var activeSession: ListeningSession?
     private(set) var playbackState: PlaybackState = .empty
     private(set) var operationNotice: String?
@@ -69,6 +92,9 @@ final class ShufflePlayer {
     deinit {
         observationTask?.cancel()
         for continuation in transitionContinuations.values {
+            continuation.finish()
+        }
+        for continuation in draftContinuations.values {
             continuation.finish()
         }
     }

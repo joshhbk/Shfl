@@ -4,7 +4,7 @@ import XCTest
 @testable import Shfl
 
 @MainActor
-final class AppPlaybackSessionCoordinatorTests: XCTestCase {
+final class ListeningSessionHostTests: XCTestCase {
     private var container: ModelContainer!
     private var modelContext: ModelContext!
     private var archive: SessionArchive!
@@ -29,8 +29,8 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
     }
 
     func testHandleDidEnterBackgroundCheckpointsSession() async throws {
-        let player = ShufflePlayer(playbackTransport: mockService)
-        let coordinator = makeCoordinator(player: player)
+        let host = makeHost()
+        let player = host.player
 
         let song = Song(
             id: "1",
@@ -45,70 +45,97 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         await waitUntil { (try? self.archive.load().session) != nil }
 
         await mockService.setPlaybackTime(42)
-        coordinator.handleDidEnterBackground()
+        host.handleDidEnterBackground()
 
         let saved = try archive.load()
         XCTAssertEqual(saved.pool.map(\.id), ["1"])
         XCTAssertEqual(saved.session?.currentSongID, "1")
         XCTAssertEqual(saved.session?.playbackPosition, 42)
-        withExtendedLifetime(coordinator) {}
     }
 
-    func testFreshShuffleFollowedByDraftSaveRestoresOnNextLaunch() async throws {
-        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
-        let player = ShufflePlayer(playbackTransport: mockService)
-        let coordinator = makeCoordinator(player: player)
-        try player.seedSongs([song])
+    func testDraftEditsPersistWithoutAnExplicitSave() async throws {
+        let songs = ["one", "two"].map {
+            Song(id: $0, title: $0, artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        let host = makeHost()
 
-        // Same ordering as AppViewModel.shuffleAll: no yield between start and draft save.
-        try await player.startFreshShuffle(seed: 7)
-        coordinator.poolDidChange()
+        try host.player.seedSongs(songs)
+        await waitUntil { (try? self.archive.load().pool.map(\.id)) == ["one", "two"] }
+
+        // A swipe-dismissed sheet never reports back; the edit alone must be durable.
+        await host.player.removeSong(id: "one")
+        await waitUntil { (try? self.archive.load().pool.map(\.id)) == ["two"] }
+    }
+
+    func testFreshShuffleAndDraftEditRestoreOnNextLaunch() async throws {
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let host = makeHost()
+
+        // Same ordering as AppViewModel.shuffleAll: seed then start, no yield between.
+        try host.player.seedSongs([song])
+        try await host.player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session?.seed) == 7 }
+        await waitForStateUpdate()
 
         let nextTransport = DeterministicMusicService()
-        let nextPlayer = ShufflePlayer(playbackTransport: nextTransport)
-        let nextCoordinator = AppPlaybackSessionCoordinator(
-            player: nextPlayer,
-            authorizer: nextTransport,
+        let nextHost = ListeningSessionHost(
             playbackTransport: nextTransport,
-            archive: SessionArchive(modelContext: ModelContext(container)),
-            scrobbleTracker: ScrobbleTracker(
-                scrobbleManager: ScrobbleManager(transports: []), playbackTransport: nextTransport
-            )
+            archive: SessionArchive(modelContext: ModelContext(container))
         )
-        await nextCoordinator.onAppear()
-        XCTAssertTrue(nextCoordinator.didRestorePlaybackState)
-        XCTAssertEqual(nextPlayer.playbackState, .paused(song))
-        XCTAssertEqual(nextPlayer.activeSession?.seed, 7)
-        withExtendedLifetime(coordinator) {}
+        await nextHost.restoreSavedSession()
+        XCTAssertTrue(nextHost.didRestorePlaybackState)
+        XCTAssertEqual(nextHost.player.allSongs, [song])
+        XCTAssertEqual(nextHost.player.playbackState, .paused(song))
+        XCTAssertEqual(nextHost.player.activeSession?.seed, 7)
+        withExtendedLifetime(host) {}
     }
 
-    func testDraftSavePreservesPausedRestoredSession() async throws {
+    func testDraftEditPreservesPausedRestoredSession() async throws {
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let added = Song(id: "two", title: "Two", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 7)
         let record = try XCTUnwrap(ListeningSessionRecord.make(
             session: session, currentSongID: song.id, playbackPosition: 42, savedAt: Date()
         ))
         try archive.commit(pool: [song], session: record)
-        let player = ShufflePlayer(playbackTransport: mockService)
-        let coordinator = makeCoordinator(player: player)
-        await coordinator.onAppear()
-        coordinator.poolDidChange()
+        let host = makeHost()
+        await host.restoreSavedSession()
+
+        try await host.player.addSong(added)
+        await waitUntil { (try? self.archive.load().pool.count) == 2 }
         XCTAssertEqual(try archive.load().session, record)
+    }
+
+    func testStaleSessionIsClearedButPoolIsKept() async throws {
+        let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 7)
+        let savedAt = Date()
+        let record = try XCTUnwrap(ListeningSessionRecord.make(
+            session: session, currentSongID: song.id, playbackPosition: 42, savedAt: savedAt
+        ))
+        try archive.commit(pool: [song], session: record)
+        let host = makeHost(now: { savedAt.addingTimeInterval(ListeningSessionRecord.staleAfter + 1) })
+
+        await host.restoreSavedSession()
+
+        XCTAssertFalse(host.didRestorePlaybackState)
+        XCTAssertEqual(host.player.allSongs, [song])
+        let saved = try archive.load()
+        XCTAssertEqual(saved.pool, [song])
+        XCTAssertNil(saved.session)
     }
 
     func testRemoveAllThenCheckpointDoesNotReviveSession() async throws {
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
-        let player = ShufflePlayer(playbackTransport: mockService)
-        let coordinator = makeCoordinator(player: player)
-        try player.seedSongs([song])
-        try await player.startFreshShuffle(seed: 7)
+        let host = makeHost()
+        try host.player.seedSongs([song])
+        try await host.player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session) != nil }
 
-        await player.removeAllSongs()
+        await host.player.removeAllSongs()
         await waitUntil { (try? self.archive.load().session) == nil }
-        coordinator.poolDidChange()
-        coordinator.handleDidEnterBackground()
+        await waitForStateUpdate()
+        host.handleDidEnterBackground()
         let saved = try archive.load()
         XCTAssertTrue(saved.pool.isEmpty)
         XCTAssertNil(saved.session)
@@ -118,8 +145,8 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         let songs = ["one", "two"].map {
             Song(id: $0, title: $0, artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
-        let player = ShufflePlayer(playbackTransport: mockService)
-        let coordinator = makeCoordinator(player: player)
+        let host = makeHost()
+        let player = host.player
         try player.seedSongs(songs)
         try await player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session) != nil }
@@ -128,7 +155,7 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         let session = try XCTUnwrap(player.activeSession)
         let restored = await player.restore(session, currentSongID: selectedID, playbackPosition: 23)
         XCTAssertTrue(restored)
-        coordinator.handleDidEnterBackground()
+        host.handleDidEnterBackground()
         let saved = try archive.load()
         XCTAssertEqual(saved.session?.currentSongID, selectedID)
         XCTAssertEqual(saved.session?.playbackPosition, 23)
@@ -137,8 +164,8 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
     func testUnrecognizedTransportSongDoesNotEraseLastValidSession() async throws {
         let librarySong = Song(id: "i.library", title: "Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let catalogSong = Song(id: "123456", title: "Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)
-        let player = ShufflePlayer(playbackTransport: mockService)
-        let coordinator = makeCoordinator(player: player)
+        let host = makeHost()
+        let player = host.player
         try player.seedSongs([librarySong])
         try await player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session) != nil }
@@ -148,19 +175,13 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         // An unrecognized report must not be interpreted as an explicit clear.
         await mockService.simulatePlaybackState(.playing(catalogSong))
         await waitUntil { player.playbackState.currentSongId == catalogSong.id }
-        coordinator.handleDidEnterBackground()
+        host.handleDidEnterBackground()
         XCTAssertEqual(try archive.load().session, validRecord)
     }
 
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
-        let player = ShufflePlayer(playbackTransport: mockService)
-
         var persistCallCount = 0
-        let coordinator = makeCoordinator(
-            player: player,
-            lifecyclePersistenceHook: { persistCallCount += 1 }
-        )
-        _ = coordinator
+        let host = makeHost(lifecyclePersistenceHook: { persistCallCount += 1 })
 
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
 
@@ -170,10 +191,12 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         }
 
         XCTAssertEqual(persistCallCount, 1)
+        withExtendedLifetime(host) {}
     }
 
     func testTransitionsDriveScrobblingAndPersistenceAcrossRestoreResumeAndFreshShuffle() async throws {
-        let player = ShufflePlayer(playbackTransport: mockService)
+        let host = makeHost()
+        let player = host.player
         let nowPlaying = expectation(description: "Now playing for each listening session")
         nowPlaying.expectedFulfillmentCount = 2
         let scrobbleTransport = RecordingScrobbleTransport(nowPlaying: nowPlaying)
@@ -181,7 +204,8 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
             scrobbleManager: ScrobbleManager(transports: [scrobbleTransport]),
             playbackTransport: mockService
         )
-        let coordinator = makeCoordinator(player: player, scrobbleTracker: tracker)
+        // Each consumer owns its own subscription to the shared seam.
+        tracker.start(consuming: player.playbackTransitions)
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         try player.seedSongs([song])
 
@@ -199,44 +223,27 @@ final class AppPlaybackSessionCoordinatorTests: XCTestCase {
         XCTAssertEqual(saved?.currentSongID, song.id)
         XCTAssertEqual(saved?.seed, 2)
         XCTAssertEqual(saved?.playbackPosition, 0)
-        withExtendedLifetime(coordinator) {}
+        withExtendedLifetime(tracker) {}
     }
 
-    func testCoordinatorCanBeReleasedWhileWaitingForTransitions() async {
-        let player = ShufflePlayer(playbackTransport: mockService)
-        var coordinator: AppPlaybackSessionCoordinator? = makeCoordinator(player: player)
-        weak var releasedCoordinator = coordinator
+    func testHostCanBeReleasedWhileWaitingForTransitions() async {
+        var host: ListeningSessionHost? = makeHost()
+        weak var releasedHost = host
         await Task.yield()
-        coordinator = nil
-        XCTAssertNil(releasedCoordinator)
+        host = nil
+        XCTAssertNil(releasedHost)
     }
 
-    private func makeCoordinator(
-        player: ShufflePlayer,
-        scrobbleTracker: ScrobbleTracker? = nil,
+    private func makeHost(
+        now: @escaping () -> Date = Date.init,
         lifecyclePersistenceHook: (() -> Void)? = nil
-    ) -> AppPlaybackSessionCoordinator {
-        let scrobbleTracker = scrobbleTracker ?? ScrobbleTracker(
-            scrobbleManager: ScrobbleManager(transports: []),
-            playbackTransport: mockService
-        )
-
-        return AppPlaybackSessionCoordinator(
-            player: player,
-            authorizer: mockService,
+    ) -> ListeningSessionHost {
+        ListeningSessionHost(
             playbackTransport: mockService,
             archive: archive,
-            scrobbleTracker: scrobbleTracker,
+            now: now,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
-    }
-
-    private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async {
-        for _ in 0..<500 {
-            if condition() { return }
-            try? await Task.sleep(for: .milliseconds(1))
-        }
-        XCTFail("Timed out waiting for persistence")
     }
 }
 
