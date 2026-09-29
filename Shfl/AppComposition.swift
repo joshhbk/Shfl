@@ -43,12 +43,12 @@ struct AppComposition {
                 configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)]
             )
             let appSettings = AppSettings()
-            let musicService = AppleMusicService()
             return AppComposition(
                 modelContainer: modelContainer,
                 appSettings: appSettings,
                 appViewModel: AppViewModel(
-                    musicService: musicService,
+                    library: AppleMusicService(),
+                    playbackTransport: MusicKitTransport(),
                     modelContext: modelContainer.mainContext,
                     appSettings: appSettings
                 ),
@@ -79,7 +79,8 @@ struct AppComposition {
                 modelContainer: modelContainer,
                 appSettings: appSettings,
                 appViewModel: AppViewModel(
-                    musicService: musicService,
+                    library: musicService,
+                    playbackTransport: musicService,
                     modelContext: modelContainer.mainContext,
                     appSettings: appSettings,
                     scrobblingEnabled: false

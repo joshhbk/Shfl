@@ -136,7 +136,7 @@ struct MainView: View {
     private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
         SongPickerView(
             player: viewModel.player,
-            musicService: viewModel.musicService,
+            libraryCatalog: viewModel.library,
             initialSortOption: appSettings.librarySortOption,
             onAddSongs: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
             onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
@@ -165,7 +165,7 @@ struct MainView: View {
         } else if viewModel.isAuthorized {
             PlayerView(
                 player: viewModel.player,
-                musicService: viewModel.musicService,
+                playbackTransport: viewModel.playbackTransport,
                 initialThemeId: appSettings.currentThemeId,
                 onManageTapped: { viewModel.openManage() },
                 onAddTapped: { viewModel.openPickerDirect() },

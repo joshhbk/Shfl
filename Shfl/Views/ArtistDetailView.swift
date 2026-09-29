@@ -8,14 +8,14 @@ struct ArtistDetailView: View {
 
     init(
         artistName: String,
-        musicService: MusicService,
+        libraryCatalog: LibraryCatalog,
         selectedSongIds: Set<String>,
         isAtCapacity: Bool,
         onToggleSong: @escaping (Song) -> Void
     ) {
         self._viewModel = State(wrappedValue: ArtistDetailViewModel(
             artistName: artistName,
-            libraryCatalog: musicService
+            libraryCatalog: libraryCatalog
         ))
         self.selectedSongIds = selectedSongIds
         self.isAtCapacity = isAtCapacity

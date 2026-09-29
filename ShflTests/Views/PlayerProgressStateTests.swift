@@ -48,7 +48,7 @@ struct PlayerProgressStateTests {
     func transitionsBoostedToSteady() async {
         let musicService = DeterministicMusicService()
         let state = PlayerProgressState(
-            musicService: musicService,
+            playbackTransport: musicService,
             boostedUpdateInterval: 0.05,
             steadyUpdateInterval: 0.25,
             boostDuration: 0.08
@@ -71,7 +71,7 @@ struct PlayerProgressStateTests {
         let musicService = DeterministicMusicService()
         await musicService.setPlaybackDuration(240)
         let state = PlayerProgressState(
-            musicService: musicService,
+            playbackTransport: musicService,
             boostedUpdateInterval: 0.05,
             steadyUpdateInterval: 0.2,
             boostDuration: 0.06

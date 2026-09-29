@@ -291,11 +291,13 @@ actor DeterministicMusicService: MusicService {
         continuations.values.forEach { $0.yield(event) }
     }
 
+    /// Like the MusicKit adapter, completion is published only as
+    /// `.sessionEnded`; the stopped state is replayed to late subscribers.
     private func finishSession() {
         sessionHasEnded = true
         updateSnapshot(time: 0)
         updateCurrentSongID(nil)
-        publish(.stateChanged(.stopped))
+        currentState = .stopped
         publish(.sessionEnded)
     }
 

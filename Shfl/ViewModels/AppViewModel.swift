@@ -4,7 +4,8 @@ import SwiftUI
 @Observable
 @MainActor
 final class AppViewModel {
-    @ObservationIgnored let musicService: MusicService
+    @ObservationIgnored let library: MusicAuthorizing & LibraryCatalog
+    @ObservationIgnored let playbackTransport: PlaybackTransport
     @ObservationIgnored let lastFMTransport: LastFMTransport?
 
     @ObservationIgnored private let sessionHost: ListeningSessionHost
@@ -29,16 +30,18 @@ final class AppViewModel {
     var player: ShufflePlayer { sessionHost.player }
 
     init(
-        musicService: MusicService,
+        library: MusicAuthorizing & LibraryCatalog,
+        playbackTransport: PlaybackTransport,
         modelContext: ModelContext,
         appSettings: AppSettings,
         lifecyclePersistenceHook: (() -> Void)? = nil,
         scrobblingEnabled: Bool = true
     ) {
-        self.musicService = musicService
+        self.library = library
+        self.playbackTransport = playbackTransport
         self.appSettings = appSettings
         self.sessionHost = ListeningSessionHost(
-            playbackTransport: musicService,
+            playbackTransport: playbackTransport,
             archive: SessionArchive(modelContext: modelContext),
             initialAlgorithm: appSettings.shuffleAlgorithm,
             lifecyclePersistenceHook: lifecyclePersistenceHook
@@ -57,19 +60,19 @@ final class AppViewModel {
             scrobbleTransports = []
         }
         let scrobbleManager = ScrobbleManager(transports: scrobbleTransports)
-        self.scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, playbackTransport: musicService)
+        self.scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, playbackTransport: playbackTransport)
         scrobbleTracker.start(consuming: player.playbackTransitions)
     }
 
     func onAppear() async {
-        async let authStatus = musicService.isAuthorized
+        async let authStatus = library.isAuthorized
         await sessionHost.restoreSavedSession()
         isAuthorized = await authStatus
         isLoading = false
     }
 
     func requestAuthorization() async {
-        isAuthorized = await musicService.requestAuthorization()
+        isAuthorized = await library.requestAuthorization()
         if !isAuthorized {
             authorizationError = "Apple Music access is required to use Shuffled. Please enable it in Settings."
         }
@@ -80,7 +83,7 @@ final class AppViewModel {
         loadingMessage = "Finding songs in your library..."
         do {
             let source = LibraryAutofillSource(
-				libraryCatalog: musicService,
+				libraryCatalog: library,
                 algorithm: appSettings.autofillAlgorithm
             )
             let songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
@@ -103,7 +106,7 @@ final class AppViewModel {
                 prefetchTask?.cancel()
                 prefetchTask = nil
                 let source = LibraryAutofillSource(
-				libraryCatalog: musicService,
+				libraryCatalog: library,
                     algorithm: appSettings.autofillAlgorithm
                 )
                 songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
@@ -131,7 +134,7 @@ final class AppViewModel {
         prefetchTask = Task {
             do {
                 let source = LibraryAutofillSource(
-                    libraryCatalog: musicService,
+                    libraryCatalog: library,
                     algorithm: appSettings.autofillAlgorithm
                 )
                 let songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
