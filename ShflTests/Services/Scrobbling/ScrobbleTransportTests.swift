@@ -8,6 +8,9 @@ actor MockScrobbleTransport: ScrobbleTransport {
     private(set) var scrobbledEvents: [ScrobbleEvent] = []
     private(set) var nowPlayingEvents: [ScrobbleEvent] = []
 
+    // Explicit: Xcode 27 rejects the implicit initializer it synthesizes here.
+    init() {}
+
     func setAuthenticated(_ value: Bool) {
         _isAuthenticated = value
     }
