@@ -4,11 +4,10 @@ import SwiftUI
 @Observable
 @MainActor
 final class AppViewModel {
-    let player: ShufflePlayer
     @ObservationIgnored let musicService: MusicService
     @ObservationIgnored let lastFMTransport: LastFMTransport?
 
-    @ObservationIgnored let sessionHost: ListeningSessionHost
+    @ObservationIgnored private let sessionHost: ListeningSessionHost
     @ObservationIgnored private let appSettings: AppSettings
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
@@ -27,6 +26,8 @@ final class AppViewModel {
     var loadingMessage = "Loading..."
     var authorizationError: String?
 
+    var player: ShufflePlayer { sessionHost.player }
+
     init(
         musicService: MusicService,
         modelContext: ModelContext,
@@ -36,14 +37,12 @@ final class AppViewModel {
     ) {
         self.musicService = musicService
         self.appSettings = appSettings
-        let sessionHost = ListeningSessionHost(
+        self.sessionHost = ListeningSessionHost(
             playbackTransport: musicService,
             archive: SessionArchive(modelContext: modelContext),
             initialAlgorithm: appSettings.shuffleAlgorithm,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
-        self.sessionHost = sessionHost
-        self.player = sessionHost.player
 
         let scrobbleTransports: [any ScrobbleTransport]
         if scrobblingEnabled {

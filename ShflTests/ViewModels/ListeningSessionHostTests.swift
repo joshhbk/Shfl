@@ -82,8 +82,8 @@ final class ListeningSessionHostTests: XCTestCase {
             playbackTransport: nextTransport,
             archive: SessionArchive(modelContext: ModelContext(container))
         )
-        await nextHost.restoreSavedSession()
-        XCTAssertTrue(nextHost.didRestorePlaybackState)
+        let restored = await nextHost.restoreSavedSession()
+        XCTAssertTrue(restored)
         XCTAssertEqual(nextHost.player.allSongs, [song])
         XCTAssertEqual(nextHost.player.playbackState, .paused(song))
         XCTAssertEqual(nextHost.player.activeSession?.seed, 7)
@@ -116,9 +116,9 @@ final class ListeningSessionHostTests: XCTestCase {
         try archive.commit(pool: [song], session: record)
         let host = makeHost(now: { savedAt.addingTimeInterval(ListeningSessionRecord.staleAfter + 1) })
 
-        await host.restoreSavedSession()
+        let restored = await host.restoreSavedSession()
 
-        XCTAssertFalse(host.didRestorePlaybackState)
+        XCTAssertFalse(restored)
         XCTAssertEqual(host.player.allSongs, [song])
         let saved = try archive.load()
         XCTAssertEqual(saved.pool, [song])

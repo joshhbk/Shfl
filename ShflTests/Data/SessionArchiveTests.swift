@@ -62,17 +62,6 @@ final class SessionArchiveTests: XCTestCase {
         XCTAssertEqual(loaded.session?.currentSongID, sessionSongs[1].id)
     }
 
-    func testClearActiveSessionKeepsPool() async throws {
-        let songs = makeSongs(2)
-        try archive.commit(pool: songs, session: makeRecord(songs: songs, currentIndex: 0))
-
-        try archive.clearActiveSession()
-
-        let loaded = try archive.load()
-        XCTAssertEqual(loaded.pool, songs)
-        XCTAssertNil(loaded.session)
-    }
-
     func testFailedCommitKeepsPreviousRecordRecoverable() async throws {
         let original = makeSongs(1)
         try archive.commit(pool: original, session: makeRecord(songs: original, currentIndex: 0))

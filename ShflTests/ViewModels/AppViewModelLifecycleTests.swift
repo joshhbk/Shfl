@@ -47,9 +47,10 @@ final class AppViewModelLifecycleTests: XCTestCase {
         try await viewModel.player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
         await mockService.setPlaybackTime(42)
 
-        viewModel.sessionHost.handleDidEnterBackground()
+        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
 
         let archive = SessionArchive(modelContext: modelContext)
+        await waitUntil { (try? archive.load().session?.playbackPosition) == 42 }
         let saved = try await archive.loadAsync()
 
         XCTAssertEqual(saved.pool.map(\.id), ["1"])

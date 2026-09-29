@@ -8,7 +8,7 @@ final class ShufflePlayer {
     @ObservationIgnored private var observationTask: Task<Void, Never>?
 
     @ObservationIgnored private var transitionContinuations: [UUID: AsyncStream<PlaybackTransition>.Continuation] = [:]
-    @ObservationIgnored private var draftContinuations: [UUID: AsyncStream<SessionDraft>.Continuation] = [:]
+    @ObservationIgnored private var songPoolContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
     @ObservationIgnored private var publishedSessionID: UUID?
     @ObservationIgnored private var hasStartedSong = false
 
@@ -34,16 +34,17 @@ final class ShufflePlayer {
         }
     }
 
-    /// Each access creates an independent subscription to song-pool membership
-    /// changes. Unlike `playbackTransitions`, the current draft is not replayed:
-    /// subscribers hear only edits made after they subscribe.
-    var draftChanges: AsyncStream<SessionDraft> {
+    /// Each access creates an independent subscription that fires when song-pool
+    /// membership changes. Algorithm changes do not fire it. Unlike
+    /// `playbackTransitions`, the current pool is not replayed: subscribers hear
+    /// only edits made after they subscribe.
+    var songPoolChanges: AsyncStream<Void> {
         let id = UUID()
         return AsyncStream { continuation in
-            draftContinuations[id] = continuation
+            songPoolContinuations[id] = continuation
             continuation.onTermination = { [weak self] _ in
                 Task { @MainActor [weak self] in
-                    self?.draftContinuations.removeValue(forKey: id)
+                    self?.songPoolContinuations.removeValue(forKey: id)
                 }
             }
         }
@@ -52,8 +53,8 @@ final class ShufflePlayer {
     private(set) var draft: SessionDraft {
         didSet {
             guard draft.songs != oldValue.songs else { return }
-            for continuation in draftContinuations.values {
-                continuation.yield(draft)
+            for continuation in songPoolContinuations.values {
+                continuation.yield()
             }
         }
     }
@@ -94,7 +95,7 @@ final class ShufflePlayer {
         for continuation in transitionContinuations.values {
             continuation.finish()
         }
-        for continuation in draftContinuations.values {
+        for continuation in songPoolContinuations.values {
             continuation.finish()
         }
     }

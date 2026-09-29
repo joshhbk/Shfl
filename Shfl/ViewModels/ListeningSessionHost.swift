@@ -5,29 +5,26 @@ import UIKit
 /// draft and the active session, session restore, and durability.
 ///
 /// Durability is driven by state, never by callers. Song-pool edits arrive on
-/// the player's draft seam, song starts on its transition seam, and lifecycle
+/// the player's song-pool stream, song starts on its transition seam, and lifecycle
 /// checkpoints on the background notification. Each commit writes the live
 /// pool together with the latest session record, so the two can never disagree.
-@Observable
 @MainActor
 final class ListeningSessionHost {
     let player: ShufflePlayer
 
-    private(set) var didRestorePlaybackState = false
-
-    @ObservationIgnored private let playbackTransport: PlaybackTransport
-    @ObservationIgnored private let archive: SessionArchive
-    @ObservationIgnored private let now: () -> Date
-    @ObservationIgnored private let lifecyclePersistenceHook: (() -> Void)?
+    private let playbackTransport: PlaybackTransport
+    private let archive: SessionArchive
+    private let now: () -> Date
+    private let lifecyclePersistenceHook: (() -> Void)?
 
     /// The session record the archive currently holds, so a pool-only commit
     /// can carry it forward without reading storage back.
-    @ObservationIgnored private var committedSession: ListeningSessionRecord?
-    @ObservationIgnored private var latestSessionSaveTime: Date?
+    private var committedSession: ListeningSessionRecord?
+    private var latestSessionSaveTime: Date?
 
-    @ObservationIgnored private var transitionTask: Task<Void, Never>?
-    @ObservationIgnored private var draftTask: Task<Void, Never>?
-    @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
+    private var transitionTask: Task<Void, Never>?
+    private var songPoolTask: Task<Void, Never>?
+    private var backgroundObserver: NSObjectProtocol?
 
     init(
         playbackTransport: PlaybackTransport,
@@ -51,14 +48,16 @@ final class ListeningSessionHost {
 
     deinit {
         transitionTask?.cancel()
-        draftTask?.cancel()
+        songPoolTask?.cancel()
         if let observer = backgroundObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
 
     /// Reinstates the saved song pool and, when still valid, the saved session.
-    func restoreSavedSession() async {
+    /// Returns whether a saved session was loaded into the player.
+    @discardableResult
+    func restoreSavedSession() async -> Bool {
         let archived = (try? await archive.loadAsync()) ?? .empty
         committedSession = archived.session
 
@@ -70,7 +69,7 @@ final class ListeningSessionHost {
 
         guard let record = archived.session else {
             print("📱 Restore: No saved listening session")
-            return
+            return false
         }
 
         print("📱 Restore: Attempting to restore session (song=\(record.currentSongID), position=\(record.playbackPosition))")
@@ -78,20 +77,22 @@ final class ListeningSessionHost {
         case .restore(let session, let currentSongID, _, let position):
             // Played history is the session order before the current song, so
             // the session and current song fully reinstate it.
-            didRestorePlaybackState = await player.restore(
+            let restored = await player.restore(
                 session,
                 currentSongID: currentSongID,
                 playbackPosition: position
             )
-            if !didRestorePlaybackState {
+            if !restored {
                 print("📱 Restore: Saved session could not be loaded; next play will create a fresh shuffle")
             }
+            return restored
 
         case .discard(let reason):
             print("📱 Restore: Discarding saved session (\(reason))")
             if reason == .stale {
                 commit(session: nil, savedAt: now())
             }
+            return false
         }
     }
 
@@ -113,9 +114,9 @@ final class ListeningSessionHost {
             }
         }
 
-        let draftChanges = player.draftChanges
-        draftTask = Task { @MainActor [weak self] in
-            for await _ in draftChanges {
+        let songPoolChanges = player.songPoolChanges
+        songPoolTask = Task { @MainActor [weak self] in
+            for await _ in songPoolChanges {
                 guard !Task.isCancelled, let self else { return }
                 self.commitPool()
             }
