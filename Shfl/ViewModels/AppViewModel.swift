@@ -4,12 +4,12 @@ import SwiftUI
 @Observable
 @MainActor
 final class AppViewModel {
-    let player: ShufflePlayer
     @ObservationIgnored let musicService: MusicService
     @ObservationIgnored let lastFMTransport: LastFMTransport?
 
+    @ObservationIgnored private let sessionHost: ListeningSessionHost
     @ObservationIgnored private let appSettings: AppSettings
-    @ObservationIgnored private let sessionCoordinator: AppPlaybackSessionCoordinator
+    @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
     /// Pre-fetched library songs, ready for instant shuffle on play press
     @ObservationIgnored private var prefetchedSongs: [Song]?
@@ -20,32 +20,13 @@ final class AppViewModel {
     var showingPickerDirect = false
     var showingSettings = false
 
-    var isAuthorized: Bool {
-        get { sessionCoordinator.isAuthorized }
-        set { sessionCoordinator.isAuthorized = newValue }
-    }
-
+    var isAuthorized = false
     var isShuffling = false
+    var isLoading = true
+    var loadingMessage = "Loading..."
+    var authorizationError: String?
 
-    var isLoading: Bool {
-        get { sessionCoordinator.isLoading }
-        set { sessionCoordinator.isLoading = newValue }
-    }
-
-    var loadingMessage: String {
-        get { sessionCoordinator.loadingMessage }
-        set { sessionCoordinator.loadingMessage = newValue }
-    }
-
-    var authorizationError: String? {
-        get { sessionCoordinator.authorizationError }
-        set { sessionCoordinator.authorizationError = newValue }
-    }
-
-    /// Whether playback state was restored from persistence
-    var didRestorePlaybackState: Bool {
-        sessionCoordinator.didRestorePlaybackState
-    }
+    var player: ShufflePlayer { sessionHost.player }
 
     init(
         musicService: MusicService,
@@ -55,12 +36,13 @@ final class AppViewModel {
         scrobblingEnabled: Bool = true
     ) {
         self.musicService = musicService
-        let player = ShufflePlayer(
-            playbackTransport: musicService,
-            initialAlgorithm: appSettings.shuffleAlgorithm
-        )
-        self.player = player
         self.appSettings = appSettings
+        self.sessionHost = ListeningSessionHost(
+            playbackTransport: musicService,
+            archive: SessionArchive(modelContext: modelContext),
+            initialAlgorithm: appSettings.shuffleAlgorithm,
+            lifecyclePersistenceHook: lifecyclePersistenceHook
+        )
 
         let scrobbleTransports: [any ScrobbleTransport]
         if scrobblingEnabled {
@@ -75,33 +57,22 @@ final class AppViewModel {
             scrobbleTransports = []
         }
         let scrobbleManager = ScrobbleManager(transports: scrobbleTransports)
-        let scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, playbackTransport: musicService)
-        let sessionArchive = SessionArchive(modelContext: modelContext)
-
-        self.sessionCoordinator = AppPlaybackSessionCoordinator(
-            player: player,
-            authorizer: musicService,
-            playbackTransport: musicService,
-            archive: sessionArchive,
-            scrobbleTracker: scrobbleTracker,
-            lifecyclePersistenceHook: lifecyclePersistenceHook
-        )
+        self.scrobbleTracker = ScrobbleTracker(scrobbleManager: scrobbleManager, playbackTransport: musicService)
+        scrobbleTracker.start(consuming: player.playbackTransitions)
     }
 
     func onAppear() async {
-        await sessionCoordinator.onAppear()
+        async let authStatus = musicService.isAuthorized
+        await sessionHost.restoreSavedSession()
+        isAuthorized = await authStatus
+        isLoading = false
     }
 
     func requestAuthorization() async {
-        await sessionCoordinator.requestAuthorization()
-    }
-
-    func handleDidEnterBackground() {
-        sessionCoordinator.handleDidEnterBackground()
-    }
-
-    func poolDidChange() {
-        sessionCoordinator.poolDidChange()
+        isAuthorized = await musicService.requestAuthorization()
+        if !isAuthorized {
+            authorizationError = "Apple Music access is required to use Shuffled. Please enable it in Settings."
+        }
     }
 
     func autofillLibrary() async {
@@ -114,7 +85,6 @@ final class AppViewModel {
             )
             let songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
             try player.seedSongs(songs)
-            sessionCoordinator.poolDidChange()
         } catch {
             print("Failed to autofill library: \(error)")
         }
@@ -142,7 +112,6 @@ final class AppViewModel {
             try await player.startFreshShuffle(
                 algorithm: appSettings.shuffleAlgorithm
             )
-            sessionCoordinator.poolDidChange()
         } catch {
             print("Failed to shuffle all: \(error)")
         }
@@ -181,7 +150,6 @@ final class AppViewModel {
 
     func closeManage() {
         showingManage = false
-        sessionCoordinator.poolDidChange()
     }
 
     func openPicker() {
@@ -190,7 +158,6 @@ final class AppViewModel {
 
     func closePicker() {
         showingPicker = false
-        sessionCoordinator.poolDidChange()
     }
 
     func openPickerDirect() {
@@ -199,7 +166,6 @@ final class AppViewModel {
 
     func closePickerDirect() {
         showingPickerDirect = false
-        sessionCoordinator.poolDidChange()
     }
 
     func openSettings() {

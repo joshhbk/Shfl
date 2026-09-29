@@ -15,7 +15,10 @@ enum SessionArchiveError: Error {
 
 /// The single persistence module for the song pool and the active listening
 /// session. Hides SwiftData, JSON encoding, and atomic replacement behind one
-/// three-method interface.
+/// load/commit interface.
+///
+/// Only `ListeningSessionHost` writes here; it keeps the last written session
+/// record in memory, so any other writer would desynchronise it.
 @MainActor
 final class SessionArchive {
     private let modelContext: ModelContext
@@ -71,25 +74,6 @@ final class SessionArchive {
                 sessionJSON: try session.map(Self.encode)
             )
             modelContext.insert(record)
-            try saveHandler()
-        } catch {
-            modelContext.rollback()
-            throw error
-        }
-    }
-
-    /// Clears the active session but keeps the song pool.
-    func clearActiveSession() throws {
-        let pool = try load().pool
-        try commit(pool: pool, session: nil)
-    }
-
-    func clearAll() throws {
-        do {
-            let descriptor = FetchDescriptor<PersistedSession>()
-            for existing in try modelContext.fetch(descriptor) {
-                modelContext.delete(existing)
-            }
             try saveHandler()
         } catch {
             modelContext.rollback()

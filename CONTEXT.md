@@ -28,6 +28,10 @@ _Avoid_: Pending queue, deferred transport state
 The pure domain module that turns a session draft plus a recorded random seed into one complete, reproducible listening-session order.
 _Avoid_: Queue engine, shuffle manager
 
+**Session host**:
+The module that owns one launch's listening session: the session draft, the active listening session, session restore, and durability. It saves because state changed (a draft edit, a song start, a lifecycle checkpoint), never because a caller asked it to.
+_Avoid_: Session coordinator, session recorder, persistence manager
+
 **Transport adapter**:
 The module that hides MusicKit-specific queue loading, identifier mapping, playback timing, and event observation behind Shfl's playback interface.
 _Avoid_: Music service, queue sync

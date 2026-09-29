@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Shfl
 
-actor MockScrobbleTransport: ScrobbleTransport {
+actor MockScrobbleTransport {
     private var _isAuthenticated: Bool = true
     var isAuthenticated: Bool { _isAuthenticated }
     private(set) var scrobbledEvents: [ScrobbleEvent] = []
@@ -20,6 +20,10 @@ actor MockScrobbleTransport: ScrobbleTransport {
         nowPlayingEvents.append(event)
     }
 }
+
+// Declared in an extension: Xcode 27 infers `nonisolated` onto an actor that
+// lists a nonisolated protocol on its primary declaration, then rejects it.
+extension MockScrobbleTransport: ScrobbleTransport {}
 
 @Suite("ScrobbleTransport Tests")
 struct ScrobbleTransportTests {

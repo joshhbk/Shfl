@@ -6,7 +6,7 @@ import Synchronization
 /// It uses the same music seam as MusicKit. Catalog results are supplied at
 /// construction time, and playback time advances only when `advance(by:)` is
 /// called. No Apple Music account, network, or wall clock is involved.
-nonisolated actor DeterministicMusicService: MusicService {
+actor DeterministicMusicService: MusicService {
     nonisolated struct Configuration: Sendable {
         var isAuthorized = true
         var librarySongs: [Song] = []
