@@ -84,7 +84,20 @@ final class ShufflePlayer {
     }
 
     func startFreshShuffle(seed: UInt64) async throws {
-        try await installFreshSession(autoplay: true, seed: seed)
+        let session: ListeningSession
+        do {
+            session = try composer.compose(draft: sessionDraft.draft, seed: seed)
+        } catch {
+            throw report("Couldn't build a shuffle", error: error)
+        }
+        try await install(
+            session,
+            currentSongID: session.songIDs[0],
+            playbackPosition: 0,
+            autoplay: true
+        )
+        operationNotice = nil
+        record("session-started", detail: "seed=\(seed)")
     }
 
     /// Resumes the active listening session. Does nothing without one: the
@@ -175,26 +188,6 @@ final class ShufflePlayer {
         record("debug-reset")
     }
 
-    private func installFreshSession(
-        autoplay: Bool,
-        seed: UInt64 = UInt64.random(in: UInt64.min ... UInt64.max)
-    ) async throws {
-        let session: ListeningSession
-        do {
-            session = try composer.compose(draft: sessionDraft.draft, seed: seed)
-        } catch {
-            throw report("Couldn't build a shuffle", error: error)
-        }
-        try await install(
-            session,
-            currentSongID: session.songIDs[0],
-            playbackPosition: 0,
-            autoplay: autoplay
-        )
-        operationNotice = nil
-        record("session-started", detail: "seed=\(seed), autoplay=\(autoplay)")
-    }
-
     private func install(
         _ session: ListeningSession,
         currentSongID: String,
@@ -231,7 +224,9 @@ final class ShufflePlayer {
         }
     }
 
-    private func updatePlaybackState(_ state: PlaybackState) {
+    /// - Parameter endingSession: The session just played past its last song,
+    ///   rather than being cleared.
+    private func updatePlaybackState(_ state: PlaybackState, endingSession: Bool = false) {
         let sessionChanged = publishedSessionID != activeSession?.id
         guard state != playbackState || sessionChanged else { return }
         let songChanged = state.currentSongId != playbackState.currentSongId || sessionChanged
@@ -245,7 +240,7 @@ final class ShufflePlayer {
                 songTransition = songChanged ? .selected(song) : nil
             }
         } else {
-            songTransition = songChanged ? .cleared : nil
+            songTransition = songChanged ? (endingSession ? .sessionEnded : .cleared) : nil
         }
         playbackState = state
         publishedSessionID = activeSession?.id
@@ -265,12 +260,12 @@ final class ShufflePlayer {
         observationTask = Task { @MainActor [weak self] in
             for await event in events {
                 guard !Task.isCancelled, let self else { return }
-                await self.handlePlaybackEvent(event)
+                self.handlePlaybackEvent(event)
             }
         }
     }
 
-    private func handlePlaybackEvent(_ event: PlaybackEvent) async {
+    private func handlePlaybackEvent(_ event: PlaybackEvent) {
         // A load commits its state only after the atomic transport operation
         // succeeds. Intermediate transport reports must not escape that boundary.
         guard !isLoadingSession else { return }
@@ -285,17 +280,12 @@ final class ShufflePlayer {
             updatePlaybackState(state)
             record("transport-state", detail: state.label)
         case .sessionEnded:
+            // The session host decides what follows a session end.
             guard activeSession != nil else { return }
             activeSession = nil
-            updatePlaybackState(.stopped)
+            updatePlaybackState(.stopped, endingSession: true)
             sessionEndCount &+= 1
             record("session-ended")
-            guard !sessionDraft.isEmpty else { return }
-            do {
-                try await installFreshSession(autoplay: true)
-            } catch {
-                // `installFreshSession` records and exposes the failure.
-            }
         }
     }
 

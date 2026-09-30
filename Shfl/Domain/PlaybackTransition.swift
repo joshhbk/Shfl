@@ -17,5 +17,9 @@ nonisolated enum SongTransition: Equatable, Sendable {
     case selected(Song)
     case started(Song)
     case selectedAndStarted(Song)
+    /// No song is current: the session was cleared, failed to load, or none
+    /// was ever loaded.
     case cleared
+    /// The listening session played past its last song.
+    case sessionEnded
 }
