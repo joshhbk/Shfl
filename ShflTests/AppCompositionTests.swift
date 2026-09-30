@@ -34,7 +34,7 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertTrue(viewModel.isAuthorized)
 
         await viewModel.autofillLibrary()
-        XCTAssertEqual(viewModel.player.songCount, 3)
+        XCTAssertEqual(viewModel.sessionDraft.songCount, 3)
 
         await viewModel.togglePlayback()
         XCTAssertEqual(viewModel.player.playbackState.currentSong?.title, "Low Tide")

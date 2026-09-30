@@ -23,7 +23,7 @@ struct PlaybackScenarioTests {
     @Test("A session plays in order, then a fresh one starts", arguments: TransportKind.allCases)
     func playsThroughThenStartsFreshSession(kind: TransportKind) async throws {
         let rig = ScenarioRig(kind, songs: songs)
-        try rig.player.seedSongs(songs)
+        try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
         let firstSession = try #require(rig.player.activeSession)
 
@@ -44,7 +44,7 @@ struct PlaybackScenarioTests {
     @Test("Skip forward, then back to the start", arguments: TransportKind.allCases)
     func skipsForwardAndBack(kind: TransportKind) async throws {
         let rig = ScenarioRig(kind, songs: songs)
-        try rig.player.seedSongs(songs)
+        try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
         let order = try #require(rig.player.activeSession?.songOrder)
 
@@ -59,7 +59,7 @@ struct PlaybackScenarioTests {
     @Test("Pause and resume keep the session and song", arguments: TransportKind.allCases)
     func pausesAndResumes(kind: TransportKind) async throws {
         let rig = ScenarioRig(kind, songs: songs)
-        try rig.player.seedSongs(songs)
+        try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
         let session = try #require(rig.player.activeSession)
         let first = session.songOrder[0]
@@ -75,7 +75,7 @@ struct PlaybackScenarioTests {
     @Test("Restore comes back paused at the saved song and position", arguments: TransportKind.allCases)
     func restoresPausedAtPosition(kind: TransportKind) async throws {
         let rig = ScenarioRig(kind, songs: songs)
-        try rig.player.seedSongs(songs)
+        try rig.draft.add(songs)
         let session = ListeningSession(songOrder: songs, algorithm: .noRepeat, seed: 3)
 
         let restored = await rig.player.restore(session, currentSongID: songs[1].id, playbackPosition: 42)
@@ -89,7 +89,7 @@ struct PlaybackScenarioTests {
     @Test("Seeking moves the playback position", arguments: TransportKind.allCases)
     func seeks(kind: TransportKind) async throws {
         let rig = ScenarioRig(kind, songs: songs)
-        try rig.player.seedSongs(songs)
+        try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
 
         rig.player.seek(to: 95)
@@ -97,17 +97,46 @@ struct PlaybackScenarioTests {
         #expect(rig.transport.currentPlaybackTime == 95)
     }
 
-    @Test("Removing every song clears playback", arguments: TransportKind.allCases)
-    func removingEverythingClears(kind: TransportKind) async throws {
+    @Test("Removing every song leaves the current session playing", arguments: TransportKind.allCases)
+    func removingEverythingKeepsPlaying(kind: TransportKind) async throws {
         let rig = ScenarioRig(kind, songs: songs)
-        try rig.player.seedSongs(songs)
+        try rig.draft.add(songs)
+        try await rig.player.startFreshShuffle(seed: 11)
+        let session = try #require(rig.player.activeSession)
+
+        rig.draft.removeAll()
+        await rig.finishCurrentSong()
+
+        try await eventually { rig.player.playbackState == .playing(session.songOrder[1]) }
+        #expect(rig.player.activeSession?.id == session.id)
+    }
+
+    @Test("When the session ends with an empty pool, playback stops", arguments: TransportKind.allCases)
+    func emptyPoolStopsAtSessionEnd(kind: TransportKind) async throws {
+        let rig = ScenarioRig(kind, songs: songs)
+        try rig.draft.add([songs[0]])
         try await rig.player.startFreshShuffle(seed: 11)
 
-        await rig.player.removeAllSongs()
+        rig.draft.removeAll()
+        await rig.finishCurrentSong()
+
+        try await eventually { rig.player.sessionEndCount == 1 }
+        #expect(rig.player.activeSession == nil)
+        #expect(rig.player.playbackState == .stopped)
+    }
+
+    @Test("Clearing the session stops playback", arguments: TransportKind.allCases)
+    func clearingSessionStops(kind: TransportKind) async throws {
+        let rig = ScenarioRig(kind, songs: songs)
+        try rig.draft.add(songs)
+        try await rig.player.startFreshShuffle(seed: 11)
+
+        await rig.player.clearSession()
 
         try await eventually { rig.player.playbackState == .empty }
         #expect(rig.player.activeSession == nil)
         #expect(rig.transport.currentSongId == nil)
+        #expect(rig.draft.songCount == songs.count)
     }
 }
 
@@ -116,6 +145,7 @@ struct PlaybackScenarioTests {
 @MainActor
 private struct ScenarioRig {
     let transport: PlaybackTransport
+    let draft = SessionDraftStore()
     let player: ShufflePlayer
     let finishCurrentSong: () async -> Void
 
@@ -135,7 +165,7 @@ private struct ScenarioRig {
             transport = MusicKitTransport(player: fake, confirmationDelay: {})
             finishCurrentSong = { await fake.finishCurrentEntry() }
         }
-        player = ShufflePlayer(playbackTransport: transport)
+        player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
     }
 }
 

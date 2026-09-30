@@ -3,14 +3,14 @@ import SwiftUI
 struct ManageView: View {
     var player: ShufflePlayer
     let onAddTapped: () -> Void
-    let onRemoveSong: @MainActor (String) -> Void
     let onDismiss: () -> Void
+    @Environment(\.sessionDraft) private var sessionDraft
     @State private var isStartingNewShuffle = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if player.allSongs.isEmpty {
+                if sessionDraft.isEmpty {
                     emptyState
                 } else {
                     songList
@@ -28,7 +28,7 @@ struct ManageView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .disabled(player.remainingCapacity == 0)
+                    .disabled(sessionDraft.isAtCapacity)
                 }
             }
         }
@@ -78,18 +78,18 @@ struct ManageView: View {
             }
 
             Section {
-                ForEach(player.allSongs) { song in
+                ForEach(sessionDraft.songs) { song in
                     SongDisplay(song: song)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                onRemoveSong(song.id)
+                                sessionDraft.remove(songID: song.id)
                             } label: {
                                 Label("Remove", systemImage: "trash")
                             }
                         }
                 }
             } header: {
-                Text("\(player.songCount) of \(player.capacity) songs")
+                Text("\(sessionDraft.songCount) of \(sessionDraft.capacity) songs")
             }
         }
     }

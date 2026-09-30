@@ -9,28 +9,40 @@ import XCTest
 @MainActor
 final class ViewTeardownTests: XCTestCase {
     func test_closingTheSongPickerReleasesItsStateWithoutCrashing() async throws {
-        let service = DeterministicMusicService()
+        let draft = SessionDraftStore()
         try await showThenTearDown(
             SongPickerView(
-                player: ShufflePlayer(playbackTransport: service),
-                libraryCatalog: service,
+                libraryCatalog: DeterministicMusicService(),
                 initialSortOption: .mostPlayed,
-                onAddSongs: { _ in },
-                onRemoveSong: { _ in },
-                onRemoveAllSongs: {},
                 onDismiss: {}
             )
+            .environment(\.sessionDraft, draft)
         )
     }
 
     func test_leavingThePlayerReleasesItsStateWithoutCrashing() async throws {
         let service = DeterministicMusicService()
+        let draft = SessionDraftStore()
         try await showThenTearDown(
             PlayerView(
-                player: ShufflePlayer(playbackTransport: service),
+                player: ShufflePlayer(playbackTransport: service, sessionDraft: draft),
                 playbackTransport: service,
                 onManageTapped: {}
             )
+            .environment(\.sessionDraft, draft)
+        )
+    }
+
+    func test_closingManageReleasesItsStateWithoutCrashing() async throws {
+        let draft = SessionDraftStore()
+        try draft.add(Song(id: "1", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+        try await showThenTearDown(
+            ManageView(
+                player: ShufflePlayer(playbackTransport: DeterministicMusicService(), sessionDraft: draft),
+                onAddTapped: {},
+                onDismiss: {}
+            )
+            .environment(\.sessionDraft, draft)
         )
     }
 

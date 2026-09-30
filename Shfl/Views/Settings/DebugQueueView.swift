@@ -16,14 +16,15 @@ struct DebugQueueView: View {
 private struct DebugListeningSessionContent: View {
     let player: ShufflePlayer
 
+    @Environment(\.sessionDraft) private var sessionDraft
     @State private var showingResetConfirmation = false
     @State private var copiedAt: Date?
 
     var body: some View {
         List {
             Section("Draft") {
-                row("Songs", "\(player.songCount)")
-                row("Algorithm", player.draft.algorithm.displayName)
+                row("Songs", "\(sessionDraft.songCount)")
+                row("Algorithm", sessionDraft.algorithm.displayName)
                 row("Pending changes", player.hasPendingSessionChanges ? "Yes" : "No")
             }
 
@@ -101,6 +102,7 @@ private struct DebugListeningSessionContent: View {
         .navigationTitle("Playback Diagnostics")
         .alert("Clear everything?", isPresented: $showingResetConfirmation) {
             Button("Clear", role: .destructive) {
+                sessionDraft.removeAll()
                 Task { await player.hardResetQueueForDebug() }
             }
             Button("Cancel", role: .cancel) {}
@@ -113,8 +115,8 @@ private struct DebugListeningSessionContent: View {
             "\($0.timestamp.ISO8601Format()) \($0.event) \($0.detail ?? "")"
         }.joined(separator: "\n")
         return """
-        draft.count=\(player.songCount)
-        draft.algorithm=\(player.draft.algorithm.rawValue)
+        draft.count=\(sessionDraft.songCount)
+        draft.algorithm=\(sessionDraft.algorithm.rawValue)
         pending=\(player.hasPendingSessionChanges)
         session.id=\(session?.id.uuidString ?? "none")
         session.seed=\(session.map { String($0.seed) } ?? "none")
@@ -140,6 +142,9 @@ private struct DebugListeningSessionContent: View {
 #Preview {
     NavigationStack {
         DebugQueueView()
-            .environment(\.shufflePlayer, ShufflePlayer(playbackTransport: DeterministicMusicService()))
+            .environment(
+                \.shufflePlayer,
+                ShufflePlayer(playbackTransport: DeterministicMusicService(), sessionDraft: SessionDraftStore())
+            )
     }
 }

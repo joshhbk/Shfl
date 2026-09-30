@@ -93,4 +93,8 @@ extension EnvironmentValues {
         get { self[LastFMTransportKey.self] }
         set { self[LastFMTransportKey.self] = newValue }
     }
+
+    /// The session draft views edit. `MainView` injects the app's store; the
+    /// default is an empty store so previews work without setup.
+    @Entry var sessionDraft = SessionDraftStore()
 }

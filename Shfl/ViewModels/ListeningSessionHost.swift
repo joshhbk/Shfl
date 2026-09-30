@@ -1,15 +1,16 @@
 import Foundation
 import UIKit
 
-/// Owns one launch's listening session: the player that holds the session
-/// draft and the active session, session restore, and durability.
+/// Owns one launch's listening session: the session draft, the player that
+/// holds the active session, session restore, and durability.
 ///
 /// Durability is driven by state, never by callers. Song-pool edits arrive on
-/// the player's song-pool stream, song starts on its transition seam, and lifecycle
+/// the draft's song-pool stream, song starts on the player's transition seam, and lifecycle
 /// checkpoints on the background notification. Each commit writes the live
 /// pool together with the latest session record, so the two can never disagree.
 @MainActor
 final class ListeningSessionHost {
+    let sessionDraft: SessionDraftStore
     let player: ShufflePlayer
 
     private let playbackTransport: PlaybackTransport
@@ -33,9 +34,11 @@ final class ListeningSessionHost {
         now: @escaping () -> Date = Date.init,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) {
+        let sessionDraft = SessionDraftStore(algorithm: initialAlgorithm)
+        self.sessionDraft = sessionDraft
         self.player = ShufflePlayer(
             playbackTransport: playbackTransport,
-            initialAlgorithm: initialAlgorithm
+            sessionDraft: sessionDraft
         )
         self.playbackTransport = playbackTransport
         self.archive = archive
@@ -64,7 +67,7 @@ final class ListeningSessionHost {
         print("📱 Restore: Loaded \(archived.pool.count) songs, session=\(archived.session != nil ? "exists" : "nil")")
 
         if !archived.pool.isEmpty {
-            try? player.seedSongs(archived.pool)
+            try? sessionDraft.add(archived.pool)
         }
 
         guard let record = archived.session else {
@@ -114,7 +117,7 @@ final class ListeningSessionHost {
             }
         }
 
-        let songPoolChanges = player.songPoolChanges
+        let songPoolChanges = sessionDraft.songPoolChanges
         songPoolTask = Task { @MainActor [weak self] in
             for await _ in songPoolChanges {
                 guard !Task.isCancelled, let self else { return }
@@ -178,9 +181,9 @@ final class ListeningSessionHost {
     /// song-start transition still buffered on the transition seam.
     private func commitPool() {
         do {
-            try archive.commit(pool: player.allSongs, session: committedSession)
+            try archive.commit(pool: sessionDraft.songs, session: committedSession)
             #if DEBUG
-            print("💾 Saved pool: \(player.allSongs.count) songs")
+            print("💾 Saved pool: \(sessionDraft.songs.count) songs")
             #endif
         } catch {
             print("💾 Failed to save session draft: \(error)")
@@ -192,11 +195,11 @@ final class ListeningSessionHost {
         if let latestSessionSaveTime, savedAt < latestSessionSaveTime { return }
 
         do {
-            try archive.commit(pool: player.allSongs, session: session)
+            try archive.commit(pool: sessionDraft.songs, session: session)
             committedSession = session
             latestSessionSaveTime = savedAt
             #if DEBUG
-            print("💾 Saved: pool=\(player.allSongs.count), current=\(session?.currentSongID ?? "nil"), position=\(session?.playbackPosition ?? 0)")
+            print("💾 Saved: pool=\(sessionDraft.songs.count), current=\(session?.currentSongID ?? "nil"), position=\(session?.playbackPosition ?? 0)")
             #endif
         } catch {
             print("💾 Failed to commit session: \(error)")

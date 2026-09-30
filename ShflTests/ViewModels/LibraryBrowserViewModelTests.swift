@@ -93,20 +93,18 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
     // MARK: - Autofill Method Tests
 
-    func test_autofill_addsSongsToPlayer() async {
+    func test_autofill_addsSongsToTheDraft() async {
         let songs = (1...50).map {
             Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }
         await mockService.setLibrarySongs(songs)
 
-        let player = ShufflePlayer(playbackTransport: mockService)
+        let draft = SessionDraftStore()
         let source = LibraryAutofillSource(libraryCatalog: mockService)
 
-        await viewModel.autofill(into: player, using: source) { songs in
-            try await player.addSongsWithQueueRebuild(songs)
-        }
+        await viewModel.autofill(into: draft, using: source)
 
-        XCTAssertEqual(player.songCount, 50)
+        XCTAssertEqual(draft.songCount, 50)
         XCTAssertEqual(viewModel.autofillState, .completed(count: 50))
     }
 
@@ -116,19 +114,17 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
         await mockService.setLibrarySongs(songs)
 
-        let player = ShufflePlayer(playbackTransport: mockService)
+        let draft = SessionDraftStore()
         // Add 100 songs first
         for i in 1...100 {
-            try? await player.addSong(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+            try? draft.add(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: player, using: source) { songs in
-            try await player.addSongsWithQueueRebuild(songs)
-        }
+        await viewModel.autofill(into: draft, using: source)
 
         // Should only add 20 more (120 - 100)
-        XCTAssertEqual(player.songCount, 120)
+        XCTAssertEqual(draft.songCount, 120)
         XCTAssertEqual(viewModel.autofillState, .completed(count: 20))
     }
 
@@ -138,32 +134,28 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
         await mockService.setLibrarySongs(songs)
 
-        let player = ShufflePlayer(playbackTransport: mockService)
+        let draft = SessionDraftStore()
         // Pre-add some songs that are also in library
-        try? await player.addSong(songs[0])
-        try? await player.addSong(songs[1])
+        try? draft.add(songs[0])
+        try? draft.add(songs[1])
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: player, using: source) { songs in
-            try await player.addSongsWithQueueRebuild(songs)
-        }
+        await viewModel.autofill(into: draft, using: source)
 
         // Should add 8 new songs (10 - 2 already added)
-        XCTAssertEqual(player.songCount, 10)
+        XCTAssertEqual(draft.songCount, 10)
         XCTAssertEqual(viewModel.autofillState, .completed(count: 8))
     }
 
     func test_autofill_completesWithZeroWhenFull() async {
-        let player = ShufflePlayer(playbackTransport: mockService)
+        let draft = SessionDraftStore()
         // Fill to capacity
         for i in 1...120 {
-            try? await player.addSong(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+            try? draft.add(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: player, using: source) { songs in
-            try await player.addSongsWithQueueRebuild(songs)
-        }
+        await viewModel.autofill(into: draft, using: source)
 
         XCTAssertEqual(viewModel.autofillState, .completed(count: 0))
     }
@@ -172,14 +164,12 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         let songs = [Song(id: "1", title: "Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)]
         await mockService.setLibrarySongs(songs)
 
-        let player = ShufflePlayer(playbackTransport: mockService)
+        let draft = SessionDraftStore()
         let source = LibraryAutofillSource(libraryCatalog: mockService)
 
         // Start autofill
         let task = Task {
-            await viewModel.autofill(into: player, using: source) { songs in
-                try await player.addSongsWithQueueRebuild(songs)
-            }
+            await viewModel.autofill(into: draft, using: source)
         }
 
         // Verify it completes correctly
@@ -194,21 +184,20 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
         await mockService.setLibrarySongs(allSongs)
 
-        let player = ShufflePlayer(playbackTransport: mockService)
-        try await player.addSong(allSongs[0])
-        try await player.addSong(allSongs[1])
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: mockService, sessionDraft: draft)
+        try draft.add(allSongs[0])
+        try draft.add(allSongs[1])
         try await player.play()
         try await Task.sleep(nanoseconds: 100_000_000)
 
         await mockService.resetPlaybackRecording()
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: player, using: source) { songs in
-            try await player.addSongsWithQueueRebuild(songs)
-        }
+        await viewModel.autofill(into: draft, using: source)
 
         XCTAssertEqual(viewModel.autofillState, .completed(count: 3))
-        XCTAssertEqual(player.songCount, 5)
+        XCTAssertEqual(draft.songCount, 5)
 
         // Transport sync is deferred to avoid playback interruption
         let loadCallCount = await mockService.loadCallCount
@@ -217,7 +206,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         // Active session stays immutable; the draft contains the next shuffle.
         let activeSessionIds = Set(player.lastShuffledQueue.map(\.id))
         XCTAssertEqual(activeSessionIds, Set(allSongs.prefix(2).map(\.id)))
-        XCTAssertEqual(Set(player.allSongs.map(\.id)), Set(allSongs.map(\.id)))
+        XCTAssertEqual(Set(draft.songs.map(\.id)), Set(allSongs.map(\.id)))
         XCTAssertTrue(player.hasPendingSessionChanges)
     }
 }
