@@ -9,7 +9,7 @@ struct PlaylistDetailView: View {
     init(
         playlistId: String,
         playlistName: String,
-        musicService: MusicService,
+        libraryCatalog: LibraryCatalog,
         selectedSongIds: Set<String>,
         isAtCapacity: Bool,
         onToggleSong: @escaping (Song) -> Void
@@ -17,7 +17,7 @@ struct PlaylistDetailView: View {
         self._viewModel = State(wrappedValue: PlaylistDetailViewModel(
             playlistId: playlistId,
             playlistName: playlistName,
-            libraryCatalog: musicService
+            libraryCatalog: libraryCatalog
         ))
         self.selectedSongIds = selectedSongIds
         self.isAtCapacity = isAtCapacity

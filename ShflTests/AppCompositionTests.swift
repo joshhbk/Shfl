@@ -25,7 +25,7 @@ final class AppCompositionTests: XCTestCase {
         let composition = try AppComposition.make(mode: .deterministic)
         let viewModel = composition.appViewModel
         let transport = try XCTUnwrap(
-            viewModel.musicService as? DeterministicMusicService
+            viewModel.playbackTransport as? DeterministicMusicService
         )
 
         XCTAssertFalse(composition.showsStartupSplash)

@@ -16,7 +16,7 @@ enum BrowseMode: String, CaseIterable {
 
 struct SongPickerView: View {
     var player: ShufflePlayer
-    let musicService: MusicService
+    let libraryCatalog: LibraryCatalog
     let onDismiss: () -> Void
 
     @State private var viewModel: LibraryBrowserViewModel
@@ -32,7 +32,7 @@ struct SongPickerView: View {
 
     init(
         player: ShufflePlayer,
-        musicService: MusicService,
+        libraryCatalog: LibraryCatalog,
         initialSortOption: SortOption,
         onAddSongs: @escaping @MainActor ([Song]) async throws -> Void,
         onRemoveSong: @escaping @MainActor (String) async -> Void,
@@ -40,11 +40,11 @@ struct SongPickerView: View {
         onDismiss: @escaping () -> Void
     ) {
         self.player = player
-        self.musicService = musicService
+        self.libraryCatalog = libraryCatalog
         self.onDismiss = onDismiss
         self._viewModel = State(
             wrappedValue: LibraryBrowserViewModel(
-                libraryCatalog: musicService,
+                libraryCatalog: libraryCatalog,
                 initialSortOption: initialSortOption
             )
         )
@@ -290,7 +290,7 @@ struct SongPickerView: View {
         case .artists:
             ArtistListView(
                 viewModel: viewModel,
-                musicService: musicService,
+                libraryCatalog: libraryCatalog,
                 selectedSongIds: editor.selectedSongIds,
                 isAtCapacity: editor.isAtCapacity,
                 onToggleSong: { editor.toggle($0) }
@@ -298,7 +298,7 @@ struct SongPickerView: View {
         case .playlists:
             PlaylistListView(
                 viewModel: viewModel,
-                musicService: musicService,
+                libraryCatalog: libraryCatalog,
                 selectedSongIds: editor.selectedSongIds,
                 isAtCapacity: editor.isAtCapacity,
                 onToggleSong: { editor.toggle($0) }
@@ -396,7 +396,7 @@ struct SongPickerView: View {
     private var artistSearchResultsList: some View {
         ArtistListView(
             viewModel: viewModel,
-            musicService: musicService,
+            libraryCatalog: libraryCatalog,
             selectedSongIds: editor.selectedSongIds,
             isAtCapacity: editor.isAtCapacity,
             onToggleSong: { editor.toggle($0) },
@@ -420,7 +420,7 @@ struct SongPickerView: View {
     private var playlistSearchResultsList: some View {
         PlaylistListView(
             viewModel: viewModel,
-            musicService: musicService,
+            libraryCatalog: libraryCatalog,
             selectedSongIds: editor.selectedSongIds,
             isAtCapacity: editor.isAtCapacity,
             onToggleSong: { editor.toggle($0) },
@@ -526,7 +526,7 @@ struct SongPickerView: View {
         Task { @MainActor in
             let requestedCount = editor.remainingCapacity
             let algorithm = appSettings?.autofillAlgorithm ?? .random
-            let source = LibraryAutofillSource(libraryCatalog: musicService, algorithm: algorithm)
+            let source = LibraryAutofillSource(libraryCatalog: libraryCatalog, algorithm: algorithm)
             await viewModel.autofill(
                 into: player,
                 using: source,
@@ -615,7 +615,7 @@ private enum PreviewPickerLibrary {
 
     SongPickerView(
         player: player,
-        musicService: service,
+        libraryCatalog: service,
         initialSortOption: .mostPlayed,
         onAddSongs: { _ in },
         onRemoveSong: { _ in },
@@ -634,7 +634,7 @@ private enum PreviewPickerLibrary {
             if let player {
                 SongPickerView(
                     player: player,
-                    musicService: service,
+                    libraryCatalog: service,
                     initialSortOption: .mostPlayed,
                     onAddSongs: { _ in },
                     onRemoveSong: { _ in },
@@ -664,7 +664,7 @@ private enum PreviewPickerLibrary {
 
     SongPickerView(
         player: player,
-        musicService: service,
+        libraryCatalog: service,
         initialSortOption: .mostPlayed,
         onAddSongs: { _ in },
         onRemoveSong: { _ in },

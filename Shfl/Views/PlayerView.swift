@@ -3,7 +3,7 @@ import Vortex
 
 struct PlayerView: View {
     var player: ShufflePlayer
-    let musicService: MusicService
+    let playbackTransport: PlaybackTransport
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
@@ -23,7 +23,7 @@ struct PlayerView: View {
 
     init(
         player: ShufflePlayer,
-        musicService: MusicService,
+        playbackTransport: PlaybackTransport,
         initialThemeId: String? = nil,
         onManageTapped: @escaping () -> Void,
         onAddTapped: @escaping () -> Void = {},
@@ -35,7 +35,7 @@ struct PlayerView: View {
         isShuffling: Bool = false
     ) {
         self.player = player
-        self.musicService = musicService
+        self.playbackTransport = playbackTransport
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
@@ -69,7 +69,7 @@ struct PlayerView: View {
                     onSettings: onSettingsTapped,
                     onSeek: { time in
                         progressState?.handleUserSeek(to: time)
-                        musicService.seek(to: time)
+                        player.seek(to: time)
                     },
                     onShuffle: onShuffle,
                     isShuffling: isShuffling,
@@ -90,7 +90,7 @@ struct PlayerView: View {
         .environment(\.shuffleTheme, tintProvider.computedTheme)
         .onAppear {
             if progressState == nil {
-                progressState = PlayerProgressState(musicService: musicService)
+                progressState = PlayerProgressState(playbackTransport: playbackTransport)
             }
             progressState?.startUpdating(playbackState: player.playbackState)
 
@@ -271,7 +271,7 @@ private struct PlayerViewPreviewHost: View {
     var body: some View {
         PlayerView(
             player: player,
-            musicService: musicService,
+            playbackTransport: musicService,
             initialThemeId: themeId,
             onManageTapped: {},
             onAddTapped: {},

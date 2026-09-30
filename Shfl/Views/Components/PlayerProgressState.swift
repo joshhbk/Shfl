@@ -13,7 +13,7 @@ final class PlayerProgressState {
     private(set) var duration: TimeInterval = 0
     private(set) var pollingMode: PollingMode = .disabled
 
-    private let musicService: MusicService
+    private let playbackTransport: PlaybackTransport
     private var timer: Timer?
     private var timerInterval: TimeInterval?
     private var boostExpiryTask: Task<Void, Never>?
@@ -33,13 +33,13 @@ final class PlayerProgressState {
     }
 
     init(
-        musicService: MusicService,
+        playbackTransport: PlaybackTransport,
         boostedUpdateInterval: TimeInterval = 0.12,
         steadyUpdateInterval: TimeInterval = 0.45,
         boostDuration: TimeInterval = 2.5,
         nowProvider: @escaping () -> Date = Date.init
     ) {
-        self.musicService = musicService
+        self.playbackTransport = playbackTransport
         self.boostedUpdateInterval = boostedUpdateInterval
         self.steadyUpdateInterval = steadyUpdateInterval
         self.boostDuration = boostDuration
@@ -64,7 +64,7 @@ final class PlayerProgressState {
     }
 
     func refreshDuration() {
-        duration = musicService.currentSongDuration
+        duration = playbackTransport.currentSongDuration
     }
 
     func handlePlaybackStateChange(_ newState: PlaybackState) {
@@ -99,8 +99,8 @@ final class PlayerProgressState {
     }
 
     private func refreshNow() {
-        let newTime = musicService.currentPlaybackTime
-        let newDuration = musicService.currentSongDuration
+        let newTime = playbackTransport.currentPlaybackTime
+        let newDuration = playbackTransport.currentSongDuration
         if abs(newTime - currentTime) > timeUpdateThreshold {
             currentTime = newTime
         }

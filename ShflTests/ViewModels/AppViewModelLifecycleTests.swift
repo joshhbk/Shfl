@@ -30,7 +30,8 @@ final class AppViewModelLifecycleTests: XCTestCase {
 
     func testHandleDidEnterBackgroundPersistsSongsAndPlaybackState() async throws {
         let viewModel = AppViewModel(
-            musicService: mockService,
+            library: mockService,
+            playbackTransport: mockService,
             modelContext: modelContext,
             appSettings: appSettings
         )
@@ -62,7 +63,8 @@ final class AppViewModelLifecycleTests: XCTestCase {
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
         var persistCallCount = 0
         let viewModel = AppViewModel(
-            musicService: mockService,
+            library: mockService,
+            playbackTransport: mockService,
             modelContext: modelContext,
             appSettings: appSettings,
             lifecyclePersistenceHook: { persistCallCount += 1 }

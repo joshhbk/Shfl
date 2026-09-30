@@ -228,6 +228,11 @@ final class ShufflePlayer {
         }
     }
 
+    func seek(to time: TimeInterval) {
+        playbackTransport.seek(to: time)
+        record("seek", detail: String(format: "%.1f", time))
+    }
+
     func togglePlayback(algorithm: ShuffleAlgorithm? = nil) async throws {
         if playbackState.isPlaying {
             await pause()
@@ -368,12 +373,13 @@ final class ShufflePlayer {
         guard !isLoadingSession else { return }
         switch event {
         case .stateChanged(let state):
-            // MusicKit may briefly report empty while changing entries. The
-            // transport's explicit sessionEnded event owns completion.
+            // An active session ends only through `.sessionEnded` or `clear()`.
+            // A state report can't end it, including one made before the
+            // session loaded but delivered after.
             if activeSession != nil, (state == .empty || state == .stopped) {
                 return
             }
-            updatePlaybackState(normalized(state))
+            updatePlaybackState(state)
             record("transport-state", detail: state.label)
         case .sessionEnded:
             guard activeSession != nil else { return }
@@ -387,19 +393,6 @@ final class ShufflePlayer {
             } catch {
                 // `installFreshSession` records and exposes the failure.
             }
-        }
-    }
-
-    private func normalized(_ state: PlaybackState) -> PlaybackState {
-        guard let observed = state.currentSong,
-              let sessionSong = activeSession?.song(id: observed.id) else {
-            return state
-        }
-        switch state {
-        case .playing: return .playing(sessionSong)
-        case .paused: return .paused(sessionSong)
-        case .loading: return .loading(sessionSong)
-        default: return state
         }
     }
 
