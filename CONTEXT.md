@@ -24,6 +24,18 @@ _Avoid_: Fresh shuffle, reload
 The editable song pool and shuffle settings that will be used to compose the next listening session. Changes to the draft do not rewrite a listening session that is already playing; emptying the draft lets the current session play to its end. The session draft store is the only place the draft is edited.
 _Avoid_: Pending queue, deferred transport state
 
+**Session end**:
+A listening session playing past its last song. A fresh shuffle from the session draft follows, unless the draft is empty, in which case playback stops.
+_Avoid_: Queue exhausted, session cleared
+
+**Session clear**:
+Deliberately discarding the active listening session and stopping playback, with no listening session to follow.
+_Avoid_: Session end, reset
+
+**Autofill**:
+Filling an empty session draft with songs chosen from the user's library, so a listener who asks to play with nothing to shuffle still gets a listening session.
+_Avoid_: Prefetch, fill library, shuffle all
+
 **Session composer**:
 The pure domain module that turns a session draft plus a recorded random seed into one complete, reproducible listening-session order.
 _Avoid_: Queue engine, shuffle manager

@@ -36,10 +36,10 @@ final class AppCompositionTests: XCTestCase {
         await viewModel.autofillLibrary()
         XCTAssertEqual(viewModel.sessionDraft.songCount, 3)
 
-        await viewModel.togglePlayback()
+        await viewModel.sessionHost.togglePlayback()
         XCTAssertEqual(viewModel.player.playbackState.currentSong?.title, "Low Tide")
 
-        await viewModel.skipToNext()
+        try await viewModel.player.skipToNext()
         await waitUntil {
             viewModel.player.playbackState.currentSong?.title == "Second Wind"
         }

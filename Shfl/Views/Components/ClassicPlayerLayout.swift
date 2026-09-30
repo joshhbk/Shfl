@@ -11,7 +11,6 @@ struct ClassicPlayerLayout: View {
     let onAdd: () -> Void
     let onSettings: () -> Void
     let onSeek: (TimeInterval) -> Void
-    let onShuffle: () -> Void
     let isShuffling: Bool
     let showError: Bool
     let errorMessage: String
@@ -84,7 +83,7 @@ struct ClassicPlayerLayout: View {
             // Click wheel - floating with shadow
             ClickWheelView(
                 isPlaying: playbackState.isPlaying,
-                onPlayPause: hasSongs ? onPlayPause : onShuffle,
+                onPlayPause: onPlayPause,
                 onSkipForward: onSkipForward,
                 onSkipBack: onSkipBack,
                 onVolumeUp: { VolumeController.increaseVolume() },

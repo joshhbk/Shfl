@@ -71,7 +71,7 @@ final class ListeningSessionHostTests: XCTestCase {
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let host = makeHost()
 
-        // Same ordering as AppViewModel.shuffleAll: seed then start, no yield between.
+        // Same ordering as a fresh shuffle from the host: add then start, no yield between.
         try host.sessionDraft.add([song])
         try await host.player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session?.seed) == 7 }
@@ -80,7 +80,8 @@ final class ListeningSessionHostTests: XCTestCase {
         let nextTransport = DeterministicMusicService()
         let nextHost = ListeningSessionHost(
             playbackTransport: nextTransport,
-            archive: SessionArchive(modelContext: ModelContext(container))
+            archive: SessionArchive(modelContext: ModelContext(container)),
+            makeAutofillSource: { StubAutofillSource(songs: []) }
         )
         let restored = await nextHost.restoreSavedSession()
         XCTAssertTrue(restored)
@@ -227,6 +228,88 @@ final class ListeningSessionHostTests: XCTestCase {
         withExtendedLifetime(tracker) {}
     }
 
+    // MARK: - Starting
+
+    func testPlayPauseWithNoSessionShufflesTheDraft() async throws {
+        let source = StubAutofillSource(songs: makeSongs("library"))
+        let host = makeHost(autofillSource: source, makeSeed: { 7 })
+        try host.sessionDraft.add(makeSongs("one", "two"))
+
+        await host.togglePlayback()
+
+        XCTAssertEqual(host.player.activeSession?.seed, 7)
+        XCTAssertEqual(Set(host.player.activeSession?.songIDs ?? []), ["one", "two"])
+        XCTAssertTrue(host.player.playbackState.isPlaying)
+        XCTAssertEqual(source.fetchCount, 0)
+    }
+
+    func testPlayPauseWithNoSessionAndAnEmptyDraftAutofillsThenShuffles() async throws {
+        let source = StubAutofillSource(songs: makeSongs("a", "b", "c"))
+        let host = makeHost(autofillSource: source)
+
+        await host.togglePlayback()
+
+        XCTAssertEqual(Set(host.sessionDraft.songs.map(\.id)), ["a", "b", "c"])
+        XCTAssertEqual(Set(host.player.activeSession?.songIDs ?? []), ["a", "b", "c"])
+        XCTAssertTrue(host.player.playbackState.isPlaying)
+    }
+
+    func testPlayPauseKeepsTheActiveSessionAfterTheDraftIsEmptied() async throws {
+        let source = StubAutofillSource(songs: makeSongs("library"))
+        let host = makeHost(autofillSource: source)
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.togglePlayback()
+        let session = try XCTUnwrap(host.player.activeSession)
+        let current = try XCTUnwrap(host.player.playbackState.currentSong)
+
+        host.sessionDraft.removeAll()
+        await host.togglePlayback()
+        await waitUntil { host.player.playbackState == .paused(current) }
+        await host.togglePlayback()
+        await waitUntil { host.player.playbackState == .playing(current) }
+
+        XCTAssertEqual(host.player.activeSession?.id, session.id)
+        XCTAssertTrue(host.sessionDraft.isEmpty)
+        XCTAssertEqual(source.fetchCount, 0)
+    }
+
+    func testStartFreshShuffleReplacesTheActiveSessionButNeverAutofills() async throws {
+        let source = StubAutofillSource(songs: makeSongs("library"))
+        var seed: UInt64 = 0
+        let host = makeHost(autofillSource: source, makeSeed: { seed += 1; return seed })
+        try host.sessionDraft.add(makeSongs("one", "two"))
+
+        await host.startFreshShuffle()
+        let first = try XCTUnwrap(host.player.activeSession)
+        await host.startFreshShuffle()
+        let second = try XCTUnwrap(host.player.activeSession)
+        XCTAssertNotEqual(second.id, first.id)
+        XCTAssertEqual(second.seed, 2)
+
+        host.sessionDraft.removeAll()
+        await host.startFreshShuffle()
+
+        XCTAssertEqual(host.player.activeSession?.id, second.id)
+        XCTAssertEqual(source.fetchCount, 0)
+    }
+
+    func testIsStartingSessionCoversAutofillAndIgnoresRepeatPresses() async throws {
+        let source = StubAutofillSource(songs: makeSongs("a"), holdsUntilReleased: true)
+        let host = makeHost(autofillSource: source)
+
+        let start = Task { await host.togglePlayback() }
+        await waitUntil { source.isHeld }
+        XCTAssertTrue(host.isStartingSession)
+
+        await host.togglePlayback()
+        XCTAssertEqual(source.fetchCount, 1)
+
+        source.release()
+        await start.value
+        XCTAssertFalse(host.isStartingSession)
+        XCTAssertEqual(host.player.activeSession?.songIDs, ["a"])
+    }
+
     func testHostCanBeReleasedWhileWaitingForTransitions() async {
         var host: ListeningSessionHost? = makeHost()
         weak var releasedHost = host
@@ -236,15 +319,54 @@ final class ListeningSessionHostTests: XCTestCase {
     }
 
     private func makeHost(
+        autofillSource: AutofillSource? = nil,
+        makeSeed: @escaping () -> UInt64 = { 1 },
         now: @escaping () -> Date = Date.init,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) -> ListeningSessionHost {
-        ListeningSessionHost(
+        let autofillSource = autofillSource ?? StubAutofillSource(songs: [])
+        return ListeningSessionHost(
             playbackTransport: mockService,
             archive: archive,
+            makeAutofillSource: { autofillSource },
+            makeSeed: makeSeed,
             now: now,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
+    }
+
+    private func makeSongs(_ ids: String...) -> [Song] {
+        ids.map { Song(id: $0, title: $0, artist: "Artist", albumTitle: "Album", artworkURL: nil) }
+    }
+}
+
+/// Serves fixed songs, optionally holding each fetch until released so a test
+/// can observe the host mid-autofill.
+@MainActor
+private final class StubAutofillSource: AutofillSource {
+    private let songs: [Song]
+    private let holdsUntilReleased: Bool
+    private var held: CheckedContinuation<Void, Never>?
+    private(set) var fetchCount = 0
+
+    var isHeld: Bool { held != nil }
+
+    init(songs: [Song], holdsUntilReleased: Bool = false) {
+        self.songs = songs
+        self.holdsUntilReleased = holdsUntilReleased
+    }
+
+    func release() {
+        held?.resume()
+        held = nil
+    }
+
+    func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
+        fetchCount += 1
+        if holdsUntilReleased {
+            await withCheckedContinuation { held = $0 }
+        }
+        return Array(songs.filter { !excluding.contains($0.id) }.prefix(limit))
     }
 }
 

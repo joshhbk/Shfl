@@ -188,7 +188,7 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         let player = ShufflePlayer(playbackTransport: mockService, sessionDraft: draft)
         try draft.add(allSongs[0])
         try draft.add(allSongs[1])
-        try await player.play()
+        try await player.startFreshShuffle(seed: 1)
         try await Task.sleep(nanoseconds: 100_000_000)
 
         await mockService.resetPlaybackRecording()

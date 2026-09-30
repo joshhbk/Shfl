@@ -5,7 +5,7 @@ struct ManageView: View {
     let onAddTapped: () -> Void
     let onDismiss: () -> Void
     @Environment(\.sessionDraft) private var sessionDraft
-    @State private var isStartingNewShuffle = false
+    @Environment(\.listeningSessionHost) private var sessionHost
 
     var body: some View {
         NavigationStack {
@@ -56,15 +56,11 @@ struct ManageView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                    if player.hasPendingSessionChanges {
+                    if player.hasPendingSessionChanges, !sessionDraft.isEmpty {
                         Button {
-                            isStartingNewShuffle = true
-                            Task {
-                                try? await player.startFreshShuffle()
-                                isStartingNewShuffle = false
-                            }
+                            Task { await sessionHost?.startFreshShuffle() }
                         } label: {
-                            if isStartingNewShuffle {
+                            if sessionHost?.isStartingSession == true {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
                             } else {
@@ -72,7 +68,7 @@ struct ManageView: View {
                                     .frame(maxWidth: .infinity)
                             }
                         }
-                        .disabled(isStartingNewShuffle)
+                        .disabled(sessionHost?.isStartingSession ?? true)
                     }
                 }
             }

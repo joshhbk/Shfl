@@ -7,14 +7,12 @@ struct PlayerView: View {
     let onManageTapped: () -> Void
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
-    let onPlayPauseTapped: () -> Void
     let onSkipForwardTapped: () -> Void
     let onSkipBackTapped: () -> Void
-    let onShuffle: () -> Void
-    let isShuffling: Bool
 
     @Environment(\.appSettings) private var appSettings
     @Environment(\.sessionDraft) private var sessionDraft
+    @Environment(\.listeningSessionHost) private var sessionHost
     @State private var themeController: ThemeController
     @State private var tintProvider: TintedThemeProvider
     @State private var progressState: PlayerProgressState?
@@ -29,25 +27,23 @@ struct PlayerView: View {
         onManageTapped: @escaping () -> Void,
         onAddTapped: @escaping () -> Void = {},
         onSettingsTapped: @escaping () -> Void = {},
-        onPlayPauseTapped: @escaping () -> Void = {},
         onSkipForwardTapped: @escaping () -> Void = {},
-        onSkipBackTapped: @escaping () -> Void = {},
-        onShuffle: @escaping () -> Void = {},
-        isShuffling: Bool = false
+        onSkipBackTapped: @escaping () -> Void = {}
     ) {
         self.player = player
         self.playbackTransport = playbackTransport
         self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
-        self.onPlayPauseTapped = onPlayPauseTapped
         self.onSkipForwardTapped = onSkipForwardTapped
         self.onSkipBackTapped = onSkipBackTapped
-        self.onShuffle = onShuffle
-        self.isShuffling = isShuffling
         self._themeController = State(wrappedValue: ThemeController(themeId: initialThemeId))
         let initialTheme = initialThemeId.flatMap { ShuffleTheme.theme(byId: $0) } ?? .pink
         self._tintProvider = State(wrappedValue: TintedThemeProvider(theme: initialTheme))
+    }
+
+    private var isStartingSession: Bool {
+        sessionHost?.isStartingSession ?? player.isLoadingSession
     }
 
     var body: some View {
@@ -55,7 +51,7 @@ struct PlayerView: View {
             ZStack {
                 BrushedMetalBackground()
 
-                if player.playbackState.currentSong == nil && !isShuffling {
+                if player.playbackState.currentSong == nil && !isStartingSession {
                     IdleShuffleParticles(currentTheme: themeController.currentTheme)
                 }
 
@@ -63,7 +59,7 @@ struct PlayerView: View {
                     playbackState: player.playbackState,
                     hasSongs: !sessionDraft.isEmpty,
                     progressState: progressState,
-                    onPlayPause: onPlayPauseTapped,
+                    onPlayPause: { Task { await sessionHost?.togglePlayback() } },
                     onSkipForward: onSkipForwardTapped,
                     onSkipBack: onSkipBackTapped,
                     onAdd: onAddTapped,
@@ -72,8 +68,7 @@ struct PlayerView: View {
                         progressState?.handleUserSeek(to: time)
                         player.seek(to: time)
                     },
-                    onShuffle: onShuffle,
-                    isShuffling: isShuffling,
+                    isShuffling: isStartingSession,
                     showError: showError,
                     errorMessage: errorMessage,
                     safeAreaInsets: geometry.safeAreaInsets,
@@ -274,11 +269,8 @@ private struct PlayerViewPreviewHost: View {
             onManageTapped: {},
             onAddTapped: {},
             onSettingsTapped: {},
-            onPlayPauseTapped: {},
             onSkipForwardTapped: {},
-            onSkipBackTapped: {},
-            onShuffle: {},
-            isShuffling: false
+            onSkipBackTapped: {}
         )
         .environment(\.sessionDraft, sessionDraft)
     }

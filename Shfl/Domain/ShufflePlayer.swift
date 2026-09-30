@@ -83,23 +83,14 @@ final class ShufflePlayer {
         record("session-cleared")
     }
 
-    /// Compatibility entry point. It creates one paused immutable session.
-    func prepareQueue() async throws {
-        guard !sessionDraft.isEmpty else { return }
-        try await installFreshSession(autoplay: false)
-    }
-
-    func startFreshShuffle(
-        seed: UInt64 = UInt64.random(in: UInt64.min ... UInt64.max)
-    ) async throws {
+    func startFreshShuffle(seed: UInt64) async throws {
         try await installFreshSession(autoplay: true, seed: seed)
     }
 
+    /// Resumes the active listening session. Does nothing without one: the
+    /// session host decides when a new session starts.
     func play() async throws {
-        if activeSession == nil {
-            try await installFreshSession(autoplay: true)
-            return
-        }
+        guard activeSession != nil else { return }
         do {
             try await playbackTransport.play()
             record("play")
