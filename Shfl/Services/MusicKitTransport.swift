@@ -315,6 +315,7 @@ final class MusicKitTransport: PlaybackTransport {
 }
 
 final class PlaybackEventBroadcaster {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private var continuations: [UUID: AsyncStream<PlaybackEvent>.Continuation] = [:]
     private var latestEvent: PlaybackEvent = .stateChanged(.empty)
     private let lock = NSLock()

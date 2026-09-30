@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Reference box so sortOption can be captured by closures during init without capturing self.
 private final class SortOptionRef {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     var value: SortOption
     init(_ value: SortOption) { self.value = value }
 }
@@ -10,6 +11,7 @@ private final class SortOptionRef {
 @Observable
 @MainActor
 final class LibraryBrowserViewModel {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     enum Mode: Equatable {
         case browse
         case search

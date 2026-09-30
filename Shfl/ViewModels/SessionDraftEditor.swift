@@ -10,6 +10,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class SessionDraftEditor {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     @ObservationIgnored private let player: ShufflePlayer
     @ObservationIgnored private let addSongs: @MainActor ([Song]) async throws -> Void
     @ObservationIgnored private let removeSong: @MainActor (String) async -> Void

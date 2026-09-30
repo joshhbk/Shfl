@@ -3,6 +3,7 @@ import Foundation
 @Observable
 @MainActor
 final class PlaylistDetailViewModel {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     let lane: LibraryLane<Song>
 
     // Facade properties for view compatibility

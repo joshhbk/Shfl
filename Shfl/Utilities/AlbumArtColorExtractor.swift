@@ -5,6 +5,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class AlbumArtColorExtractor {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private(set) var extractedColor: Color?
 
     @ObservationIgnored private var currentSongId: String?

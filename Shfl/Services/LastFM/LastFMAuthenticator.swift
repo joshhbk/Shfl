@@ -220,6 +220,7 @@ actor LastFMAuthenticator {
 
 @MainActor
 final class WebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     static let shared = WebAuthContextProvider()
 
     private override init() {

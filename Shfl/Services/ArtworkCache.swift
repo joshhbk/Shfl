@@ -8,6 +8,7 @@ import MusicKit
 /// keeping eventing local and typed (no NotificationCenter payload parsing).
 @MainActor
 final class ArtworkCache {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     static let shared = ArtworkCache()
 
     enum ArtworkType {

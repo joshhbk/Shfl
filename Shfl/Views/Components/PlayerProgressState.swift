@@ -3,6 +3,7 @@ import Foundation
 /// Timer-based progress tracking for playback position
 @Observable @MainActor
 final class PlayerProgressState {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     enum PollingMode: Equatable {
         case disabled
         case boosted

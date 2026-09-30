@@ -4,6 +4,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class AppViewModel {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     @ObservationIgnored let library: MusicAuthorizing & LibraryCatalog
     @ObservationIgnored let playbackTransport: PlaybackTransport
     @ObservationIgnored let lastFMTransport: LastFMTransport?

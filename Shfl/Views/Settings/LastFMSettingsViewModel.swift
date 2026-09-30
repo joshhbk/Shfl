@@ -43,6 +43,7 @@ enum RecentTracksState: Equatable {
 @Observable
 @MainActor
 final class LastFMSettingsViewModel {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     var connectionState: ConnectionState = .disconnected
     var isRefreshing = false
     var errorMessage: String?
