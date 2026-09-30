@@ -4,6 +4,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class TintedThemeProvider {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     /// The computed theme with blended colors, ready for environment injection
     private(set) var computedTheme: ShuffleTheme
 

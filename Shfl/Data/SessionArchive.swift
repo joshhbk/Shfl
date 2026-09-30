@@ -21,6 +21,7 @@ enum SessionArchiveError: Error {
 /// record in memory, so any other writer would desynchronise it.
 @MainActor
 final class SessionArchive {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private let modelContext: ModelContext
     private let container: ModelContainer
     private let saveHandler: () throws -> Void

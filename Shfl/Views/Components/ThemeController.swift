@@ -3,6 +3,7 @@ import SwiftUI
 /// Manages theme switching with swipe gesture support
 @Observable @MainActor
 final class ThemeController {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private(set) var currentThemeIndex: Int
     @ObservationIgnored private(set) var dragOffset: CGFloat = 0
 

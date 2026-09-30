@@ -3,6 +3,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class SongUndoManager {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private(set) var currentState: UndoState?
     private var dismissTask: Task<Void, Never>?
 

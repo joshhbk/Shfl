@@ -17,6 +17,7 @@ struct PageResult<Item> {
 @Observable
 @MainActor
 final class LibraryLane<Item: Sendable> {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     // MARK: - Adapter closures
 
     @ObservationIgnored private let pageSize: Int

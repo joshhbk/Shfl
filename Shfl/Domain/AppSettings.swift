@@ -6,6 +6,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class AppSettings {
+    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     @ObservationIgnored private let defaults: UserDefaults
 
     var shuffleAlgorithm: ShuffleAlgorithm {
