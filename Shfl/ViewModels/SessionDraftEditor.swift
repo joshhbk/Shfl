@@ -1,10 +1,8 @@
 import SwiftUI
 
-/// The picker's editing state around the session draft: undo, the action
-/// error banner, and whether autofill has run out of songs.
-///
-/// Membership and capacity are read from `SessionDraftStore`; this module
-/// never keeps its own copy. Every edit is a direct store write.
+/// The song picker's editing state: undo, the error banner, and whether
+/// autofill has run out of songs. Edits go straight to the
+/// `SessionDraftStore` passed in.
 @Observable
 @MainActor
 final class SessionDraftEditor {

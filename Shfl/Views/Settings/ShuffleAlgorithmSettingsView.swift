@@ -35,8 +35,8 @@ struct ShuffleAlgorithmSettingsView: View {
                 guard let player else { return }
                 isStartingNewShuffle = true
                 Task {
-                    // MainView stages the chosen algorithm on the draft as
-                    // soon as the setting changes.
+                    // MainView has already applied the chosen algorithm to
+                    // the next shuffle.
                     try? await player.startFreshShuffle()
                     isStartingNewShuffle = false
                 }

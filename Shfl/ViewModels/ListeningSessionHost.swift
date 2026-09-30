@@ -1,13 +1,13 @@
 import Foundation
 import UIKit
 
-/// Owns one launch's listening session: the session draft, the player that
-/// holds the active session, session restore, and durability.
+/// Owns the listening session for one app launch: the session draft, the
+/// player, restoring the last session at launch, and saving.
 ///
-/// Durability is driven by state, never by callers. Song-pool edits arrive on
-/// the draft's song-pool stream, song starts on the player's transition seam, and lifecycle
-/// checkpoints on the background notification. Each commit writes the live
-/// pool together with the latest session record, so the two can never disagree.
+/// Saving happens on its own whenever something changes: songs are added or
+/// removed, a song starts playing, or the app goes to the background. Each
+/// save stores the song pool and the current session together, so they
+/// always match.
 @MainActor
 final class ListeningSessionHost {
     let sessionDraft: SessionDraftStore

@@ -51,8 +51,8 @@ final class ShufflePlayer {
             || activeSession.algorithm != draft.algorithm
     }
 
-    /// - Parameter sessionDraft: Read when composing a fresh shuffle. The
-    ///   player never edits it.
+    /// - Parameter sessionDraft: The songs and algorithm used when a new
+    ///   shuffle starts.
     init(
         playbackTransport: PlaybackTransport,
         sessionDraft: SessionDraftStore
@@ -74,8 +74,7 @@ final class ShufflePlayer {
         operationNotice = nil
     }
 
-    /// Stops playback and discards the active session. The session draft is
-    /// untouched.
+    /// Stops playback and ends the current listening session.
     func clearSession() async {
         activeSession = nil
         updatePlaybackState(.empty)

@@ -1,11 +1,11 @@
 import Foundation
 
-/// The single place the session draft is edited: which songs are in the pool,
+/// The one place the session draft is edited: which songs are in the pool,
 /// the shuffle algorithm, and filling the pool from the library.
 ///
-/// Edits here only shape the next listening session. `ShufflePlayer` reads the
-/// draft when it composes a fresh shuffle, and `ListeningSessionHost` saves the
-/// pool whenever `songPoolChanges` fires.
+/// Edits here apply to the next shuffle. `ShufflePlayer` reads the draft when
+/// it starts a new shuffle, and `ListeningSessionHost` saves the pool whenever
+/// `songPoolChanges` fires.
 @Observable
 @MainActor
 final class SessionDraftStore {
@@ -30,9 +30,8 @@ final class SessionDraftStore {
         }
     }
 
-    /// Each access creates an independent subscription that fires when song-pool
-    /// membership changes. Algorithm changes do not fire it. The current pool is
-    /// not replayed: subscribers hear only edits made after they subscribe.
+    /// Each read returns a new stream that fires whenever songs are added to or
+    /// removed from the pool, starting with the next edit.
     var songPoolChanges: AsyncStream<Void> {
         let id = UUID()
         return AsyncStream { continuation in
@@ -61,8 +60,8 @@ final class SessionDraftStore {
 
     // MARK: - Editing
 
-    /// Adds songs not already in the pool. Throws `.capacityReached` without
-    /// changing the pool if they don't all fit.
+    /// Adds the songs that aren't already in the pool. If they don't all fit,
+    /// throws `.capacityReached` and leaves the pool as it was.
     func add(_ songs: [Song]) throws {
         draft = try draft.adding(songs)
     }
@@ -75,7 +74,7 @@ final class SessionDraftStore {
         draft = draft.removing(songID: songID)
     }
 
-    /// Empties the pool. A session that is already playing keeps playing.
+    /// Empties the pool. Whatever is playing now keeps playing.
     func removeAll() {
         draft = draft.removingAll()
     }
@@ -84,8 +83,8 @@ final class SessionDraftStore {
         draft = draft.using(algorithm)
     }
 
-    /// Fills the remaining capacity with songs from `source` that aren't already
-    /// in the pool. Returns how many songs were added.
+    /// Adds songs from `source` until the pool is full, skipping ones already
+    /// in it. Returns how many songs were added.
     @discardableResult
     func autofill(from source: AutofillSource) async throws -> Int {
         let limit = remainingCapacity
@@ -94,7 +93,7 @@ final class SessionDraftStore {
             excluding: Set(draft.songs.map(\.id)),
             limit: limit
         )
-        // The pool may have changed while fetching; add only what still fits.
+        // Songs may have been added while this was fetching, so check again.
         let before = songCount
         try add(Array(fetched.filter { !contains($0.id) }.prefix(remainingCapacity)))
         return songCount - before

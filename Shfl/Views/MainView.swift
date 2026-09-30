@@ -125,7 +125,7 @@ struct MainView: View {
                 Text(error)
             }
         }
-        // Outermost, so the sheets above receive it too.
+        // Kept last so the sheets above can read it too.
         .environment(\.sessionDraft, viewModel.sessionDraft)
     }
 
