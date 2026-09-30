@@ -81,7 +81,7 @@ final class ListeningSessionHostTests: XCTestCase {
         let nextHost = ListeningSessionHost(
             playbackTransport: nextTransport,
             archive: SessionArchive(modelContext: ModelContext(container)),
-            makeAutofillSource: { StubAutofillSource(songs: []) }
+            autofillSource: StubAutofillSource(songs: [])
         )
         let restored = await nextHost.restoreSavedSession()
         XCTAssertTrue(restored)
@@ -310,6 +310,42 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(host.player.activeSession?.songIDs, ["a"])
     }
 
+    // MARK: - Warming autofill
+
+    func testEmptyingTheDraftWarmsAutofillButAddingSongsDoesNot() async throws {
+        let source = StubAutofillSource(songs: [])
+        let host = makeHost(autofillSource: source)
+
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        host.sessionDraft.remove(songID: "one")
+        await waitForStateUpdate()
+        XCTAssertEqual(source.warmCount, 0)
+
+        host.sessionDraft.remove(songID: "two")
+        await waitUntil { source.warmCount == 1 }
+    }
+
+    func testRestoringAnEmptyPoolWarmsAutofill() async {
+        let source = StubAutofillSource(songs: [])
+        let host = makeHost(autofillSource: source)
+
+        await host.restoreSavedSession()
+
+        XCTAssertEqual(source.warmCount, 1)
+    }
+
+    func testRestoringASavedPoolDoesNotWarmAutofill() async throws {
+        try archive.commit(pool: makeSongs("one"), session: nil)
+        let source = StubAutofillSource(songs: [])
+        let host = makeHost(autofillSource: source)
+
+        await host.restoreSavedSession()
+        await waitForStateUpdate()
+
+        XCTAssertEqual(host.sessionDraft.songs.map(\.id), ["one"])
+        XCTAssertEqual(source.warmCount, 0)
+    }
+
     // MARK: - Session end
 
     func testSessionEndContinuesWithAFreshShuffleOfTheStagedDraft() async throws {
@@ -379,7 +415,7 @@ final class ListeningSessionHostTests: XCTestCase {
     }
 
     private func makeHost(
-        autofillSource: AutofillSource? = nil,
+        autofillSource: StubAutofillSource? = nil,
         makeSeed: @escaping () -> UInt64 = { 1 },
         now: @escaping () -> Date = Date.init,
         lifecyclePersistenceHook: (() -> Void)? = nil
@@ -388,7 +424,7 @@ final class ListeningSessionHostTests: XCTestCase {
         return ListeningSessionHost(
             playbackTransport: mockService,
             archive: archive,
-            makeAutofillSource: { autofillSource },
+            autofillSource: autofillSource,
             makeSeed: makeSeed,
             now: now,
             lifecyclePersistenceHook: lifecyclePersistenceHook
@@ -403,17 +439,22 @@ final class ListeningSessionHostTests: XCTestCase {
 /// Serves fixed songs, optionally holding each fetch until released so a test
 /// can observe the host mid-autofill.
 @MainActor
-private final class StubAutofillSource: AutofillSource {
+private final class StubAutofillSource: WarmableAutofillSource {
     private let songs: [Song]
     private let holdsUntilReleased: Bool
     private var held: CheckedContinuation<Void, Never>?
     private(set) var fetchCount = 0
+    private(set) var warmCount = 0
 
     var isHeld: Bool { held != nil }
 
     init(songs: [Song], holdsUntilReleased: Bool = false) {
         self.songs = songs
         self.holdsUntilReleased = holdsUntilReleased
+    }
+
+    func warm() {
+        warmCount += 1
     }
 
     func release() {

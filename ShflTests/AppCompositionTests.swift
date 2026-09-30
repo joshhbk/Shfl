@@ -33,10 +33,9 @@ final class AppCompositionTests: XCTestCase {
         await viewModel.onAppear()
         XCTAssertTrue(viewModel.isAuthorized)
 
-        await viewModel.autofillLibrary()
-        XCTAssertEqual(viewModel.sessionDraft.songCount, 3)
-
+        // Play on an empty draft autofills it from the library first.
         await viewModel.sessionHost.togglePlayback()
+        XCTAssertEqual(viewModel.sessionDraft.songCount, 3)
         XCTAssertEqual(viewModel.player.playbackState.currentSong?.title, "Low Tide")
 
         try await viewModel.player.skipToNext()

@@ -74,17 +74,6 @@ struct MainView: View {
         .onChange(of: viewModel.isLoading) { _, _ in
             dismissSplashIfReady()
         }
-        .onChange(of: viewModel.isAuthorized) { _, isAuthorized in
-            guard isAuthorized,
-                  !appSettings.hasCompletedOnboarding,
-                  viewModel.sessionDraft.isEmpty else { return }
-            appSettings.hasCompletedOnboarding = true
-            viewModel.isLoading = true
-            viewModel.loadingMessage = "Finding songs in your library..."
-            Task {
-                await viewModel.autofillLibrary()
-            }
-        }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
             viewModel.sessionDraft.stage(newAlgorithm)
         }
@@ -153,7 +142,7 @@ struct MainView: View {
     @ViewBuilder
     private var launchContent: some View {
         if viewModel.isLoading {
-            LoadingView(message: viewModel.loadingMessage)
+            LoadingView(message: "Loading...")
                 .environment(\.shuffleTheme, loadingTheme)
                 .transition(.opacity)
         } else if viewModel.isAuthorized {
