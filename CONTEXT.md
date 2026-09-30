@@ -21,7 +21,7 @@ Reinstatement of a saved listening session, including its exact queue order, cur
 _Avoid_: Fresh shuffle, reload
 
 **Session draft**:
-The editable song pool and shuffle settings that will be used to compose the next listening session. Changes to the draft do not rewrite a listening session that is already playing.
+The editable song pool and shuffle settings that will be used to compose the next listening session. Changes to the draft do not rewrite a listening session that is already playing; emptying the draft lets the current session play to its end. The session draft store is the only place the draft is edited.
 _Avoid_: Pending queue, deferred transport state
 
 **Session composer**:

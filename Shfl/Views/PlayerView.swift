@@ -14,6 +14,7 @@ struct PlayerView: View {
     let isShuffling: Bool
 
     @Environment(\.appSettings) private var appSettings
+    @Environment(\.sessionDraft) private var sessionDraft
     @State private var themeController: ThemeController
     @State private var tintProvider: TintedThemeProvider
     @State private var progressState: PlayerProgressState?
@@ -60,7 +61,7 @@ struct PlayerView: View {
 
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
-                    hasSongs: player.songCount > 0,
+                    hasSongs: !sessionDraft.isEmpty,
                     progressState: progressState,
                     onPlayPause: onPlayPauseTapped,
                     onSkipForward: onSkipForwardTapped,
@@ -232,6 +233,7 @@ private let previewQueueSongs = [
 
 private struct PlayerViewPreviewHost: View {
     private let musicService: DeterministicMusicService
+    private let sessionDraft = SessionDraftStore()
     private let player: ShufflePlayer
     private let themeId: String
 
@@ -253,19 +255,15 @@ private struct PlayerViewPreviewHost: View {
                 playbackState: initialPlaybackState
             )
         )
-        let player = ShufflePlayer(playbackTransport: musicService)
-
         switch state {
         case .empty:
             break
-        case .armed:
-            try? player.seedSongs(previewQueueSongs)
-        case .loading, .playing, .paused, .error:
-            try? player.seedSongs(previewQueueSongs)
+        case .armed, .loading, .playing, .paused, .error:
+            try? sessionDraft.add(previewQueueSongs)
         }
 
         self.musicService = musicService
-        self.player = player
+        self.player = ShufflePlayer(playbackTransport: musicService, sessionDraft: sessionDraft)
     }
 
     var body: some View {
@@ -282,6 +280,7 @@ private struct PlayerViewPreviewHost: View {
             onShuffle: {},
             isShuffling: false
         )
+        .environment(\.sessionDraft, sessionDraft)
     }
 }
 

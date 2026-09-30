@@ -77,7 +77,7 @@ struct MainView: View {
         .onChange(of: viewModel.isAuthorized) { _, isAuthorized in
             guard isAuthorized,
                   !appSettings.hasCompletedOnboarding,
-                  viewModel.player.draftIsEmpty else { return }
+                  viewModel.sessionDraft.isEmpty else { return }
             appSettings.hasCompletedOnboarding = true
             viewModel.isLoading = true
             viewModel.loadingMessage = "Finding songs in your library..."
@@ -86,17 +86,12 @@ struct MainView: View {
             }
         }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
-            Task {
-                await viewModel.onShuffleAlgorithmChanged(newAlgorithm)
-            }
+            viewModel.sessionDraft.stage(newAlgorithm)
         }
         .sheet(isPresented: $viewModel.showingManage) {
             ManageView(
                 player: viewModel.player,
                 onAddTapped: { viewModel.openPicker() },
-                onRemoveSong: { songId in
-                    Task { await viewModel.removeSong(id: songId) }
-                },
                 onDismiss: { viewModel.closeManage() }
             )
             .tint(deviceAccentColor)
@@ -130,17 +125,15 @@ struct MainView: View {
                 Text(error)
             }
         }
+        // Kept last so the sheets above can read it too.
+        .environment(\.sessionDraft, viewModel.sessionDraft)
     }
 
     @ViewBuilder
     private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
         SongPickerView(
-            player: viewModel.player,
             libraryCatalog: viewModel.library,
             initialSortOption: appSettings.librarySortOption,
-            onAddSongs: { songs in try await viewModel.addSongsWithQueueRebuild(songs) },
-            onRemoveSong: { songId in await viewModel.removeSong(id: songId) },
-            onRemoveAllSongs: { await viewModel.removeAllSongs() },
             onDismiss: onDismiss
         )
         .tint(deviceAccentColor)
@@ -177,8 +170,8 @@ struct MainView: View {
                 isShuffling: viewModel.isShuffling || viewModel.player.isLoadingSession
             )
             .transition(.opacity)
-            .task(id: viewModel.player.draftIsEmpty) {
-                if viewModel.player.draftIsEmpty {
+            .task(id: viewModel.sessionDraft.isEmpty) {
+                if viewModel.sessionDraft.isEmpty {
                     viewModel.prefetchLibraryIfNeeded()
                 }
             }

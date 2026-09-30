@@ -5,11 +5,12 @@ import XCTest
 final class ShufflePlayerTests: XCTestCase {
     func test_firstPlayLoadsOneExactSessionAtBeginning() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let songs = makeSongs(5)
-        try player.seedSongs(songs)
+        try draft.add(songs)
 
-        try await player.startFreshShuffle(algorithm: .noRepeat, seed: 42)
+        try await player.startFreshShuffle(seed: 42)
 
         let request = await transport.lastLoadRequest
         let loadCallCount = await transport.loadCallCount
@@ -32,9 +33,10 @@ final class ShufflePlayerTests: XCTestCase {
 
     func test_activeEditsOnlyChangeNextSessionDraft() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let original = makeSongs(4)
-        try player.seedSongs(original)
+        try draft.add(original)
         try await player.startFreshShuffle(seed: 7)
         let activeOrder = try XCTUnwrap(player.activeSession?.songIDs)
 
@@ -45,36 +47,38 @@ final class ShufflePlayerTests: XCTestCase {
             albumTitle: "",
             artworkURL: nil
         )
-        try await player.addSong(addition)
-        await player.removeSong(id: original[0].id)
+        try draft.add(addition)
+        draft.remove(songID: original[0].id)
 
         let loadCallCount = await transport.loadCallCount
         XCTAssertEqual(loadCallCount, 1)
         XCTAssertEqual(player.activeSession?.songIDs, activeOrder)
         XCTAssertTrue(player.hasPendingSessionChanges)
-        XCTAssertTrue(player.allSongs.contains(addition))
-        XCTAssertFalse(player.allSongs.contains(original[0]))
+        XCTAssertTrue(draft.songs.contains(addition))
+        XCTAssertFalse(draft.songs.contains(original[0]))
     }
 
     func test_algorithmChangeDoesNotReloadActiveSession() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs(makeSongs(5))
-        try await player.startFreshShuffle(algorithm: .noRepeat, seed: 1)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add(makeSongs(5))
+        try await player.startFreshShuffle(seed: 1)
 
-        player.stageAlgorithm(.artistSpacing)
+        draft.stage(.artistSpacing)
 
         let loadCallCount = await transport.loadCallCount
         XCTAssertEqual(loadCallCount, 1)
         XCTAssertEqual(player.activeSession?.algorithm, .noRepeat)
-        XCTAssertEqual(player.draft.algorithm, .artistSpacing)
+        XCTAssertEqual(draft.draft.algorithm, .artistSpacing)
         XCTAssertTrue(player.hasPendingSessionChanges)
     }
 
     func test_pauseAndResumePreserveSessionPositionWithoutReload() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs(makeSongs(3))
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add(makeSongs(3))
         try await player.startFreshShuffle(seed: 6)
         let sessionID = player.activeSession?.id
         await transport.setPlaybackTime(42)
@@ -91,8 +95,9 @@ final class ShufflePlayerTests: XCTestCase {
 
     func test_nextAndPreviousFollowSessionOrderWithoutReload() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs(makeSongs(4))
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add(makeSongs(4))
         try await player.startFreshShuffle(seed: 11)
         let order = try XCTUnwrap(player.activeSession?.songIDs)
 
@@ -108,8 +113,9 @@ final class ShufflePlayerTests: XCTestCase {
 
     func test_virtualTimeAdvancesFiveSongsWithoutReloadingOrWrapping() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs(makeSongs(5))
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add(makeSongs(5))
         try await player.startFreshShuffle(seed: 99)
         await settle()
 
@@ -136,8 +142,9 @@ final class ShufflePlayerTests: XCTestCase {
 
     func test_transientEmptyDoesNotEndOrReloadSession() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs(makeSongs(3))
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add(makeSongs(3))
         try await player.startFreshShuffle(seed: 4)
         let activeID = player.activeSession?.id
         await settle()
@@ -153,7 +160,8 @@ final class ShufflePlayerTests: XCTestCase {
 
     func test_sessionEndBuildsNextSessionFromStagedDraft() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let original = makeSongs(3)
         let added = Song(
             id: "added",
@@ -162,10 +170,10 @@ final class ShufflePlayerTests: XCTestCase {
             albumTitle: "Album",
             artworkURL: nil
         )
-        try player.seedSongs(original)
+        try draft.add(original)
         try await player.startFreshShuffle(seed: 4)
-        try await player.addSong(added)
-        await player.removeSong(id: original[0].id)
+        try draft.add(added)
+        draft.remove(songID: original[0].id)
         await settle()
 
         await transport.simulateSessionEnded()
@@ -183,9 +191,10 @@ final class ShufflePlayerTests: XCTestCase {
 
     func test_restoreUsesOnePausedAtomicLoadWithExactOrderAndPosition() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let songs = makeSongs(4)
-        try player.seedSongs(songs)
+        try draft.add(songs)
         let order = [songs[2], songs[0], songs[3], songs[1]]
         let session = ListeningSession(
             songOrder: order,
@@ -211,22 +220,25 @@ final class ShufflePlayerTests: XCTestCase {
 
     func test_clearIsTheOnlyDraftEditThatClearsActiveSession() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs(makeSongs(3))
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add(makeSongs(3))
         try await player.startFreshShuffle(seed: 2)
 
-        await player.removeAllSongs()
+        draft.removeAll()
+        await player.clearSession()
         await settle()
 
-        XCTAssertTrue(player.draftIsEmpty)
+        XCTAssertTrue(draft.isEmpty)
         XCTAssertNil(player.activeSession)
         XCTAssertEqual(player.playbackState, .empty)
     }
 
     func test_failedFreshLoadLeavesNoFalseActiveSession() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs(makeSongs(3))
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add(makeSongs(3))
         await transport.failNextLoad(with:
             NSError(domain: "test-load", code: 1)
         )

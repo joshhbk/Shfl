@@ -15,12 +15,11 @@ enum BrowseMode: String, CaseIterable {
 }
 
 struct SongPickerView: View {
-    var player: ShufflePlayer
     let libraryCatalog: LibraryCatalog
     let onDismiss: () -> Void
 
     @State private var viewModel: LibraryBrowserViewModel
-    @State private var editor: SessionDraftEditor
+    @State private var editor = SessionDraftEditor()
     @State private var navigationPath = NavigationPath()
     @State private var showingAutofillCompletion = false
     @State private var autofillTapCount = 0
@@ -28,32 +27,20 @@ struct SongPickerView: View {
     @FocusState private var isSearchFieldFocused: Bool
 
     @Environment(\.appSettings) private var appSettings
+    @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.shuffleTheme) private var shuffleTheme
 
     init(
-        player: ShufflePlayer,
         libraryCatalog: LibraryCatalog,
         initialSortOption: SortOption,
-        onAddSongs: @escaping @MainActor ([Song]) async throws -> Void,
-        onRemoveSong: @escaping @MainActor (String) async -> Void,
-        onRemoveAllSongs: @escaping @MainActor () async -> Void,
         onDismiss: @escaping () -> Void
     ) {
-        self.player = player
         self.libraryCatalog = libraryCatalog
         self.onDismiss = onDismiss
         self._viewModel = State(
             wrappedValue: LibraryBrowserViewModel(
                 libraryCatalog: libraryCatalog,
                 initialSortOption: initialSortOption
-            )
-        )
-        self._editor = State(
-            wrappedValue: SessionDraftEditor(
-                player: player,
-                addSongs: onAddSongs,
-                removeSong: onRemoveSong,
-                removeAllSongs: onRemoveAllSongs
             )
         )
     }
@@ -233,10 +220,10 @@ struct SongPickerView: View {
                     .accessibilityIdentifier("songPicker.autofill")
                 }
 
-                if !editor.selectedSongIds.isEmpty {
+                if !selectedSongIds.isEmpty {
                     Button(role: .destructive) {
                         showingAutofillCompletion = false
-                        editor.clearAll()
+                        editor.clearAll(in: sessionDraft)
                     } label: {
                         Image(systemName: "trash")
                             .font(.body.weight(.semibold))
@@ -273,11 +260,11 @@ struct SongPickerView: View {
     }
 
     private var shouldOfferAutofill: Bool {
-        editor.remainingCapacity > 0 && !editor.autofillIsExhausted
+        sessionDraft.remainingCapacity > 0 && !editor.autofillIsExhausted
     }
 
     private var completionActionHint: String {
-        "Adds available songs up to \(editor.capacity) total"
+        "Adds available songs up to \(sessionDraft.capacity) total"
     }
 
     // MARK: - Library Content
@@ -291,17 +278,17 @@ struct SongPickerView: View {
             ArtistListView(
                 viewModel: viewModel,
                 libraryCatalog: libraryCatalog,
-                selectedSongIds: editor.selectedSongIds,
-                isAtCapacity: editor.isAtCapacity,
-                onToggleSong: { editor.toggle($0) }
+                selectedSongIds: selectedSongIds,
+                isAtCapacity: sessionDraft.isAtCapacity,
+                onToggleSong: { editor.toggle($0, in: sessionDraft) }
             )
         case .playlists:
             PlaylistListView(
                 viewModel: viewModel,
                 libraryCatalog: libraryCatalog,
-                selectedSongIds: editor.selectedSongIds,
-                isAtCapacity: editor.isAtCapacity,
-                onToggleSong: { editor.toggle($0) }
+                selectedSongIds: selectedSongIds,
+                isAtCapacity: sessionDraft.isAtCapacity,
+                onToggleSong: { editor.toggle($0, in: sessionDraft) }
             )
         }
     }
@@ -352,8 +339,8 @@ struct SongPickerView: View {
     }
 
     private var songSearchResultsList: some View {
-        let selectedSongIds = editor.selectedSongIds
-        let isAtCapacity = editor.isAtCapacity
+        let selectedSongIds = selectedSongIds
+        let isAtCapacity = sessionDraft.isAtCapacity
 
         return ScrollView {
             LazyVStack(spacing: 0) {
@@ -362,7 +349,7 @@ struct SongPickerView: View {
                         song: song,
                         isSelected: selectedSongIds.contains(song.id),
                         isAtCapacity: isAtCapacity,
-                        onToggle: { editor.toggle(song) }
+                        onToggle: { editor.toggle(song, in: sessionDraft) }
                     )
                     .equatable()
                     Divider().padding(.leading, 72)
@@ -397,9 +384,9 @@ struct SongPickerView: View {
         ArtistListView(
             viewModel: viewModel,
             libraryCatalog: libraryCatalog,
-            selectedSongIds: editor.selectedSongIds,
-            isAtCapacity: editor.isAtCapacity,
-            onToggleSong: { editor.toggle($0) },
+            selectedSongIds: selectedSongIds,
+            isAtCapacity: sessionDraft.isAtCapacity,
+            onToggleSong: { editor.toggle($0, in: sessionDraft) },
             searchResults: viewModel.artistSearchResults,
             hasMoreSearchResults: viewModel.hasMoreArtistSearchResults,
             onLoadMore: { Task { @MainActor in await viewModel.loadMoreArtistSearchResults() } }
@@ -421,9 +408,9 @@ struct SongPickerView: View {
         PlaylistListView(
             viewModel: viewModel,
             libraryCatalog: libraryCatalog,
-            selectedSongIds: editor.selectedSongIds,
-            isAtCapacity: editor.isAtCapacity,
-            onToggleSong: { editor.toggle($0) },
+            selectedSongIds: selectedSongIds,
+            isAtCapacity: sessionDraft.isAtCapacity,
+            onToggleSong: { editor.toggle($0, in: sessionDraft) },
             searchResults: viewModel.playlistSearchResults,
             hasMoreSearchResults: viewModel.hasMorePlaylistSearchResults,
             onLoadMore: { Task { @MainActor in await viewModel.loadMorePlaylistSearchResults() } }
@@ -435,8 +422,8 @@ struct SongPickerView: View {
     private var skeletonList: some View { SkeletonList() }
 
     private func songList(songs: [Song], isPaginated: Bool) -> some View {
-        let selectedSongIds = editor.selectedSongIds
-        let isAtCapacity = editor.isAtCapacity
+        let selectedSongIds = selectedSongIds
+        let isAtCapacity = sessionDraft.isAtCapacity
 
         return ScrollView {
             LazyVStack(spacing: 0) {
@@ -445,7 +432,7 @@ struct SongPickerView: View {
                         song: song,
                         isSelected: selectedSongIds.contains(song.id),
                         isAtCapacity: isAtCapacity,
-                        onToggle: { editor.toggle(song) }
+                        onToggle: { editor.toggle(song, in: sessionDraft) }
                     )
                     .equatable()
                     Divider().padding(.leading, 72)
@@ -473,7 +460,7 @@ struct SongPickerView: View {
                 if let undoState = editor.undoState {
                     UndoPill(
                         state: undoState,
-                        onUndo: { editor.undo(undoState) },
+                        onUndo: { editor.undo(undoState, in: sessionDraft) },
                         onDismiss: { editor.dismissUndo() }
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -514,6 +501,10 @@ struct SongPickerView: View {
         }
     }
 
+    private var selectedSongIds: Set<String> {
+        Set(sessionDraft.songs.map(\.id))
+    }
+
     private var hasOverlayMessage: Bool {
         editor.undoState != nil || editor.actionErrorMessage != nil || showAutofillBanner
     }
@@ -524,20 +515,18 @@ struct SongPickerView: View {
         autofillTapCount += 1
         HapticFeedback.light.trigger()
         Task { @MainActor in
-            let requestedCount = editor.remainingCapacity
+            let requestedCount = sessionDraft.remainingCapacity
             let algorithm = appSettings?.autofillAlgorithm ?? .random
             let source = LibraryAutofillSource(libraryCatalog: libraryCatalog, algorithm: algorithm)
-            await viewModel.autofill(
-                into: player,
-                using: source,
-                addSongs: { songs in
-                    try await editor.add(songs)
-                }
-            )
+            await viewModel.autofill(into: sessionDraft, using: source)
 
             if case .completed(let count) = viewModel.autofillState {
                 showingAutofillCompletion = count > 0
-                editor.noteAutofillCompleted(addedCount: count, requestedCount: requestedCount)
+                editor.noteAutofillCompleted(
+                    addedCount: count,
+                    requestedCount: requestedCount,
+                    remainingCapacity: sessionDraft.remainingCapacity
+                )
             }
         }
     }
@@ -610,65 +599,31 @@ private enum PreviewPickerLibrary {
 }
 
 #Preview("Songs Tab") {
-    let service = PreviewPickerLibrary.makeService()
-    let player = ShufflePlayer(playbackTransport: service)
-
     SongPickerView(
-        player: player,
-        libraryCatalog: service,
+        libraryCatalog: PreviewPickerLibrary.makeService(),
         initialSortOption: .mostPlayed,
-        onAddSongs: { _ in },
-        onRemoveSong: { _ in },
-        onRemoveAllSongs: {},
         onDismiss: {}
     )
     .environment(\.appSettings, AppSettings())
 }
 
 #Preview("With Selected Songs") {
-    struct Wrapper: View {
-        let service = PreviewPickerLibrary.makeService()
-        @State private var player: ShufflePlayer?
+    let draft = SessionDraftStore()
+    try? draft.add(Array(PreviewPickerLibrary.sampleSongs.prefix(5)))
 
-        var body: some View {
-            if let player {
-                SongPickerView(
-                    player: player,
-                    libraryCatalog: service,
-                    initialSortOption: .mostPlayed,
-                    onAddSongs: { _ in },
-                    onRemoveSong: { _ in },
-                    onRemoveAllSongs: {},
-                    onDismiss: {}
-                )
-                .environment(\.appSettings, AppSettings())
-            } else {
-                ProgressView()
-                    .task {
-                        let p = ShufflePlayer(playbackTransport: service)
-                        for song in PreviewPickerLibrary.sampleSongs.prefix(5) {
-                            try? await p.addSong(song)
-                        }
-                        player = p
-                    }
-            }
-        }
-    }
-
-    return Wrapper()
+    return SongPickerView(
+        libraryCatalog: PreviewPickerLibrary.makeService(),
+        initialSortOption: .mostPlayed,
+        onDismiss: {}
+    )
+    .environment(\.appSettings, AppSettings())
+    .environment(\.sessionDraft, draft)
 }
 
 #Preview("Empty Library") {
-    let service = DeterministicMusicService()
-    let player = ShufflePlayer(playbackTransport: service)
-
     SongPickerView(
-        player: player,
-        libraryCatalog: service,
+        libraryCatalog: DeterministicMusicService(),
         initialSortOption: .mostPlayed,
-        onAddSongs: { _ in },
-        onRemoveSong: { _ in },
-        onRemoveAllSongs: {},
         onDismiss: {}
     )
     .environment(\.appSettings, AppSettings())

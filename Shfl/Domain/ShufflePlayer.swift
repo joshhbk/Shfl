@@ -4,11 +4,11 @@ import Foundation
 @MainActor
 final class ShufflePlayer {
     @ObservationIgnored private let playbackTransport: PlaybackTransport
+    @ObservationIgnored private let sessionDraft: SessionDraftStore
     @ObservationIgnored private let composer = SessionComposer()
     @ObservationIgnored private var observationTask: Task<Void, Never>?
 
     @ObservationIgnored private var transitionContinuations: [UUID: AsyncStream<PlaybackTransition>.Continuation] = [:]
-    @ObservationIgnored private var songPoolContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
     @ObservationIgnored private var publishedSessionID: UUID?
     @ObservationIgnored private var hasStartedSong = false
 
@@ -34,30 +34,6 @@ final class ShufflePlayer {
         }
     }
 
-    /// Each access creates an independent subscription that fires when song-pool
-    /// membership changes. Algorithm changes do not fire it. Unlike
-    /// `playbackTransitions`, the current pool is not replayed: subscribers hear
-    /// only edits made after they subscribe.
-    var songPoolChanges: AsyncStream<Void> {
-        let id = UUID()
-        return AsyncStream { continuation in
-            songPoolContinuations[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.songPoolContinuations.removeValue(forKey: id)
-                }
-            }
-        }
-    }
-
-    private(set) var draft: SessionDraft {
-        didSet {
-            guard draft.songs != oldValue.songs else { return }
-            for continuation in songPoolContinuations.values {
-                continuation.yield()
-            }
-        }
-    }
     private(set) var activeSession: ListeningSession?
     private(set) var playbackState: PlaybackState = .empty
     private(set) var operationNotice: String?
@@ -65,27 +41,24 @@ final class ShufflePlayer {
     private(set) var sessionEndCount = 0
     private(set) var recentPlaybackTrace: [PlaybackTraceEntry] = []
 
-    var songCount: Int { draft.songs.count }
-    var allSongs: [Song] { draft.songs }
-    var capacity: Int { SessionDraft.maxSongs }
-    var remainingCapacity: Int { draft.remainingCapacity }
-    var draftIsEmpty: Bool { draft.songs.isEmpty }
-
     var lastShuffledQueue: [Song] { activeSession?.songOrder ?? [] }
     var transportCurrentSongId: String? { playbackTransport.currentSongId }
     var hasPendingSessionChanges: Bool {
+        let draft = sessionDraft.draft
         guard let activeSession else { return !draft.songs.isEmpty }
         return activeSession.songIDs.count != draft.songs.count
             || Set(activeSession.songIDs) != Set(draft.songs.map(\.id))
             || activeSession.algorithm != draft.algorithm
     }
 
+    /// - Parameter sessionDraft: The songs and algorithm used when a new
+    ///   shuffle starts.
     init(
         playbackTransport: PlaybackTransport,
-        initialAlgorithm: ShuffleAlgorithm = .noRepeat
+        sessionDraft: SessionDraftStore
     ) {
         self.playbackTransport = playbackTransport
-        self.draft = SessionDraft(algorithm: initialAlgorithm)
+        self.sessionDraft = sessionDraft
         startObserving()
         record("player-created")
     }
@@ -95,95 +68,34 @@ final class ShufflePlayer {
         for continuation in transitionContinuations.values {
             continuation.finish()
         }
-        for continuation in songPoolContinuations.values {
-            continuation.finish()
-        }
     }
 
     func clearOperationNotice() {
         operationNotice = nil
     }
 
-    func stageAlgorithm(_ algorithm: ShuffleAlgorithm) {
-        draft = draft.using(algorithm)
-        record("algorithm-staged", detail: algorithm.rawValue)
-    }
-
-    func addSong(_ song: Song) async throws {
-        do {
-            let updated = try draft.adding(song)
-            guard updated != draft else { return }
-            draft = updated
-            record("song-added", detail: song.id)
-        } catch {
-            throw mapDraftError(error)
-        }
-    }
-
-    func seedSongs(_ songs: [Song]) throws {
-        do {
-            let updated = try draft.adding(songs)
-            guard updated != draft else { return }
-            draft = updated
-            record("songs-seeded", detail: "\(songs.count)")
-        } catch {
-            throw mapDraftError(error)
-        }
-    }
-
-    func addSongsWithQueueRebuild(
-        _ songs: [Song],
-        algorithm: ShuffleAlgorithm? = nil
-    ) async throws {
-        if let algorithm {
-            draft = draft.using(algorithm)
-        }
-        try seedSongs(songs)
-    }
-
-    func removeSong(id: String) async {
-        let updated = draft.removing(songID: id)
-        guard updated != draft else { return }
-        draft = updated
-        record("song-removed", detail: id)
-    }
-
-    func removeAllSongs() async {
-        draft = draft.removingAll()
+    /// Stops playback and ends the current listening session.
+    func clearSession() async {
         activeSession = nil
         updatePlaybackState(.empty)
         operationNotice = nil
         await playbackTransport.clear()
-        record("all-songs-cleared")
-    }
-
-    func containsSong(id: String) -> Bool {
-        draft.songs.contains { $0.id == id }
+        record("session-cleared")
     }
 
     /// Compatibility entry point. It creates one paused immutable session.
-    func prepareQueue(algorithm: ShuffleAlgorithm? = nil) async throws {
-        if let algorithm {
-            draft = draft.using(algorithm)
-        }
-        guard !draft.songs.isEmpty else { return }
+    func prepareQueue() async throws {
+        guard !sessionDraft.isEmpty else { return }
         try await installFreshSession(autoplay: false)
     }
 
     func startFreshShuffle(
-        algorithm: ShuffleAlgorithm? = nil,
         seed: UInt64 = UInt64.random(in: UInt64.min ... UInt64.max)
     ) async throws {
-        if let algorithm {
-            draft = draft.using(algorithm)
-        }
         try await installFreshSession(autoplay: true, seed: seed)
     }
 
-    func play(algorithm: ShuffleAlgorithm? = nil) async throws {
-        if let algorithm {
-            draft = draft.using(algorithm)
-        }
+    func play() async throws {
         if activeSession == nil {
             try await installFreshSession(autoplay: true)
             return
@@ -233,11 +145,11 @@ final class ShufflePlayer {
         record("seek", detail: String(format: "%.1f", time))
     }
 
-    func togglePlayback(algorithm: ShuffleAlgorithm? = nil) async throws {
+    func togglePlayback() async throws {
         if playbackState.isPlaying {
             await pause()
         } else {
-            try await play(algorithm: algorithm)
+            try await play()
         }
     }
 
@@ -267,7 +179,7 @@ final class ShufflePlayer {
     }
 
     func hardResetQueueForDebug() async {
-        await removeAllSongs()
+        await clearSession()
         recentPlaybackTrace = []
         record("debug-reset")
     }
@@ -278,7 +190,7 @@ final class ShufflePlayer {
     ) async throws {
         let session: ListeningSession
         do {
-            session = try composer.compose(draft: draft, seed: seed)
+            session = try composer.compose(draft: sessionDraft.draft, seed: seed)
         } catch {
             throw report("Couldn't build a shuffle", error: error)
         }
@@ -387,20 +299,13 @@ final class ShufflePlayer {
             updatePlaybackState(.stopped)
             sessionEndCount &+= 1
             record("session-ended")
-            guard !draft.songs.isEmpty else { return }
+            guard !sessionDraft.isEmpty else { return }
             do {
                 try await installFreshSession(autoplay: true)
             } catch {
                 // `installFreshSession` records and exposes the failure.
             }
         }
-    }
-
-    private func mapDraftError(_ error: Error) -> ShufflePlayerError {
-        if case ShufflePlayerError.capacityReached = error {
-            return .capacityReached
-        }
-        return .playbackFailed(error.localizedDescription)
     }
 
     private func report(_ action: String, error: Error) -> ShufflePlayerError {

@@ -1,53 +1,20 @@
 import SwiftUI
 
-/// Owns the picker's edit surface over the session draft: membership, capacity
-/// and undo.
-///
-/// Membership is read straight from the player's `SessionDraft`, so there is a
-/// single source of truth. This module never keeps a second copy of the
-/// selected song IDs; every mutation is a draft write, and the derived
-/// `selectedSongIds` follows it.
+/// The song picker's editing state: undo, the error banner, and whether
+/// autofill has run out of songs. Edits go straight to the
+/// `SessionDraftStore` passed in.
 @Observable
 @MainActor
 final class SessionDraftEditor {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    @ObservationIgnored private let player: ShufflePlayer
-    @ObservationIgnored private let addSongs: @MainActor ([Song]) async throws -> Void
-    @ObservationIgnored private let removeSong: @MainActor (String) async -> Void
-    @ObservationIgnored private let removeAllSongs: @MainActor () async -> Void
     @ObservationIgnored private let undoManager: SongUndoManager
 
     private(set) var actionErrorMessage: String?
     private(set) var autofillIsExhausted = false
 
-    init(
-        player: ShufflePlayer,
-        addSongs: @escaping @MainActor ([Song]) async throws -> Void,
-        removeSong: @escaping @MainActor (String) async -> Void,
-        removeAllSongs: @escaping @MainActor () async -> Void,
-        undoManager: SongUndoManager? = nil
-    ) {
-        self.player = player
-        self.addSongs = addSongs
-        self.removeSong = removeSong
-        self.removeAllSongs = removeAllSongs
+    init(undoManager: SongUndoManager? = nil) {
         self.undoManager = undoManager ?? SongUndoManager()
     }
-
-    // MARK: - Membership & capacity (derived from the draft)
-
-    var selectedSongIds: Set<String> {
-        Set(player.draft.songs.map(\.id))
-    }
-
-    func contains(_ songID: String) -> Bool {
-        player.containsSong(id: songID)
-    }
-
-    var songCount: Int { player.songCount }
-    var capacity: Int { player.capacity }
-    var remainingCapacity: Int { player.remainingCapacity }
-    var isAtCapacity: Bool { player.remainingCapacity == 0 }
 
     // MARK: - Undo
 
@@ -59,62 +26,52 @@ final class SessionDraftEditor {
 
     // MARK: - Editing
 
-    func toggle(_ song: Song) {
+    func toggle(_ song: Song, in draft: SessionDraftStore) {
         autofillIsExhausted = false
 
-        if contains(song.id) {
-            Task { @MainActor in await removeSong(song.id) }
+        if draft.contains(song.id) {
+            draft.remove(songID: song.id)
             undoManager.recordAction(.removed, song: song)
-        } else {
-            Task { @MainActor in
-                do {
-                    try await addSongs([song])
-                    undoManager.recordAction(.added, song: song)
+            return
+        }
 
-                    if CapacityProgressBar.isMilestone(songCount) {
-                        HapticFeedback.milestone.trigger()
-                    }
-                } catch ShufflePlayerError.capacityReached {
-                    // Handled by SongRow's nope animation
-                } catch {
-                    showActionError(error.localizedDescription)
-                }
+        do {
+            try draft.add(song)
+            undoManager.recordAction(.added, song: song)
+            if CapacityProgressBar.isMilestone(draft.songCount) {
+                HapticFeedback.milestone.trigger()
             }
+        } catch ShufflePlayerError.capacityReached {
+            // Handled by SongRow's nope animation
+        } catch {
+            showActionError(error.localizedDescription)
         }
     }
 
-    /// Adds songs to the draft through the same write port as every other
-    /// edit, so bulk edits (autofill) cannot bypass membership bookkeeping.
-    func add(_ songs: [Song]) async throws {
-        try await addSongs(songs)
-    }
-
-    func undo(_ state: UndoState) {
+    func undo(_ state: UndoState, in draft: SessionDraftStore) {
         autofillIsExhausted = false
 
         switch state.action {
         case .added:
-            Task { @MainActor in await removeSong(state.song.id) }
+            draft.remove(songID: state.song.id)
             HapticFeedback.light.trigger()
         case .removed:
-            Task { @MainActor in
-                try? await addSongs([state.song])
-                HapticFeedback.medium.trigger()
-            }
+            try? draft.add(state.song)
+            HapticFeedback.medium.trigger()
         }
 
         undoManager.dismiss()
     }
 
-    func clearAll() {
+    func clearAll(in draft: SessionDraftStore) {
         autofillIsExhausted = false
         undoManager.dismiss()
-        Task { @MainActor in await removeAllSongs() }
+        draft.removeAll()
     }
 
-    /// Reconciles autofill exhaustion with the post-autofill draft. Delegating
-    /// to `remainingCapacity` means the flag can never disagree with membership.
-    func noteAutofillCompleted(addedCount: Int, requestedCount: Int) {
+    /// Autofill is exhausted when it came back short while there was still
+    /// room, so the library has no more songs to offer.
+    func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
         autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
     }
 

@@ -29,6 +29,7 @@ final class AppViewModel {
     var authorizationError: String?
 
     var player: ShufflePlayer { sessionHost.player }
+    var sessionDraft: SessionDraftStore { sessionHost.sessionDraft }
 
     init(
         library: MusicAuthorizing & LibraryCatalog,
@@ -87,8 +88,7 @@ final class AppViewModel {
 				libraryCatalog: library,
                 algorithm: appSettings.autofillAlgorithm
             )
-            let songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
-            try player.seedSongs(songs)
+            try await sessionDraft.autofill(from: source)
         } catch {
             print("Failed to autofill library: \(error)")
         }
@@ -98,24 +98,20 @@ final class AppViewModel {
     func shuffleAll() async {
         isShuffling = true
         do {
-            let songs: [Song]
             if let prefetched = prefetchedSongs {
-                songs = prefetched
                 prefetchedSongs = nil
                 prefetchTask = nil
+                try sessionDraft.add(prefetched)
             } else {
                 prefetchTask?.cancel()
                 prefetchTask = nil
                 let source = LibraryAutofillSource(
-				libraryCatalog: library,
+                    libraryCatalog: library,
                     algorithm: appSettings.autofillAlgorithm
                 )
-                songs = try await source.fetchSongs(excluding: Set(), limit: SessionDraft.maxSongs)
+                try await sessionDraft.autofill(from: source)
             }
-            try player.seedSongs(songs)
-            try await player.startFreshShuffle(
-                algorithm: appSettings.shuffleAlgorithm
-            )
+            try await player.startFreshShuffle()
         } catch {
             print("Failed to shuffle all: \(error)")
         }
@@ -128,7 +124,7 @@ final class AppViewModel {
     /// Safe to call multiple times — guards against redundant work.
     func prefetchLibraryIfNeeded() {
         guard isAuthorized,
-              player.draftIsEmpty,
+              sessionDraft.isEmpty,
               prefetchedSongs == nil,
               prefetchTask == nil else { return }
 
@@ -180,14 +176,10 @@ final class AppViewModel {
         showingSettings = false
     }
 
-    // MARK: - Coordinator Commands
-
-    func onShuffleAlgorithmChanged(_ algorithm: ShuffleAlgorithm) async {
-        player.stageAlgorithm(algorithm)
-    }
+    // MARK: - Playback Commands
 
     func togglePlayback() async {
-        try? await player.togglePlayback(algorithm: appSettings.shuffleAlgorithm)
+        try? await player.togglePlayback()
     }
 
     func skipToNext() async {
@@ -196,24 +188,5 @@ final class AppViewModel {
 
     func restartOrSkipToPrevious() async {
         try? await player.restartOrSkipToPrevious()
-    }
-
-    func addSong(_ song: Song) async throws {
-        try await player.addSong(song)
-    }
-
-    func addSongsWithQueueRebuild(_ songs: [Song]) async throws {
-        try await player.addSongsWithQueueRebuild(
-            songs,
-            algorithm: appSettings.shuffleAlgorithm
-        )
-    }
-
-    func removeSong(id: String) async {
-        await player.removeSong(id: id)
-    }
-
-    func removeAllSongs() async {
-        await player.removeAllSongs()
     }
 }

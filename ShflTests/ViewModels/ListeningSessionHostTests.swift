@@ -40,7 +40,7 @@ final class ListeningSessionHostTests: XCTestCase {
             artworkURL: nil
         )
 
-        try await player.addSong(song)
+        try host.sessionDraft.add(song)
         try await player.startFreshShuffle(seed: 5)
         await waitUntil { (try? self.archive.load().session) != nil }
 
@@ -59,11 +59,11 @@ final class ListeningSessionHostTests: XCTestCase {
         }
         let host = makeHost()
 
-        try host.player.seedSongs(songs)
+        try host.sessionDraft.add(songs)
         await waitUntil { (try? self.archive.load().pool.map(\.id)) == ["one", "two"] }
 
         // A swipe-dismissed sheet never reports back; the edit alone must be durable.
-        await host.player.removeSong(id: "one")
+        host.sessionDraft.remove(songID: "one")
         await waitUntil { (try? self.archive.load().pool.map(\.id)) == ["two"] }
     }
 
@@ -72,7 +72,7 @@ final class ListeningSessionHostTests: XCTestCase {
         let host = makeHost()
 
         // Same ordering as AppViewModel.shuffleAll: seed then start, no yield between.
-        try host.player.seedSongs([song])
+        try host.sessionDraft.add([song])
         try await host.player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session?.seed) == 7 }
         await waitForStateUpdate()
@@ -84,7 +84,7 @@ final class ListeningSessionHostTests: XCTestCase {
         )
         let restored = await nextHost.restoreSavedSession()
         XCTAssertTrue(restored)
-        XCTAssertEqual(nextHost.player.allSongs, [song])
+        XCTAssertEqual(nextHost.sessionDraft.songs, [song])
         XCTAssertEqual(nextHost.player.playbackState, .paused(song))
         XCTAssertEqual(nextHost.player.activeSession?.seed, 7)
         withExtendedLifetime(host) {}
@@ -101,7 +101,7 @@ final class ListeningSessionHostTests: XCTestCase {
         let host = makeHost()
         await host.restoreSavedSession()
 
-        try await host.player.addSong(added)
+        try host.sessionDraft.add(added)
         await waitUntil { (try? self.archive.load().pool.count) == 2 }
         XCTAssertEqual(try archive.load().session, record)
     }
@@ -119,7 +119,7 @@ final class ListeningSessionHostTests: XCTestCase {
         let restored = await host.restoreSavedSession()
 
         XCTAssertFalse(restored)
-        XCTAssertEqual(host.player.allSongs, [song])
+        XCTAssertEqual(host.sessionDraft.songs, [song])
         let saved = try archive.load()
         XCTAssertEqual(saved.pool, [song])
         XCTAssertNil(saved.session)
@@ -128,11 +128,12 @@ final class ListeningSessionHostTests: XCTestCase {
     func testRemoveAllThenCheckpointDoesNotReviveSession() async throws {
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let host = makeHost()
-        try host.player.seedSongs([song])
+        try host.sessionDraft.add([song])
         try await host.player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session) != nil }
 
-        await host.player.removeAllSongs()
+        host.sessionDraft.removeAll()
+        await host.player.clearSession()
         await waitUntil { (try? self.archive.load().session) == nil }
         await waitForStateUpdate()
         host.handleDidEnterBackground()
@@ -147,7 +148,7 @@ final class ListeningSessionHostTests: XCTestCase {
         }
         let host = makeHost()
         let player = host.player
-        try player.seedSongs(songs)
+        try host.sessionDraft.add(songs)
         try await player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session) != nil }
         let previousID = try XCTUnwrap(archive.load().session?.currentSongID)
@@ -166,7 +167,7 @@ final class ListeningSessionHostTests: XCTestCase {
         let catalogSong = Song(id: "123456", title: "Song", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         let host = makeHost()
         let player = host.player
-        try player.seedSongs([librarySong])
+        try host.sessionDraft.add([librarySong])
         try await player.startFreshShuffle(seed: 7)
         await waitUntil { (try? self.archive.load().session) != nil }
         let validRecord = try XCTUnwrap(archive.load().session)
@@ -207,7 +208,7 @@ final class ListeningSessionHostTests: XCTestCase {
         // Each consumer owns its own subscription to the shared seam.
         tracker.start(consuming: player.playbackTransitions)
         let song = Song(id: "one", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil)
-        try player.seedSongs([song])
+        try host.sessionDraft.add([song])
 
         let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 1)
         let restored = await player.restore(session, currentSongID: song.id, playbackPosition: 42)

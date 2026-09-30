@@ -298,33 +298,16 @@ final class LibraryBrowserViewModel {
 
     // MARK: - Autofill
 
-    func autofill(
-        into player: ShufflePlayer,
-        using source: AutofillSource,
-        addSongs: ([Song]) async throws -> Void
-    ) async {
-        let limit = player.remainingCapacity
-        print("🔍 Autofill: Starting with limit \(limit)")
-        guard limit > 0 else {
+    func autofill(into draft: SessionDraftStore, using source: AutofillSource) async {
+        guard draft.remainingCapacity > 0 else {
             autofillState = .completed(count: 0)
             return
         }
 
         autofillState = .loading
-        print("🔍 Autofill: State set to loading")
-
         do {
-            let excludedIds = Set(player.allSongs.map { $0.id })
-            print("🔍 Autofill: Calling fetchSongs with \(excludedIds.count) excluded...")
-            let songs = try await source.fetchSongs(excluding: excludedIds, limit: limit)
-            print("🔍 Autofill: Fetched \(songs.count) songs")
-
-            print("🔍 Autofill: Applying songs to queue...")
-            try await addSongs(songs)
-            print("🔍 Autofill: song application complete")
-
-            autofillState = .completed(count: songs.count)
-            print("🔍 Autofill: Complete!")
+            let added = try await draft.autofill(from: source)
+            autofillState = .completed(count: added)
         } catch {
             print("🔍 Autofill: ERROR - \(error)")
             autofillState = .error(error.localizedDescription)

@@ -44,8 +44,8 @@ final class AppViewModelLifecycleTests: XCTestCase {
             artworkURL: nil
         )
 
-        try await viewModel.addSong(song)
-        try await viewModel.player.prepareQueue(algorithm: appSettings.shuffleAlgorithm)
+        try viewModel.sessionDraft.add(song)
+        try await viewModel.player.prepareQueue()
         await mockService.setPlaybackTime(42)
 
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)

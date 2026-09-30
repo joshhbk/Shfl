@@ -5,9 +5,10 @@ import XCTest
 final class PlaybackTransitionTests: XCTestCase {
     func test_subscribersReceiveEveryEdgeInOrderWithoutDuplicateLoadReports() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let song = makeSong("one")
-        try player.seedSongs([song])
+        try draft.add([song])
         let first = player.playbackTransitions
         let second = player.playbackTransitions
 
@@ -25,9 +26,10 @@ final class PlaybackTransitionTests: XCTestCase {
 
     func test_restoreThenPlayStartsSongOnceAndFreshSessionStartsItAgain() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let song = makeSong("one")
-        try player.seedSongs([song])
+        try draft.add([song])
         let stream = player.playbackTransitions
         let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 1)
         let restored = await player.restore(
@@ -57,9 +59,10 @@ final class PlaybackTransitionTests: XCTestCase {
 
     func test_loadingNewSongThenPlayingDetectsStartAfterSongChange() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let song = makeSong("one")
-        try player.seedSongs([song])
+        try draft.add([song])
         try await player.startFreshShuffle(seed: 1)
         let stream = player.playbackTransitions
         let next = makeSong("two")
@@ -74,9 +77,10 @@ final class PlaybackTransitionTests: XCTestCase {
 
     func test_transientEmptyIsSuppressedAndClearPublishesEmpty() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let song = makeSong("one")
-        try player.seedSongs([song])
+        try draft.add([song])
         try await player.startFreshShuffle(seed: 1)
         let stream = player.playbackTransitions
         await transport.simulatePlaybackState(.empty)
@@ -85,7 +89,8 @@ final class PlaybackTransitionTests: XCTestCase {
         XCTAssertEqual(events.map(\.state), [.playing(song), .paused(song)])
 
         let cleared = player.playbackTransitions
-        await player.removeAllSongs()
+        draft.removeAll()
+        await player.clearSession()
         let clearEvents = await collect(cleared, count: 2)
         XCTAssertEqual(clearEvents.last?.state, .empty)
         XCTAssertNil(clearEvents.last?.session)
@@ -94,9 +99,10 @@ final class PlaybackTransitionTests: XCTestCase {
 
     func test_sessionExhaustionPublishesStopThenOneFreshSession() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let song = makeSong("one")
-        try player.seedSongs([song])
+        try draft.add([song])
         try await player.startFreshShuffle(seed: 1)
         let oldSession = player.activeSession?.id
         let stream = player.playbackTransitions
@@ -113,8 +119,9 @@ final class PlaybackTransitionTests: XCTestCase {
 
     func test_failedLoadPublishesFailureWithoutACommittedSession() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
-        try player.seedSongs([makeSong("one")])
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add([makeSong("one")])
         let stream = player.playbackTransitions
         await transport.failNextLoad(with: NSError(domain: "load", code: 1))
         do {
@@ -131,9 +138,10 @@ final class PlaybackTransitionTests: XCTestCase {
 
     func test_cancellingOneSubscriberDoesNotStopAnother() async throws {
         let transport = DeterministicMusicService()
-        let player = ShufflePlayer(playbackTransport: transport)
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
         let song = makeSong("one")
-        try player.seedSongs([song])
+        try draft.add([song])
         let cancelledStream = player.playbackTransitions
         let task = Task { for await _ in cancelledStream {} }
         await Task.yield()
@@ -147,7 +155,7 @@ final class PlaybackTransitionTests: XCTestCase {
 
     func test_streamFinishesWhenPlayerIsReleased() async {
         let transport = DeterministicMusicService()
-        var player: ShufflePlayer? = ShufflePlayer(playbackTransport: transport)
+        var player: ShufflePlayer? = ShufflePlayer(playbackTransport: transport, sessionDraft: SessionDraftStore())
         weak var weakPlayer = player
         let stream = player!.playbackTransitions
         // Let the transport observation task reach its suspension point.
