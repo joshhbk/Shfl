@@ -125,8 +125,9 @@ struct MainView: View {
                 Text(error)
             }
         }
-        // Kept last so the sheets above can read it too.
+        // Kept last so the sheets above can read them too.
         .environment(\.sessionDraft, viewModel.sessionDraft)
+        .environment(\.listeningSessionHost, viewModel.sessionHost)
     }
 
     @ViewBuilder
@@ -163,18 +164,10 @@ struct MainView: View {
                 onManageTapped: { viewModel.openManage() },
                 onAddTapped: { viewModel.openPickerDirect() },
                 onSettingsTapped: { viewModel.openSettings() },
-                onPlayPauseTapped: { Task { await viewModel.togglePlayback() } },
-                onSkipForwardTapped: { Task { await viewModel.skipToNext() } },
-                onSkipBackTapped: { Task { await viewModel.restartOrSkipToPrevious() } },
-                onShuffle: { Task { await viewModel.shuffleAll() } },
-                isShuffling: viewModel.isShuffling || viewModel.player.isLoadingSession
+                onSkipForwardTapped: { Task { try? await viewModel.player.skipToNext() } },
+                onSkipBackTapped: { Task { try? await viewModel.player.restartOrSkipToPrevious() } }
             )
             .transition(.opacity)
-            .task(id: viewModel.sessionDraft.isEmpty) {
-                if viewModel.sessionDraft.isEmpty {
-                    viewModel.prefetchLibraryIfNeeded()
-                }
-            }
         } else {
             WelcomeView {
                 Task { await viewModel.requestAuthorization() }

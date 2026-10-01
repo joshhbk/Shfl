@@ -2,35 +2,51 @@ import Foundation
 import UIKit
 
 /// Owns the listening session for one app launch: the session draft, the
-/// player, restoring the last session at launch, and saving.
+/// player, starting listening sessions, restoring the last session at launch,
+/// and saving.
 ///
 /// Saving happens on its own whenever something changes: songs are added or
 /// removed, a song starts playing, or the app goes to the background. Each
 /// save stores the song pool and the current session together, so they
 /// always match.
+@Observable
 @MainActor
 final class ListeningSessionHost {
-    let sessionDraft: SessionDraftStore
-    let player: ShufflePlayer
+    @ObservationIgnored let sessionDraft: SessionDraftStore
+    @ObservationIgnored let player: ShufflePlayer
 
-    private let playbackTransport: PlaybackTransport
-    private let archive: SessionArchive
-    private let now: () -> Date
-    private let lifecyclePersistenceHook: (() -> Void)?
+    /// True from the moment a listening session is asked for until it has
+    /// loaded, including any autofill beforehand.
+    var isStartingSession: Bool { isPreparingSession || player.isLoadingSession }
+
+    private var isPreparingSession = false
+
+    @ObservationIgnored private let playbackTransport: PlaybackTransport
+    @ObservationIgnored private let archive: SessionArchive
+    @ObservationIgnored private let makeAutofillSource: () -> AutofillSource
+    @ObservationIgnored private let makeSeed: () -> UInt64
+    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let lifecyclePersistenceHook: (() -> Void)?
 
     /// The session record the archive currently holds, so a pool-only commit
     /// can carry it forward without reading storage back.
-    private var committedSession: ListeningSessionRecord?
-    private var latestSessionSaveTime: Date?
+    @ObservationIgnored private var committedSession: ListeningSessionRecord?
+    @ObservationIgnored private var latestSessionSaveTime: Date?
 
-    private var transitionTask: Task<Void, Never>?
-    private var songPoolTask: Task<Void, Never>?
-    private var backgroundObserver: NSObjectProtocol?
+    @ObservationIgnored private var transitionTask: Task<Void, Never>?
+    @ObservationIgnored private var songPoolTask: Task<Void, Never>?
+    @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
 
+    /// - Parameters:
+    ///   - makeAutofillSource: Where autofill finds songs, asked for each time
+    ///     so it reflects the current autofill settings.
+    ///   - makeSeed: The seed for each fresh shuffle.
     init(
         playbackTransport: PlaybackTransport,
         archive: SessionArchive,
+        makeAutofillSource: @escaping () -> AutofillSource,
         initialAlgorithm: ShuffleAlgorithm = .noRepeat,
+        makeSeed: @escaping () -> UInt64 = { UInt64.random(in: UInt64.min ... UInt64.max) },
         now: @escaping () -> Date = Date.init,
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) {
@@ -42,6 +58,8 @@ final class ListeningSessionHost {
         )
         self.playbackTransport = playbackTransport
         self.archive = archive
+        self.makeAutofillSource = makeAutofillSource
+        self.makeSeed = makeSeed
         self.now = now
         self.lifecyclePersistenceHook = lifecyclePersistenceHook
 
@@ -56,6 +74,41 @@ final class ListeningSessionHost {
             NotificationCenter.default.removeObserver(observer)
         }
     }
+
+    // MARK: - Starting
+
+    /// Plays or pauses the active listening session, whatever the session
+    /// draft holds. With no active session, starts a fresh shuffle, autofilling
+    /// the draft first when it is empty.
+    func togglePlayback() async {
+        guard player.activeSession == nil else {
+            try? await player.togglePlayback()
+            return
+        }
+        await startSession(autofillingEmptyDraft: true)
+    }
+
+    /// Replaces any active listening session with a fresh shuffle of the draft.
+    func startFreshShuffle() async {
+        await startSession(autofillingEmptyDraft: false)
+    }
+
+    private func startSession(autofillingEmptyDraft: Bool) async {
+        guard !isStartingSession else { return }
+        isPreparingSession = true
+        defer { isPreparingSession = false }
+        do {
+            if autofillingEmptyDraft, sessionDraft.isEmpty {
+                try await sessionDraft.autofill(from: makeAutofillSource())
+            }
+            try await player.startFreshShuffle(seed: makeSeed())
+        } catch {
+            // The player exposes load failures as its operation notice.
+            print("Failed to start a listening session: \(error)")
+        }
+    }
+
+    // MARK: - Restoring
 
     /// Reinstates the saved song pool and, when still valid, the saved session.
     /// Returns whether a saved session was loaded into the player.

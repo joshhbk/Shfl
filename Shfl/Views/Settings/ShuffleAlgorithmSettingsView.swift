@@ -2,8 +2,7 @@ import SwiftUI
 
 struct ShuffleAlgorithmSettingsView: View {
     @Environment(\.appSettings) private var appSettings
-    @Environment(\.shufflePlayer) private var player
-    @State private var isStartingNewShuffle = false
+    @Environment(\.listeningSessionHost) private var sessionHost
 
     private let columns = [
         GridItem(.flexible()),
@@ -15,7 +14,7 @@ struct ShuffleAlgorithmSettingsView: View {
             VStack(spacing: 24) {
                 algorithmGrid
                 descriptionSection
-                if player?.activeSession != nil {
+                if sessionHost?.player.activeSession != nil {
                     nextShuffleSection
                 }
             }
@@ -32,16 +31,11 @@ struct ShuffleAlgorithmSettingsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button {
-                guard let player else { return }
-                isStartingNewShuffle = true
-                Task {
-                    // MainView has already applied the chosen algorithm to
-                    // the next shuffle.
-                    try? await player.startFreshShuffle()
-                    isStartingNewShuffle = false
-                }
+                // MainView has already applied the chosen algorithm to the
+                // next shuffle.
+                Task { await sessionHost?.startFreshShuffle() }
             } label: {
-                if isStartingNewShuffle {
+                if sessionHost?.isStartingSession == true {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 } else {
@@ -50,7 +44,7 @@ struct ShuffleAlgorithmSettingsView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(isStartingNewShuffle)
+            .disabled(sessionHost?.isStartingSession ?? true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
