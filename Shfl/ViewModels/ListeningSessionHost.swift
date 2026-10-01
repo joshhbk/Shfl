@@ -23,7 +23,7 @@ final class ListeningSessionHost {
 
     @ObservationIgnored private let playbackTransport: PlaybackTransport
     @ObservationIgnored private let archive: SessionArchive
-    @ObservationIgnored private let makeAutofillSource: () -> AutofillSource
+    @ObservationIgnored private let autofillSource: WarmableAutofillSource
     @ObservationIgnored private let makeSeed: () -> UInt64
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let lifecyclePersistenceHook: (() -> Void)?
@@ -38,13 +38,13 @@ final class ListeningSessionHost {
     @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
 
     /// - Parameters:
-    ///   - makeAutofillSource: Where autofill finds songs, asked for each time
-    ///     so it reflects the current autofill settings.
+    ///   - autofillSource: Where autofill finds songs. It is warmed whenever
+    ///     the draft is empty, ready for the next press of play.
     ///   - makeSeed: The seed for each fresh shuffle.
     init(
         playbackTransport: PlaybackTransport,
         archive: SessionArchive,
-        makeAutofillSource: @escaping () -> AutofillSource,
+        autofillSource: WarmableAutofillSource,
         initialAlgorithm: ShuffleAlgorithm = .noRepeat,
         makeSeed: @escaping () -> UInt64 = { UInt64.random(in: UInt64.min ... UInt64.max) },
         now: @escaping () -> Date = Date.init,
@@ -58,7 +58,7 @@ final class ListeningSessionHost {
         )
         self.playbackTransport = playbackTransport
         self.archive = archive
-        self.makeAutofillSource = makeAutofillSource
+        self.autofillSource = autofillSource
         self.makeSeed = makeSeed
         self.now = now
         self.lifecyclePersistenceHook = lifecyclePersistenceHook
@@ -99,7 +99,7 @@ final class ListeningSessionHost {
         defer { isPreparingSession = false }
         do {
             if autofillingEmptyDraft, sessionDraft.isEmpty {
-                try await sessionDraft.autofill(from: makeAutofillSource())
+                try await sessionDraft.autofill(from: autofillSource)
             }
             try await player.startFreshShuffle(seed: makeSeed())
         } catch {
@@ -127,7 +127,9 @@ final class ListeningSessionHost {
 
         print("📱 Restore: Loaded \(archived.pool.count) songs, session=\(archived.session != nil ? "exists" : "nil")")
 
-        if !archived.pool.isEmpty {
+        if archived.pool.isEmpty {
+            autofillSource.warm()
+        } else {
             try? sessionDraft.add(archived.pool)
         }
 
@@ -186,6 +188,9 @@ final class ListeningSessionHost {
             for await _ in songPoolChanges {
                 guard !Task.isCancelled, let self else { return }
                 self.commitPool()
+                if self.sessionDraft.isEmpty {
+                    self.autofillSource.warm()
+                }
             }
         }
     }

@@ -20,7 +20,6 @@ final class AppViewModel {
 
     var isAuthorized = false
     var isLoading = true
-    var loadingMessage = "Loading..."
     var authorizationError: String?
 
     var player: ShufflePlayer { sessionHost.player }
@@ -40,12 +39,10 @@ final class AppViewModel {
         self.sessionHost = ListeningSessionHost(
             playbackTransport: playbackTransport,
             archive: SessionArchive(modelContext: modelContext),
-            makeAutofillSource: { [library, appSettings] in
-                LibraryAutofillSource(
-                    libraryCatalog: library,
-                    algorithm: appSettings.autofillAlgorithm
-                )
-            },
+            autofillSource: WarmedLibraryAutofillSource(
+                libraryCatalog: library,
+                algorithm: { [appSettings] in appSettings.autofillAlgorithm }
+            ),
             initialAlgorithm: appSettings.shuffleAlgorithm,
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
@@ -79,21 +76,6 @@ final class AppViewModel {
         if !isAuthorized {
             authorizationError = "Apple Music access is required to use Shuffled. Please enable it in Settings."
         }
-    }
-
-    func autofillLibrary() async {
-        isLoading = true
-        loadingMessage = "Finding songs in your library..."
-        do {
-            let source = LibraryAutofillSource(
-				libraryCatalog: library,
-                algorithm: appSettings.autofillAlgorithm
-            )
-            try await sessionDraft.autofill(from: source)
-        } catch {
-            print("Failed to autofill library: \(error)")
-        }
-        isLoading = false
     }
 
     func openManage() {

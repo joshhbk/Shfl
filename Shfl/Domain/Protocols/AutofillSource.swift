@@ -23,3 +23,11 @@ protocol AutofillSource: Sendable {
     /// - Returns: Array of songs to add
     func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song]
 }
+
+/// An autofill source that can fetch ahead of time, so the next autofill
+/// needn't wait for the library.
+@MainActor
+protocol WarmableAutofillSource: AutofillSource {
+    /// Starts fetching songs for the next autofill, if not already doing so.
+    func warm()
+}

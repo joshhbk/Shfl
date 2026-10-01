@@ -176,7 +176,7 @@ private struct ScenarioRig {
         host = ListeningSessionHost(
             playbackTransport: transport,
             archive: SessionArchive(modelContext: container.mainContext),
-            makeAutofillSource: { NoAutofillSource() }
+            autofillSource: NoAutofillSource()
         )
         modelContainer = container
     }
@@ -186,7 +186,9 @@ private struct ScenarioRig {
 }
 
 /// Scenarios start from a filled draft, so autofill never has songs to add.
-private struct NoAutofillSource: AutofillSource {
+@MainActor
+private struct NoAutofillSource: WarmableAutofillSource {
+    func warm() {}
     func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] { [] }
 }
 

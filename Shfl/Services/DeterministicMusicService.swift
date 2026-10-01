@@ -29,6 +29,7 @@ actor DeterministicMusicService: MusicService {
     private var playlistSongs: [String: [Song]]
 
     private(set) var loadCallCount = 0
+    private(set) var libraryFetchCount = 0
     private(set) var lastLoadRequest: PlaybackLoadRequest?
 
     private var nextLoadError: Error?
@@ -87,7 +88,8 @@ actor DeterministicMusicService: MusicService {
         limit: Int,
         offset: Int
     ) async throws -> LibraryPage {
-        page(sorted(librarySongs, by: sortOption), limit: limit, offset: offset)
+        libraryFetchCount += 1
+        return page(sorted(librarySongs, by: sortOption), limit: limit, offset: offset)
     }
 
     func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {

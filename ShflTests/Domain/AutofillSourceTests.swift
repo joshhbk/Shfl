@@ -151,3 +151,92 @@ struct LibraryAutofillSourceTests {
         Song(id: id, title: "Song \(id)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
     }
 }
+
+@MainActor
+@Suite("WarmedLibraryAutofillSource Tests")
+struct WarmedLibraryAutofillSourceTests {
+    private let before = ["a", "b", "c"].map(makeSong)
+    private let after = ["x", "y", "z"].map(makeSong)
+
+    @Test("A warmed batch serves the next autofill, once")
+    func warmedBatchServesOnce() async throws {
+        let service = DeterministicMusicService()
+        await service.setLibrarySongs(before)
+        let source = WarmedLibraryAutofillSource(libraryCatalog: service, algorithm: { .recentlyAdded })
+
+        source.warm()
+        await waitForLibraryFetches(1, on: service)
+        await service.setLibrarySongs(after)
+
+        let warmed = try await source.fetchSongs(excluding: [], limit: 3)
+        let live = try await source.fetchSongs(excluding: [], limit: 3)
+
+        #expect(Set(warmed.map(\.id)) == ["a", "b", "c"])
+        #expect(Set(live.map(\.id)) == ["x", "y", "z"])
+    }
+
+    @Test("A warmed batch skips songs already in the draft")
+    func warmedBatchSkipsExcluded() async throws {
+        let service = DeterministicMusicService()
+        await service.setLibrarySongs(before)
+        let source = WarmedLibraryAutofillSource(libraryCatalog: service, algorithm: { .recentlyAdded })
+
+        source.warm()
+        let songs = try await source.fetchSongs(excluding: ["a"], limit: 3)
+
+        #expect(Set(songs.map(\.id)) == ["b", "c"])
+        #expect(await service.libraryFetchCount == 1)
+    }
+
+    @Test("Changing the autofill algorithm drops the warmed batch")
+    func algorithmChangeDropsBatch() async throws {
+        let service = DeterministicMusicService()
+        await service.setLibrarySongs(before)
+        var algorithm = AutofillAlgorithm.recentlyAdded
+        let source = WarmedLibraryAutofillSource(libraryCatalog: service, algorithm: { algorithm })
+
+        source.warm()
+        await waitForLibraryFetches(1, on: service)
+        await service.setLibrarySongs(after)
+        algorithm = .random
+
+        let songs = try await source.fetchSongs(excluding: [], limit: 3)
+
+        #expect(Set(songs.map(\.id)) == ["x", "y", "z"])
+    }
+
+    @Test("A batch that can't fill the request falls back to a live fetch")
+    func shortBatchFallsBackToLive() async throws {
+        let service = DeterministicMusicService()
+        await service.setLibrarySongs(before)
+        let source = WarmedLibraryAutofillSource(
+            libraryCatalog: service,
+            algorithm: { .recentlyAdded },
+            batchSize: 2
+        )
+
+        source.warm()
+        await waitForLibraryFetches(1, on: service)
+        await service.setLibrarySongs(after)
+
+        let songs = try await source.fetchSongs(excluding: [], limit: 3)
+
+        #expect(Set(songs.map(\.id)) == ["x", "y", "z"])
+    }
+
+    private func waitForLibraryFetches(
+        _ count: Int,
+        on service: DeterministicMusicService,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
+        for _ in 0..<1_000 {
+            if await service.libraryFetchCount >= count { return }
+            await Task.yield()
+        }
+        Issue.record("The library was never fetched", sourceLocation: sourceLocation)
+    }
+}
+
+private func makeSong(_ id: String) -> Song {
+    Song(id: id, title: "Song \(id)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+}

@@ -7,7 +7,8 @@ final class ShflLaunchUITests: XCTestCase {
 
     func testPlaybackScenarioStartsPausesResumesAndAdvances() {
         let app = makeDeterministicApp()
-        XCTAssertTrue(app.staticTexts["Ready to shuffle"].waitForExistence(timeout: 10))
+        // A first launch starts with an empty draft; play autofills it.
+        XCTAssertTrue(app.staticTexts["Start shuffling"].waitForExistence(timeout: 10))
 
         let playPause = element("player.playPause", in: app)
         XCTAssertTrue(playPause.waitForExistence(timeout: 2))
@@ -74,6 +75,8 @@ final class ShflLaunchUITests: XCTestCase {
         openSongPicker(in: app)
 
         XCTAssertTrue(element("songPicker.close", in: app).exists)
+        element("songPicker.autofill", in: app).tap()
+        XCTAssertTrue(element("songPicker.clear", in: app).waitForExistence(timeout: 5))
 
         element("songPicker.clear", in: app).tap()
         XCTAssertTrue(element("songPicker.clear", in: app).waitForNonExistence(timeout: 5))

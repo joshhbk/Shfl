@@ -65,7 +65,6 @@ struct AppComposition {
             appSettings.currentThemeId = "silver"
             appSettings.shuffleAlgorithm = .weightedByPlayCount
             appSettings.autofillAlgorithm = .random
-            appSettings.hasCompletedOnboarding = false
 
             let musicService = DeterministicMusicService(
                 configuration: .init(
