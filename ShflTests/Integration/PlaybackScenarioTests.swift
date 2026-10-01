@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Shfl
 
@@ -22,7 +23,7 @@ struct PlaybackScenarioTests {
 
     @Test("A session plays in order, then a fresh one starts", arguments: TransportKind.allCases)
     func playsThroughThenStartsFreshSession(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
         let firstSession = try #require(rig.player.activeSession)
@@ -43,7 +44,7 @@ struct PlaybackScenarioTests {
 
     @Test("Skip forward, then back to the start", arguments: TransportKind.allCases)
     func skipsForwardAndBack(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
         let order = try #require(rig.player.activeSession?.songOrder)
@@ -58,7 +59,7 @@ struct PlaybackScenarioTests {
 
     @Test("Pause and resume keep the session and song", arguments: TransportKind.allCases)
     func pausesAndResumes(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
         let session = try #require(rig.player.activeSession)
@@ -74,7 +75,7 @@ struct PlaybackScenarioTests {
 
     @Test("Restore comes back paused at the saved song and position", arguments: TransportKind.allCases)
     func restoresPausedAtPosition(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add(songs)
         let session = ListeningSession(songOrder: songs, algorithm: .noRepeat, seed: 3)
 
@@ -88,7 +89,7 @@ struct PlaybackScenarioTests {
 
     @Test("Seeking moves the playback position", arguments: TransportKind.allCases)
     func seeks(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
 
@@ -99,7 +100,7 @@ struct PlaybackScenarioTests {
 
     @Test("Removing every song leaves the current session playing", arguments: TransportKind.allCases)
     func removingEverythingKeepsPlaying(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
         let session = try #require(rig.player.activeSession)
@@ -113,7 +114,7 @@ struct PlaybackScenarioTests {
 
     @Test("When the session ends with an empty pool, playback stops", arguments: TransportKind.allCases)
     func emptyPoolStopsAtSessionEnd(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add([songs[0]])
         try await rig.player.startFreshShuffle(seed: 11)
 
@@ -127,7 +128,7 @@ struct PlaybackScenarioTests {
 
     @Test("Clearing the session stops playback", arguments: TransportKind.allCases)
     func clearingSessionStops(kind: TransportKind) async throws {
-        let rig = ScenarioRig(kind, songs: songs)
+        let rig = try ScenarioRig(kind, songs: songs)
         try rig.draft.add(songs)
         try await rig.player.startFreshShuffle(seed: 11)
 
@@ -140,16 +141,18 @@ struct PlaybackScenarioTests {
     }
 }
 
-/// One transport plus the player that drives it, and a way to let the current
-/// song play to its end.
+/// One transport plus the session host and player that drive it, and a way to
+/// let the current song play to its end.
 @MainActor
 private struct ScenarioRig {
     let transport: PlaybackTransport
-    let draft = SessionDraftStore()
-    let player: ShufflePlayer
+    let host: ListeningSessionHost
     let finishCurrentSong: () async -> Void
 
-    init(_ kind: PlaybackScenarioTests.TransportKind, songs: [Song]) {
+    var draft: SessionDraftStore { host.sessionDraft }
+    var player: ShufflePlayer { host.player }
+
+    init(_ kind: PlaybackScenarioTests.TransportKind, songs: [Song]) throws {
         switch kind {
         case .deterministic:
             let service = DeterministicMusicService(
@@ -165,8 +168,26 @@ private struct ScenarioRig {
             transport = MusicKitTransport(player: fake, confirmationDelay: {})
             finishCurrentSong = { await fake.finishCurrentEntry() }
         }
-        player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        // Each rig gets its own storage.
+        let container = try ModelContainer(
+            for: PersistedSession.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        host = ListeningSessionHost(
+            playbackTransport: transport,
+            archive: SessionArchive(modelContext: container.mainContext),
+            makeAutofillSource: { NoAutofillSource() }
+        )
+        modelContainer = container
     }
+
+    /// Keeps the in-memory store alive for as long as the host writes to it.
+    private let modelContainer: ModelContainer
+}
+
+/// Scenarios start from a filled draft, so autofill never has songs to add.
+private struct NoAutofillSource: AutofillSource {
+    func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] { [] }
 }
 
 @MainActor

@@ -108,6 +108,14 @@ final class ListeningSessionHost {
         }
     }
 
+    /// A session that played to its end continues as a fresh shuffle of the
+    /// draft. With an empty draft, playback stays stopped: emptying the draft
+    /// asked for no more, so there is nothing to autofill.
+    private func continueAfterSessionEnd() async {
+        guard !sessionDraft.isEmpty else { return }
+        await startFreshShuffle()
+    }
+
     // MARK: - Restoring
 
     /// Reinstates the saved song pool and, when still valid, the saved session.
@@ -167,6 +175,9 @@ final class ListeningSessionHost {
             for await transition in transitions {
                 guard !Task.isCancelled, let self else { return }
                 self.record(transition)
+                if transition.songTransition == .sessionEnded {
+                    await self.continueAfterSessionEnd()
+                }
             }
         }
 
@@ -210,7 +221,7 @@ final class ListeningSessionHost {
         switch transition.songTransition {
         case .started, .selectedAndStarted:
             break
-        case .cleared:
+        case .cleared, .sessionEnded:
             commit(session: nil, savedAt: transition.observedAt)
             return
         case .selected, nil:

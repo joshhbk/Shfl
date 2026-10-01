@@ -310,6 +310,66 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(host.player.activeSession?.songIDs, ["a"])
     }
 
+    // MARK: - Session end
+
+    func testSessionEndContinuesWithAFreshShuffleOfTheStagedDraft() async throws {
+        let host = makeHost(makeSeed: { 4 })
+        let original = makeSongs("one", "two", "three")
+        try host.sessionDraft.add(original)
+        await host.startFreshShuffle()
+        let ended = try XCTUnwrap(host.player.activeSession)
+        try host.sessionDraft.add(makeSongs("added"))
+        host.sessionDraft.remove(songID: "one")
+
+        await mockService.simulateSessionEnded()
+        await waitUntil {
+            host.player.sessionEndCount == 1
+                && host.player.activeSession.map { $0.id != ended.id } == true
+        }
+
+        XCTAssertEqual(Set(host.player.activeSession?.songIDs ?? []), ["two", "three", "added"])
+        XCTAssertTrue(host.player.playbackState.isPlaying)
+        let loadCallCount = await mockService.loadCallCount
+        XCTAssertEqual(loadCallCount, 2)
+    }
+
+    func testSessionEndWithAnEmptyDraftStopsUntilPlayIsPressed() async throws {
+        let source = StubAutofillSource(songs: makeSongs("library"))
+        let host = makeHost(autofillSource: source)
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.startFreshShuffle()
+
+        host.sessionDraft.removeAll()
+        await mockService.simulateSessionEnded()
+        await waitUntil { host.player.sessionEndCount == 1 }
+        await waitForStateUpdate()
+
+        XCTAssertNil(host.player.activeSession)
+        XCTAssertEqual(host.player.playbackState, .stopped)
+        XCTAssertEqual(source.fetchCount, 0)
+        let loadsAfterEnd = await mockService.loadCallCount
+        XCTAssertEqual(loadsAfterEnd, 1)
+
+        await host.togglePlayback()
+
+        XCTAssertEqual(source.fetchCount, 1)
+        XCTAssertEqual(host.player.activeSession?.songIDs, ["library"])
+    }
+
+    func testSessionClearNeverStartsANewSession() async throws {
+        let host = makeHost()
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.startFreshShuffle()
+
+        await host.player.clearSession()
+        await waitForStateUpdate()
+
+        XCTAssertNil(host.player.activeSession)
+        XCTAssertEqual(host.player.playbackState, .empty)
+        let loadCallCount = await mockService.loadCallCount
+        XCTAssertEqual(loadCallCount, 1)
+    }
+
     func testHostCanBeReleasedWhileWaitingForTransitions() async {
         var host: ListeningSessionHost? = makeHost()
         weak var releasedHost = host

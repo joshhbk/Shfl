@@ -97,7 +97,7 @@ final class PlaybackTransitionTests: XCTestCase {
         XCTAssertEqual(clearEvents.last?.songTransition, .cleared)
     }
 
-    func test_sessionExhaustionPublishesStopThenOneFreshSession() async throws {
+    func test_sessionExhaustionPublishesAStopMarkedAsSessionEnd() async throws {
         let transport = DeterministicMusicService()
         let draft = SessionDraftStore()
         let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
@@ -107,14 +107,13 @@ final class PlaybackTransitionTests: XCTestCase {
         let oldSession = player.activeSession?.id
         let stream = player.playbackTransitions
         await transport.simulateSessionEnded()
-        let events = await collect(stream, count: 3)
-        XCTAssertEqual(events.map(\.state), [.playing(song), .stopped, .playing(song)])
-        XCTAssertNil(events[1].session)
-        XCTAssertEqual(events[1].songTransition, .cleared)
-        XCTAssertNotEqual(events.last?.session?.id, oldSession)
-        XCTAssertEqual(events.last?.songTransition, .selectedAndStarted(song))
+        let events = await collect(stream, count: 2)
+        XCTAssertEqual(events.map(\.state), [.playing(song), .stopped])
+        XCTAssertEqual(events.first?.session?.id, oldSession)
+        XCTAssertNil(events.last?.session)
+        XCTAssertEqual(events.last?.songTransition, .sessionEnded)
         let loads = await transport.loadCallCount
-        XCTAssertEqual(loads, 2)
+        XCTAssertEqual(loads, 1)
     }
 
     func test_failedLoadPublishesFailureWithoutACommittedSession() async throws {

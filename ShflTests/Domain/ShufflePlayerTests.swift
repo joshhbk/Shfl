@@ -111,7 +111,7 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(loadCallCount, 1)
     }
 
-    func test_virtualTimeAdvancesFiveSongsWithoutReloadingOrWrapping() async throws {
+    func test_virtualTimeAdvancesFiveSongsThenEndsWithoutReloadingOrWrapping() async throws {
         let transport = DeterministicMusicService()
         let draft = SessionDraftStore()
         let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
@@ -129,15 +129,14 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(loadCallCountBeforeEnd, 1)
 
         await transport.advance(by: 180)
-        await waitUntil {
-            player.sessionEndCount == 1 && player.activeSession != nil
-        }
+        await waitUntil { player.sessionEndCount == 1 }
+        await settle()
 
-        XCTAssertNotNil(player.activeSession)
-        XCTAssertTrue(player.playbackState.isPlaying)
-        XCTAssertEqual(player.sessionEndCount, 1)
+        // What follows a session end is the session host's decision.
+        XCTAssertNil(player.activeSession)
+        XCTAssertEqual(player.playbackState, .stopped)
         let loadCallCountAfterEnd = await transport.loadCallCount
-        XCTAssertEqual(loadCallCountAfterEnd, 2)
+        XCTAssertEqual(loadCallCountAfterEnd, 1)
     }
 
     func test_transientEmptyDoesNotEndOrReloadSession() async throws {
@@ -156,37 +155,6 @@ final class ShufflePlayerTests: XCTestCase {
         XCTAssertEqual(player.sessionEndCount, 0)
         let loadCallCount = await transport.loadCallCount
         XCTAssertEqual(loadCallCount, 1)
-    }
-
-    func test_sessionEndBuildsNextSessionFromStagedDraft() async throws {
-        let transport = DeterministicMusicService()
-        let draft = SessionDraftStore()
-        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
-        let original = makeSongs(3)
-        let added = Song(
-            id: "added",
-            title: "Added",
-            artist: "New Artist",
-            albumTitle: "Album",
-            artworkURL: nil
-        )
-        try draft.add(original)
-        try await player.startFreshShuffle(seed: 4)
-        try draft.add(added)
-        draft.remove(songID: original[0].id)
-        await settle()
-
-        await transport.simulateSessionEnded()
-        await waitUntil {
-            player.sessionEndCount == 1 && player.activeSession != nil
-        }
-
-        XCTAssertEqual(
-            Set(player.activeSession?.songIDs ?? []),
-            Set([original[1].id, original[2].id, added.id])
-        )
-        let loadCallCount = await transport.loadCallCount
-        XCTAssertEqual(loadCallCount, 2)
     }
 
     func test_restoreUsesOnePausedAtomicLoadWithExactOrderAndPosition() async throws {
