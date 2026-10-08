@@ -293,6 +293,21 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(source.fetchCount, 0)
     }
 
+    func testFreshShuffleAfterTheDraftIsEmptiedCanAutofillToReplaceTheSession() async throws {
+        let source = StubAutofillSource(songs: makeSongs("library"))
+        let host = makeHost(autofillSource: source)
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.startFreshShuffle()
+        let first = try XCTUnwrap(host.player.activeSession)
+
+        host.sessionDraft.removeAll()
+        await host.startFreshShuffle(autofillingEmptyDraft: true)
+
+        XCTAssertEqual(source.fetchCount, 1)
+        XCTAssertNotEqual(host.player.activeSession?.id, first.id)
+        XCTAssertEqual(host.player.activeSession?.songIDs, ["library"])
+    }
+
     func testIsStartingSessionCoversAutofillAndIgnoresRepeatPresses() async throws {
         let source = StubAutofillSource(songs: makeSongs("a"), holdsUntilReleased: true)
         let host = makeHost(autofillSource: source)

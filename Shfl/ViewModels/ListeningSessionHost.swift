@@ -89,8 +89,10 @@ final class ListeningSessionHost {
     }
 
     /// Replaces any active listening session with a fresh shuffle of the draft.
-    func startFreshShuffle() async {
-        await startSession(autofillingEmptyDraft: false)
+    /// - Parameter autofillingEmptyDraft: Fill an empty draft first, for an
+    ///   explicit request to shuffle after the draft was cleared.
+    func startFreshShuffle(autofillingEmptyDraft: Bool = false) async {
+        await startSession(autofillingEmptyDraft: autofillingEmptyDraft)
     }
 
     private func startSession(autofillingEmptyDraft: Bool) async {

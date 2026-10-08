@@ -217,6 +217,7 @@ final class LibraryBrowserViewModel {
         case .songs: songsLane.handleSearchTextChanged(query)
         case .artists: artistsLane.handleSearchTextChanged(query)
         case .playlists: playlistsLane.handleSearchTextChanged(query)
+        case .selected: break
         }
     }
 
@@ -233,6 +234,7 @@ final class LibraryBrowserViewModel {
             case .songs: await songsLane.loadInitial(force: false)
             case .artists: await artistsLane.loadInitial(force: false)
             case .playlists: await playlistsLane.loadInitial(force: false)
+            case .selected: break
             }
         }
     }

@@ -26,25 +26,12 @@ final class ViewTeardownTests: XCTestCase {
         try await showThenTearDown(
             PlayerView(
                 player: ShufflePlayer(playbackTransport: service, sessionDraft: draft),
-                playbackTransport: service,
-                onManageTapped: {}
+                playbackTransport: service
             )
             .environment(\.sessionDraft, draft)
         )
     }
 
-    func test_closingManageReleasesItsStateWithoutCrashing() async throws {
-        let draft = SessionDraftStore()
-        try draft.add(Song(id: "1", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil))
-        try await showThenTearDown(
-            ManageView(
-                player: ShufflePlayer(playbackTransport: DeterministicMusicService(), sessionDraft: draft),
-                onAddTapped: {},
-                onDismiss: {}
-            )
-            .environment(\.sessionDraft, draft)
-        )
-    }
 
     private func showThenTearDown(_ view: some View) async throws {
         let window = UIWindow(frame: UIScreen.main.bounds)

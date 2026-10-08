@@ -4,12 +4,14 @@ enum BrowseMode: String, CaseIterable {
     case songs = "Songs"
     case artists = "Artists"
     case playlists = "Playlists"
+    case selected = "Selected"
 
     var iconName: String {
         switch self {
         case .songs: "music.note"
         case .artists: "music.mic"
         case .playlists: "music.note.list"
+        case .selected: "checkmark.circle"
         }
     }
 }
@@ -28,6 +30,7 @@ struct SongPickerView: View {
 
     @Environment(\.appSettings) private var appSettings
     @Environment(\.sessionDraft) private var sessionDraft
+    @Environment(\.listeningSessionHost) private var sessionHost
     @Environment(\.shuffleTheme) private var shuffleTheme
 
     init(
@@ -121,7 +124,10 @@ struct SongPickerView: View {
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("songPicker.scope")
             }
+
+            SessionChangesBanner()
         }
+        .animation(reduceMotion ? nil : .snappy, value: sessionHost?.player.hasPendingSessionChanges)
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 12)
@@ -136,7 +142,7 @@ struct SongPickerView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Search your library", text: $viewModel.searchText)
+            TextField(viewModel.browseMode == .selected ? "Search your picks" : "Search your library", text: $viewModel.searchText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -290,6 +296,8 @@ struct SongPickerView: View {
                 isAtCapacity: sessionDraft.isAtCapacity,
                 onToggleSong: { editor.toggle($0, in: sessionDraft) }
             )
+        case .selected:
+            selectedList(songs: sessionDraft.songs)
         }
     }
 
@@ -299,6 +307,33 @@ struct SongPickerView: View {
         case .songs: songSearchList
         case .artists: artistSearchList
         case .playlists: playlistSearchList
+        case .selected: selectedList(songs: selectedSearchResults)
+        }
+    }
+
+    // MARK: - Selected Songs
+
+    /// Picked songs matching the search, filtered locally: the draft is
+    /// already in memory, so there is no catalog lane to search.
+    private var selectedSearchResults: [Song] {
+        sessionDraft.songs.filter {
+            $0.title.localizedStandardContains(viewModel.searchText)
+                || $0.artist.localizedStandardContains(viewModel.searchText)
+        }
+    }
+
+    @ViewBuilder
+    private func selectedList(songs: [Song]) -> some View {
+        if !songs.isEmpty {
+            songList(songs: songs, isPaginated: false)
+        } else if viewModel.searchText.isEmpty {
+            ContentUnavailableView(
+                "No Songs Selected",
+                systemImage: BrowseMode.selected.iconName,
+                description: Text("Pick songs from Songs, Artists or Playlists, or use Autofill")
+            )
+        } else {
+            ContentUnavailableView.search(text: viewModel.searchText)
         }
     }
 

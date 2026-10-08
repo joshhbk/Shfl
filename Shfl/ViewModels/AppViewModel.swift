@@ -13,9 +13,7 @@ final class AppViewModel {
     @ObservationIgnored private let appSettings: AppSettings
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
-    var showingManage = false
     var showingPicker = false
-    var showingPickerDirect = false
     var showingSettings = false
 
     var isAuthorized = false
@@ -78,28 +76,12 @@ final class AppViewModel {
         }
     }
 
-    func openManage() {
-        showingManage = true
-    }
-
-    func closeManage() {
-        showingManage = false
-    }
-
     func openPicker() {
         showingPicker = true
     }
 
     func closePicker() {
         showingPicker = false
-    }
-
-    func openPickerDirect() {
-        showingPickerDirect = true
-    }
-
-    func closePickerDirect() {
-        showingPickerDirect = false
     }
 
     func openSettings() {
