@@ -1,5 +1,4 @@
 import SwiftData
-import UIKit
 import XCTest
 @testable import Shfl
 
@@ -48,7 +47,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
         await viewModel.sessionHost.startFreshShuffle()
         await mockService.setPlaybackTime(42)
 
-        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.post(name: ListeningSessionHost.didLeaveForegroundNotification, object: nil)
 
         let archive = SessionArchive(modelContext: modelContext)
         await waitUntil { (try? archive.load().session?.playbackPosition) == 42 }
@@ -71,7 +70,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
         )
         _ = viewModel
 
-        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.post(name: ListeningSessionHost.didLeaveForegroundNotification, object: nil)
 
         for _ in 0..<10 {
             if persistCallCount == 1 { break }

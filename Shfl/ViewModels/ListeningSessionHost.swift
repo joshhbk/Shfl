@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 /// Owns the listening session for one app launch: the session draft, the
 /// player, starting listening sessions, restoring the last session at launch,
@@ -275,9 +279,17 @@ final class ListeningSessionHost {
         }
     }
 
+    #if canImport(UIKit)
+    static let didLeaveForegroundNotification = UIApplication.didEnterBackgroundNotification
+    #else
+    /// Mac apps don't go to the background; leaving the app is the closest
+    /// moment to save before it might be quit.
+    static let didLeaveForegroundNotification = NSApplication.didResignActiveNotification
+    #endif
+
     private func subscribeToBackgroundNotification() {
         backgroundObserver = NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
+            forName: Self.didLeaveForegroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in

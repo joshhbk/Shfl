@@ -27,9 +27,8 @@ struct PlaylistDetailView: View {
     var body: some View {
         content
         .navigationTitle(viewModel.playlistName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
+        .inlineNavigationTitle()
+        .groupedNavigationBarBackground()
         .task {
             await viewModel.loadInitialPage()
         }

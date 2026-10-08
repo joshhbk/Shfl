@@ -66,7 +66,7 @@ struct CapacityProgressBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color(.systemGroupedBackground))
+        .background(Color.groupedBackground)
         .modifier(CapacityPulseModifier(current: current, maximum: maximum, pulseOpacity: $pulseOpacity))
     }
 

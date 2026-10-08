@@ -1,4 +1,6 @@
+#if canImport(UIKit)
 import UIKit
+#endif
 
 enum HapticFeedback {
     case light
@@ -9,6 +11,7 @@ enum HapticFeedback {
     case error
     case milestone
 
+    #if canImport(UIKit)
     private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
     private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
     private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
@@ -42,4 +45,8 @@ enum HapticFeedback {
             }
         }
     }
+    #else
+    /// Macs have no haptic engine to match these patterns.
+    func trigger() {}
+    #endif
 }

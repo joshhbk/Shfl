@@ -28,6 +28,8 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
     }
 }
 
+// Alternate app icons are an iOS-only API.
+#if canImport(UIKit)
 struct AppIconSettingsView: View {
     @State private var currentIcon: AppIconVariant = .primary
     @State private var errorMessage: String?
@@ -133,3 +135,4 @@ private struct IconCell: View {
         AppIconSettingsView()
     }
 }
+#endif

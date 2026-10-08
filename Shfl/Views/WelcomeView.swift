@@ -104,7 +104,11 @@ private struct WelcomeAppIcon: View {
     @Environment(\.shuffleTheme) private var theme
 
     private var iconName: String {
-        UIApplication.shared.alternateIconName ?? "AppIcon"
+        #if canImport(UIKit)
+        UIApplication.shared.alternateIconName ?? AppIconVariant.primary.rawValue
+        #else
+        AppIconVariant.primary.rawValue
+        #endif
     }
 
     var body: some View {

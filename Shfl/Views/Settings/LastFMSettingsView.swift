@@ -16,7 +16,7 @@ struct LastFMSettingsView: View {
             await viewModel.refreshActivity(showLoading: !viewModel.recentTracksState.hasLoadedTracks)
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .barTrailing) {
                 Button {
                     Task { await viewModel.refreshActivity(showLoading: !viewModel.recentTracksState.hasLoadedTracks) }
                 } label: {

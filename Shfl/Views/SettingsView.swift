@@ -13,11 +13,13 @@ struct SettingsView: View {
                         Label("Theme", systemImage: "paintpalette")
                     }
 
+                    #if canImport(UIKit)
                     NavigationLink {
                         AppIconSettingsView()
                     } label: {
                         Label("App Icon", systemImage: "app.badge")
                     }
+                    #endif
                 }
 
                 Section("Playback") {
@@ -60,7 +62,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .barTrailing) {
                     Button("Done") {
                         dismiss()
                     }

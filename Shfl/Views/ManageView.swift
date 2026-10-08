@@ -17,7 +17,7 @@ struct ManageView: View {
                 }
             }
             .navigationTitle("Library")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done", action: onDismiss)

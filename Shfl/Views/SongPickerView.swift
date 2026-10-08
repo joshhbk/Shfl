@@ -56,14 +56,14 @@ struct SongPickerView: View {
             }
             .accessibilityHidden(!navigationPath.isEmpty)
             .navigationTitle("Pick Your Songs")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .barLeading) {
                     if showSortButton {
                         modernSortMenu(style: .systemDefault)
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .barTrailing) {
                     Button("Done", action: onDismiss)
                         .fontWeight(.semibold)
                         .accessibilityIdentifier("songPicker.close")
@@ -137,7 +137,9 @@ struct SongPickerView: View {
                 .foregroundStyle(.secondary)
 
             TextField("Search your library", text: $viewModel.searchText)
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .focused($isSearchFieldFocused)
@@ -158,7 +160,7 @@ struct SongPickerView: View {
         .padding(.horizontal, 14)
         .frame(minHeight: 44)
         .background(
-            Color(.secondarySystemGroupedBackground),
+            Color.secondaryGroupedBackground,
             in: RoundedRectangle(cornerRadius: 12)
         )
     }

@@ -31,7 +31,7 @@ struct PickerHeaderStyle: Equatable {
     }
 
     static let systemDefault = PickerHeaderStyle(
-        background: Color(.systemGroupedBackground),
+        background: Color.groupedBackground,
         pillBackground: Color(.systemFill),
         toolbarColorScheme: nil,
         primaryContent: .primary,

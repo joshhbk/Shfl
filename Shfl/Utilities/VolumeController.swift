@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import MediaPlayer
 import UIKit
 
@@ -68,3 +69,12 @@ enum VolumeController {
         slider.sendActions(for: .touchUpInside)
     }
 }
+#else
+/// macOS has no public way to step the system volume, so the click wheel
+/// volume gestures do nothing there.
+enum VolumeController {
+    static func initialize() {}
+    static func increaseVolume() {}
+    static func decreaseVolume() {}
+}
+#endif

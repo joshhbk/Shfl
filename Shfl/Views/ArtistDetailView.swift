@@ -25,9 +25,8 @@ struct ArtistDetailView: View {
     var body: some View {
         content
         .navigationTitle(viewModel.artistName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
+        .inlineNavigationTitle()
+        .groupedNavigationBarBackground()
         .task {
             await viewModel.loadInitialPage()
         }

@@ -1,5 +1,4 @@
 import SwiftData
-import UIKit
 import XCTest
 @testable import Shfl
 
@@ -185,7 +184,7 @@ final class ListeningSessionHostTests: XCTestCase {
         var persistCallCount = 0
         let host = makeHost(lifecyclePersistenceHook: { persistCallCount += 1 })
 
-        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.post(name: ListeningSessionHost.didLeaveForegroundNotification, object: nil)
 
         for _ in 0..<10 {
             if persistCallCount == 1 { break }

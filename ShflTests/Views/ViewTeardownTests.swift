@@ -46,6 +46,7 @@ final class ViewTeardownTests: XCTestCase {
         )
     }
 
+    #if canImport(UIKit)
     private func showThenTearDown(_ view: some View) async throws {
         let window = UIWindow(frame: UIScreen.main.bounds)
         weak var weakHost: UIHostingController<AnyView>?
@@ -61,4 +62,28 @@ final class ViewTeardownTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(500))
         XCTAssertNil(weakHost)
     }
+    #else
+    private func showThenTearDown(_ view: some View) async throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 800),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        weak var weakHost: NSHostingController<AnyView>?
+        do {
+            let host = NSHostingController(rootView: AnyView(view))
+            weakHost = host
+            window.contentViewController = host
+            window.orderFront(nil)
+            try await Task.sleep(for: .milliseconds(300))
+            window.contentViewController = NSViewController()
+        }
+        // SwiftUI releases view state on a later run-loop pass, outside any task.
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertNil(weakHost)
+        window.close()
+    }
+    #endif
 }

@@ -104,9 +104,15 @@ struct MainView: View {
             set: { if !$0 { viewModel.authorizationError = nil } }
         )) {
             Button("Open Settings") {
+                #if canImport(UIKit)
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
+                #else
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Media") {
+                    NSWorkspace.shared.open(url)
+                }
+                #endif
             }
             Button("Cancel", role: .cancel) {}
         } message: {

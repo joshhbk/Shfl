@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 struct DebugQueueView: View {
     @Environment(\.shufflePlayer) private var player
@@ -81,7 +85,12 @@ private struct DebugListeningSessionContent: View {
 
             Section {
                 Button("Copy Session Diagnostics") {
+                    #if canImport(UIKit)
                     UIPasteboard.general.string = diagnostics
+                    #else
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(diagnostics, forType: .string)
+                    #endif
                     copiedAt = Date()
                 }
                 if let copiedAt {

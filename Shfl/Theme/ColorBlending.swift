@@ -1,5 +1,19 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+
+private func platformRGBColor(_ color: Color) -> UIColor {
+    UIColor(color)
+}
+#else
+import AppKit
+
+/// `NSColor` only answers HSB/RGB queries for colors in an RGB color space.
+private func platformRGBColor(_ color: Color) -> NSColor {
+    let nsColor = NSColor(color)
+    return nsColor.usingColorSpace(.sRGB) ?? nsColor
+}
+#endif
 
 /// HSB color math utilities for theme tinting
 enum ColorBlending {
@@ -15,11 +29,11 @@ enum ColorBlending {
 
     /// Extract HSB components from a SwiftUI Color
     static func extractHSB(from color: Color) -> HSB {
-        let uiColor = UIColor(color)
+        let platformColor = platformRGBColor(color)
         var h: CGFloat = 0
         var s: CGFloat = 0
         var b: CGFloat = 0
-        uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
+        platformColor.getHue(&h, saturation: &s, brightness: &b, alpha: nil)
         return HSB(hue: h, saturation: s, brightness: b)
     }
 
@@ -42,11 +56,11 @@ enum ColorBlending {
 
     /// Calculate relative luminance for contrast decisions (WCAG formula)
     static func relativeLuminance(of color: Color) -> CGFloat {
-        let uiColor = UIColor(color)
+        let platformColor = platformRGBColor(color)
         var r: CGFloat = 0
         var g: CGFloat = 0
         var b: CGFloat = 0
-        uiColor.getRed(&r, green: &g, blue: &b, alpha: nil)
+        platformColor.getRed(&r, green: &g, blue: &b, alpha: nil)
 
         // sRGB relative luminance
         return 0.2126 * r + 0.7152 * g + 0.0722 * b

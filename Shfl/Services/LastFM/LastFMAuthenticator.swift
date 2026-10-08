@@ -1,7 +1,11 @@
 import Foundation
 import Security
 import AuthenticationServices
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 nonisolated struct LastFMSession: Codable, Equatable, Sendable {
     let sessionKey: String
@@ -227,6 +231,7 @@ final class WebAuthContextProvider: NSObject, ASWebAuthenticationPresentationCon
         super.init()
     }
 
+    #if canImport(UIKit)
     func currentPresentationAnchor() -> ASPresentationAnchor? {
         let windowScenes = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -248,12 +253,18 @@ final class WebAuthContextProvider: NSObject, ASWebAuthenticationPresentationCon
 
         return nil
     }
+    #else
+    func currentPresentationAnchor() -> ASPresentationAnchor? {
+        NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first { $0.isVisible }
+    }
+    #endif
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         currentPresentationAnchor() ?? ASPresentationAnchor()
     }
 }
 
+#if canImport(UIKit)
 private extension UIScene.ActivationState {
     var sortPriority: Int {
         switch self {
@@ -270,3 +281,4 @@ private extension UIScene.ActivationState {
         }
     }
 }
+#endif
