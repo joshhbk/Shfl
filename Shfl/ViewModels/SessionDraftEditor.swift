@@ -1,28 +1,14 @@
 import SwiftUI
 
-/// The song picker's editing state: undo, the error banner, and whether
+/// The song picker's editing state: the error banner, and whether
 /// autofill has run out of songs. Edits go straight to the
 /// `SessionDraftStore` passed in.
 @Observable
 @MainActor
 final class SessionDraftEditor {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    @ObservationIgnored private let undoManager: SongUndoManager
-
     private(set) var actionErrorMessage: String?
     private(set) var autofillIsExhausted = false
-
-    init(undoManager: SongUndoManager? = nil) {
-        self.undoManager = undoManager ?? SongUndoManager()
-    }
-
-    // MARK: - Undo
-
-    var undoState: UndoState? { undoManager.currentState }
-
-    func dismissUndo() {
-        undoManager.dismiss()
-    }
 
     // MARK: - Editing
 
@@ -31,13 +17,11 @@ final class SessionDraftEditor {
 
         if draft.contains(song.id) {
             draft.remove(songID: song.id)
-            undoManager.recordAction(.removed, song: song)
             return
         }
 
         do {
             try draft.add(song)
-            undoManager.recordAction(.added, song: song)
             if CapacityProgressBar.isMilestone(draft.songCount) {
                 HapticFeedback.milestone.trigger()
             }
@@ -48,24 +32,8 @@ final class SessionDraftEditor {
         }
     }
 
-    func undo(_ state: UndoState, in draft: SessionDraftStore) {
-        autofillIsExhausted = false
-
-        switch state.action {
-        case .added:
-            draft.remove(songID: state.song.id)
-            HapticFeedback.light.trigger()
-        case .removed:
-            try? draft.add(state.song)
-            HapticFeedback.medium.trigger()
-        }
-
-        undoManager.dismiss()
-    }
-
     func clearAll(in draft: SessionDraftStore) {
         autofillIsExhausted = false
-        undoManager.dismiss()
         draft.removeAll()
     }
 

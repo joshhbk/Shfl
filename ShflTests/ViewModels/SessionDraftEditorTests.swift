@@ -15,17 +15,16 @@ final class SessionDraftEditorTests: XCTestCase {
         }
     }
 
-    func test_toggleAddsToTheDraftAndOffersUndo() throws {
+    func test_toggleAddsToTheDraft() throws {
         let draft = SessionDraftStore()
         let editor = SessionDraftEditor()
 
         editor.toggle(makeSongs(1)[0], in: draft)
 
         XCTAssertEqual(draft.songs.map(\.id), ["1"])
-        XCTAssertEqual(editor.undoState?.action, .added)
     }
 
-    func test_toggleRemovesFromTheDraftAndOffersUndo() throws {
+    func test_toggleRemovesFromTheDraft() throws {
         let draft = SessionDraftStore()
         try draft.add(makeSongs(2))
         let editor = SessionDraftEditor()
@@ -33,10 +32,9 @@ final class SessionDraftEditorTests: XCTestCase {
         editor.toggle(makeSongs(1)[0], in: draft)
 
         XCTAssertEqual(draft.songs.map(\.id), ["2"])
-        XCTAssertEqual(editor.undoState?.action, .removed)
     }
 
-    func test_toggleAtCapacityLeavesTheDraftAndUndoAlone() throws {
+    func test_toggleAtCapacityLeavesTheDraftAlone() throws {
         let draft = SessionDraftStore()
         try draft.add(makeSongs(SessionDraft.maxSongs))
         let editor = SessionDraftEditor()
@@ -44,45 +42,17 @@ final class SessionDraftEditorTests: XCTestCase {
         editor.toggle(makeSongs(1, start: 500)[0], in: draft)
 
         XCTAssertEqual(draft.songCount, SessionDraft.maxSongs)
-        XCTAssertNil(editor.undoState)
         XCTAssertNil(editor.actionErrorMessage)
     }
 
-    func test_undoingAnAddRemovesTheSong() throws {
-        let draft = SessionDraftStore()
-        let editor = SessionDraftEditor()
-        editor.toggle(makeSongs(1)[0], in: draft)
-        let undoState = try XCTUnwrap(editor.undoState)
-
-        editor.undo(undoState, in: draft)
-
-        XCTAssertTrue(draft.isEmpty)
-        XCTAssertNil(editor.undoState)
-    }
-
-    func test_undoingARemoveRestoresTheSong() throws {
-        let draft = SessionDraftStore()
-        try draft.add(makeSongs(1))
-        let editor = SessionDraftEditor()
-        editor.toggle(makeSongs(1)[0], in: draft)
-        let undoState = try XCTUnwrap(editor.undoState)
-
-        editor.undo(undoState, in: draft)
-
-        XCTAssertEqual(draft.songs.map(\.id), ["1"])
-    }
-
-    func test_clearAllEmptiesTheDraftAndDismissesUndo() throws {
+    func test_clearAllEmptiesTheDraft() throws {
         let draft = SessionDraftStore()
         try draft.add(makeSongs(3))
         let editor = SessionDraftEditor()
-        editor.toggle(makeSongs(1, start: 10)[0], in: draft)
-        XCTAssertNotNil(editor.undoState)
 
         editor.clearAll(in: draft)
 
         XCTAssertTrue(draft.isEmpty)
-        XCTAssertNil(editor.undoState)
     }
 
     // MARK: - Autofill exhaustion

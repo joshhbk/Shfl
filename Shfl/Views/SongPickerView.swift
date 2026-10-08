@@ -492,15 +492,6 @@ struct SongPickerView: View {
     private var overlayPills: some View {
         if hasOverlayMessage {
             VStack(spacing: 8) {
-                if let undoState = editor.undoState {
-                    UndoPill(
-                        state: undoState,
-                        onUndo: { editor.undo(undoState, in: sessionDraft) },
-                        onDismiss: { editor.dismissUndo() }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
                 if let actionErrorMessage = editor.actionErrorMessage {
                     Text(actionErrorMessage)
                         .font(.subheadline)
@@ -541,7 +532,7 @@ struct SongPickerView: View {
     }
 
     private var hasOverlayMessage: Bool {
-        editor.undoState != nil || editor.actionErrorMessage != nil || showAutofillBanner
+        editor.actionErrorMessage != nil || showAutofillBanner
     }
 
     // MARK: - Helpers
