@@ -4,7 +4,6 @@ import Vortex
 struct PlayerView: View {
     var player: ShufflePlayer
     let playbackTransport: PlaybackTransport
-    let onManageTapped: () -> Void
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
     let onSkipForwardTapped: () -> Void
@@ -24,7 +23,6 @@ struct PlayerView: View {
         player: ShufflePlayer,
         playbackTransport: PlaybackTransport,
         initialThemeId: String? = nil,
-        onManageTapped: @escaping () -> Void,
         onAddTapped: @escaping () -> Void = {},
         onSettingsTapped: @escaping () -> Void = {},
         onSkipForwardTapped: @escaping () -> Void = {},
@@ -32,7 +30,6 @@ struct PlayerView: View {
     ) {
         self.player = player
         self.playbackTransport = playbackTransport
-        self.onManageTapped = onManageTapped
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
         self.onSkipForwardTapped = onSkipForwardTapped
@@ -266,7 +263,6 @@ private struct PlayerViewPreviewHost: View {
             player: player,
             playbackTransport: musicService,
             initialThemeId: themeId,
-            onManageTapped: {},
             onAddTapped: {},
             onSettingsTapped: {},
             onSkipForwardTapped: {},

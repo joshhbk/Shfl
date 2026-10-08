@@ -77,20 +77,8 @@ struct MainView: View {
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
             viewModel.sessionDraft.stage(newAlgorithm)
         }
-        .sheet(isPresented: $viewModel.showingManage) {
-            ManageView(
-                player: viewModel.player,
-                onAddTapped: { viewModel.openPicker() },
-                onDismiss: { viewModel.closeManage() }
-            )
-            .tint(deviceAccentColor)
-            .environment(\.appSettings, appSettings)
-            .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
-                songPickerSheet(onDismiss: { viewModel.closePicker() })
-            }
-        }
-        .sheet(isPresented: $viewModel.showingPickerDirect, onDismiss: { viewModel.closePickerDirect() }) {
-            songPickerSheet(onDismiss: { viewModel.closePickerDirect() })
+        .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
+            songPickerSheet(onDismiss: { viewModel.closePicker() })
         }
         .sheet(isPresented: $viewModel.showingSettings) {
             SettingsView()
@@ -150,8 +138,7 @@ struct MainView: View {
                 player: viewModel.player,
                 playbackTransport: viewModel.playbackTransport,
                 initialThemeId: appSettings.currentThemeId,
-                onManageTapped: { viewModel.openManage() },
-                onAddTapped: { viewModel.openPickerDirect() },
+                onAddTapped: { viewModel.openPicker() },
                 onSettingsTapped: { viewModel.openSettings() },
                 onSkipForwardTapped: { Task { try? await viewModel.player.skipToNext() } },
                 onSkipBackTapped: { Task { try? await viewModel.player.restartOrSkipToPrevious() } }
