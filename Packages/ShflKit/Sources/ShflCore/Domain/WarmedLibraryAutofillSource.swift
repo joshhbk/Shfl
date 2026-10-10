@@ -23,10 +23,17 @@ public final class WarmedLibraryAutofillSource: WarmableAutofillSource {
 
     /// - Parameter algorithm: The chosen autofill algorithm, read at each warm
     ///   and fetch so a settings change takes effect.
-    public init(
+    public convenience init(
+        libraryCatalog: LibraryCatalog,
+        algorithm: @escaping () -> AutofillAlgorithm
+    ) {
+        self.init(libraryCatalog: libraryCatalog, algorithm: algorithm, batchSize: SessionDraft.maxSongs)
+    }
+
+    init(
         libraryCatalog: LibraryCatalog,
         algorithm: @escaping () -> AutofillAlgorithm,
-        batchSize: Int = SessionDraft.maxSongs
+        batchSize: Int
     ) {
         self.libraryCatalog = libraryCatalog
         self.currentAlgorithm = algorithm

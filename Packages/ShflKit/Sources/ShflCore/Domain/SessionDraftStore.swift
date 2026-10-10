@@ -27,7 +27,9 @@ public final class SessionDraftStore {
     @ObservationIgnored private var songPoolContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
     @ObservationIgnored private var algorithmContinuations: [UUID: AsyncStream<ShuffleAlgorithm>.Continuation] = [:]
 
-    public init(algorithm: ShuffleAlgorithm = SessionDraft.defaultAlgorithm) {
+    public nonisolated static let defaultAlgorithm = SessionDraft.defaultAlgorithm
+
+    public init(algorithm: ShuffleAlgorithm = SessionDraftStore.defaultAlgorithm) {
         draft = SessionDraft(algorithm: algorithm)
     }
 
