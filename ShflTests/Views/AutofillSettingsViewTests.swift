@@ -14,8 +14,8 @@ struct AutofillSettingsViewTests {
             return
         }
 
-        let settings = AppSettings(defaults: defaults)
-        #expect(settings.autofillAlgorithm == .random)
+        let preferences = LibraryPreferences(defaults: defaults)
+        #expect(preferences.autofillAlgorithm == .random)
     }
 
     @Test("Algorithm enum has correct display names")

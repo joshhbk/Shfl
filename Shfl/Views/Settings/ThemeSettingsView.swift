@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct ThemeSettingsView: View {
-    @Environment(\.appSettings) private var appSettings
+    @Environment(\.appearanceSettings) private var appearanceSettings
 
     private var selectedTheme: ShuffleTheme {
-        guard let id = appSettings?.currentThemeId else { return .pink }
+        guard let id = appearanceSettings?.currentThemeId else { return .pink }
         return ShuffleTheme.theme(byId: id) ?? .pink
     }
 
@@ -38,7 +38,7 @@ struct ThemeSettingsView: View {
                     action: {
                         guard selectedTheme.id != theme.id else { return }
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            appSettings?.currentThemeId = theme.id
+                            appearanceSettings?.currentThemeId = theme.id
                         }
                         HapticFeedback.light.trigger()
                     }
@@ -107,5 +107,5 @@ private struct ThemeColorDot: View {
     NavigationStack {
         ThemeSettingsView()
     }
-    .environment(\.appSettings, AppSettings())
+    .environment(\.appearanceSettings, AppearanceSettings())
 }

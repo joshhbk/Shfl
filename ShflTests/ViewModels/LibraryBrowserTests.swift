@@ -2,33 +2,48 @@ import XCTest
 @testable import Shfl
 
 @MainActor
-final class LibraryBrowserViewModelTests: XCTestCase {
+final class LibraryBrowserTests: XCTestCase {
     private var mockService: DeterministicMusicService!
-    private var viewModel: LibraryBrowserViewModel!
+    private var browser: LibraryBrowser!
+    private var defaults: UserDefaults!
+    private var defaultsSuiteName: String!
 
     override func setUp() async throws {
+        defaultsSuiteName = "LibraryBrowserTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuiteName)
         mockService = DeterministicMusicService()
-        viewModel = LibraryBrowserViewModel(libraryCatalog: mockService)
+        browser = LibraryBrowser(libraryCatalog: mockService, preferences: makePreferences())
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defaults = nil
+        browser = nil
+        mockService = nil
+    }
+
+    private func makePreferences() -> LibraryPreferences {
+        LibraryPreferences(defaults: defaults)
     }
 
     func test_initialState_isCorrect() {
-        XCTAssertTrue(viewModel.browseSongs.isEmpty)
-        XCTAssertTrue(viewModel.searchResults.isEmpty)
-        XCTAssertEqual(viewModel.searchText, "")
-        XCTAssertEqual(viewModel.currentMode, .browse)
-        XCTAssertFalse(viewModel.isLoading)  // Lane starts with isLoading=false until loadInitial
-        XCTAssertEqual(viewModel.sortOption, .mostPlayed)
+        XCTAssertTrue(browser.browseSongs.isEmpty)
+        XCTAssertTrue(browser.searchResults.isEmpty)
+        XCTAssertEqual(browser.searchText, "")
+        XCTAssertEqual(browser.currentMode, .browse)
+        XCTAssertFalse(browser.isLoading)
+        XCTAssertEqual(browser.sortOption, .mostPlayed)
     }
 
     func test_currentMode_switchesToSearchWhenTextEntered() {
-        viewModel.searchText = "test"
-        XCTAssertEqual(viewModel.currentMode, .search)
+        browser.searchText = "test"
+        XCTAssertEqual(browser.currentMode, .search)
     }
 
     func test_currentMode_switchesToBrowseWhenTextCleared() {
-        viewModel.searchText = "test"
-        viewModel.searchText = ""
-        XCTAssertEqual(viewModel.currentMode, .browse)
+        browser.searchText = "test"
+        browser.searchText = ""
+        XCTAssertEqual(browser.currentMode, .browse)
     }
 
     func test_loadInitialPage_fetchesSongs() async {
@@ -38,10 +53,10 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         ]
         await mockService.setLibrarySongs(songs)
 
-        await viewModel.loadInitialPage()
+        await browser.loadInitialPage()
 
-        XCTAssertEqual(viewModel.browseSongs.count, 2)
-        XCTAssertFalse(viewModel.browseLoading)
+        XCTAssertEqual(browser.browseSongs.count, 2)
+        XCTAssertFalse(browser.browseLoading)
     }
 
     func test_loadInitialPage_setsHasMorePages() async {
@@ -51,10 +66,10 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
         await mockService.setLibrarySongs(songs)
 
-        await viewModel.loadInitialPage()
+        await browser.loadInitialPage()
 
-        XCTAssertEqual(viewModel.browseSongs.count, 50)
-        XCTAssertTrue(viewModel.hasMorePages)
+        XCTAssertEqual(browser.browseSongs.count, 50)
+        XCTAssertTrue(browser.hasMorePages)
     }
 
     func test_loadNextPage_appendsSongs() async {
@@ -63,11 +78,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
         await mockService.setLibrarySongs(songs)
 
-        await viewModel.loadInitialPage()
-        await viewModel.loadNextPageIfNeeded(currentSong: viewModel.browseSongs.last!)
+        await browser.loadInitialPage()
+        await browser.loadNextPageIfNeeded(currentSong: browser.browseSongs.last!)
 
-        XCTAssertEqual(viewModel.browseSongs.count, 60)
-        XCTAssertFalse(viewModel.hasMorePages)
+        XCTAssertEqual(browser.browseSongs.count, 60)
+        XCTAssertFalse(browser.hasMorePages)
     }
 
     func test_search_fetchesResults() async {
@@ -78,17 +93,92 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         // Search through the songs lane directly (bypasses debounce in view model)
-        viewModel.songsLane.handleSearchTextChanged("Hello")
+        browser.songsLane.handleSearchTextChanged("Hello")
         // Wait for debounce (300ms) + search task to complete
         try? await Task.sleep(nanoseconds: 600_000_000)
 
-        let searchResults = viewModel.searchResults
+        let searchResults = browser.searchResults
         XCTAssertEqual(searchResults.count, 1)
         XCTAssertEqual(searchResults.first?.title, "Hello World")
     }
 
+    func test_choosingASortOptionSavesItAndReloadsSongsInThatOrder() async {
+        let songs = [
+            Song(id: "b", title: "Bravo", artist: "Artist", albumTitle: "Album", artworkURL: nil, playCount: 9),
+            Song(id: "a", title: "Alpha", artist: "Artist", albumTitle: "Album", artworkURL: nil, playCount: 1)
+        ]
+        await mockService.setLibrarySongs(songs)
+        await browser.loadInitialPage()
+        XCTAssertEqual(browser.browseSongs.map(\.id), ["b", "a"])
+
+        browser.chooseSortOption(.alphabetical)
+        await waitUntil { self.browser.browseSongs.map(\.id) == ["a", "b"] }
+
+        XCTAssertEqual(browser.sortOption, .alphabetical)
+        XCTAssertEqual(LibraryPreferences(defaults: defaults).sortOption, .alphabetical)
+    }
+
+    func test_choosingTheCurrentSortOptionDoesNotReload() async {
+        await browser.loadInitialPage()
+        let fetchesBefore = await mockService.libraryFetchCount
+
+        browser.chooseSortOption(.mostPlayed)
+        await waitForStateUpdate()
+
+        let fetchesAfter = await mockService.libraryFetchCount
+        XCTAssertEqual(fetchesAfter, fetchesBefore)
+    }
+
+    func test_autofillUsesTheSavedAutofillAlgorithm() async {
+        // Random autofill pages through the whole library (500 per page);
+        // recently added reads a single page, so the fetch count tells them apart.
+        let songs = (1...600).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        await mockService.setLibrarySongs(songs)
+        let preferences = makePreferences()
+        preferences.autofillAlgorithm = .recentlyAdded
+        let browser = LibraryBrowser(libraryCatalog: mockService, preferences: preferences)
+        let draft = SessionDraftStore()
+
+        await browser.autofill(into: draft)
+
+        XCTAssertEqual(draft.songCount, SessionDraft.maxSongs)
+        let fetches = await mockService.libraryFetchCount
+        XCTAssertEqual(fetches, 1)
+    }
+
+    func test_switchingToALaneLoadsItsFirstPage() async {
+        let service = DeterministicMusicService(
+            configuration: .init(libraryPlaylists: [Playlist(id: "p1", name: "Road Trip")])
+        )
+        let browser = LibraryBrowser(libraryCatalog: service, preferences: makePreferences())
+        XCTAssertEqual(browser.activeLane, .songs)
+
+        browser.activeLane = .playlists
+        await waitUntil { browser.playlists.map(\.id) == ["p1"] }
+
+        XCTAssertEqual(browser.playlists.map(\.id), ["p1"])
+    }
+
+    func test_leavingTheCatalogLoadsNothing() async {
+        let service = DeterministicMusicService(
+            configuration: .init(libraryPlaylists: [Playlist(id: "p1", name: "Road Trip")])
+        )
+        let browser = LibraryBrowser(libraryCatalog: service, preferences: makePreferences())
+
+        browser.activeLane = nil
+        browser.searchText = "Road"
+        // Past the search debounce (300ms), so a search would have run.
+        try? await Task.sleep(nanoseconds: 600_000_000)
+
+        XCTAssertTrue(browser.playlists.isEmpty)
+        XCTAssertTrue(browser.playlistSearchResults.isEmpty)
+        XCTAssertTrue(browser.searchResults.isEmpty)
+    }
+
     func test_autofillState_initiallyIdle() {
-        XCTAssertEqual(viewModel.autofillState, .idle)
+        XCTAssertEqual(browser.autofillState, .idle)
     }
 
     // MARK: - Autofill Method Tests
@@ -100,12 +190,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         let draft = SessionDraftStore()
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
 
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         XCTAssertEqual(draft.songCount, 50)
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 50))
+        XCTAssertEqual(browser.autofillState, .completed(count: 50))
     }
 
     func test_autofill_fillsOnlyRemainingCapacity() async {
@@ -119,13 +208,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         for i in 1...100 {
             try? draft.add(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
-
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         // Should only add 20 more (120 - 100)
         XCTAssertEqual(draft.songCount, 120)
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 20))
+        XCTAssertEqual(browser.autofillState, .completed(count: 20))
     }
 
     func test_autofill_excludesDuplicates() async {
@@ -138,13 +225,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         // Pre-add some songs that are also in library
         try? draft.add(songs[0])
         try? draft.add(songs[1])
-
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         // Should add 8 new songs (10 - 2 already added)
         XCTAssertEqual(draft.songCount, 10)
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 8))
+        XCTAssertEqual(browser.autofillState, .completed(count: 8))
     }
 
     func test_autofill_completesWithZeroWhenFull() async {
@@ -153,11 +238,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         for i in 1...120 {
             try? draft.add(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
+        await browser.autofill(into: draft)
 
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
-
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 0))
+        XCTAssertEqual(browser.autofillState, .completed(count: 0))
     }
 
     func test_autofill_setsLoadingState() async {
@@ -165,17 +248,16 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         let draft = SessionDraftStore()
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
 
         // Start autofill
         let task = Task {
-            await viewModel.autofill(into: draft, using: source)
+            await browser.autofill(into: draft)
         }
 
         // Verify it completes correctly
         await task.value
 
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 1))
+        XCTAssertEqual(browser.autofillState, .completed(count: 1))
     }
 
     func test_autofill_whilePlaying_defersTransportAndUpdatesDomainQueue() async throws {
@@ -192,11 +274,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
 
         await mockService.resetPlaybackRecording()
+        await browser.autofill(into: draft)
 
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
-
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 3))
+        XCTAssertEqual(browser.autofillState, .completed(count: 3))
         XCTAssertEqual(draft.songCount, 5)
 
         // Transport sync is deferred to avoid playback interruption

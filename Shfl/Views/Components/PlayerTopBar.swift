@@ -3,7 +3,7 @@ import SwiftUI
 /// Top bar with Add and Settings buttons for the player view
 struct PlayerTopBar: View {
     @Environment(\.shuffleTheme) private var theme
-    @Environment(\.appSettings) private var appSettings
+    @Environment(\.appearanceSettings) private var appearanceSettings
 
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
@@ -11,7 +11,7 @@ struct PlayerTopBar: View {
 
     /// Device theme accent color — always visible against the dark button background.
     private var iconColor: Color {
-        guard let themeId = appSettings?.currentThemeId,
+        guard let themeId = appearanceSettings?.currentThemeId,
               let deviceTheme = ShuffleTheme.theme(byId: themeId) else {
             return .white
         }

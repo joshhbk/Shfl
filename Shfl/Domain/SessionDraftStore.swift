@@ -5,27 +5,37 @@ import Foundation
 ///
 /// Edits here apply to the next shuffle. `ShufflePlayer` reads the draft when
 /// it starts a new shuffle, and `ListeningSessionHost` saves the pool whenever
-/// `songPoolChanges` fires.
+/// `songPoolChanges` fires and the algorithm whenever `algorithmChanges` does.
 @Observable
 @MainActor
 final class SessionDraftStore {
     private(set) var draft: SessionDraft {
         didSet {
-            guard draft.songs != oldValue.songs else { return }
-            for continuation in songPoolContinuations.values {
-                continuation.yield()
+            if draft.songs != oldValue.songs {
+                for continuation in songPoolContinuations.values {
+                    continuation.yield()
+                }
+            }
+            if draft.algorithm != oldValue.algorithm {
+                for continuation in algorithmContinuations.values {
+                    continuation.yield(draft.algorithm)
+                }
             }
         }
     }
 
     @ObservationIgnored private var songPoolContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
+    @ObservationIgnored private var algorithmContinuations: [UUID: AsyncStream<ShuffleAlgorithm>.Continuation] = [:]
 
-    init(algorithm: ShuffleAlgorithm = .noRepeat) {
+    init(algorithm: ShuffleAlgorithm = SessionDraft.defaultAlgorithm) {
         draft = SessionDraft(algorithm: algorithm)
     }
 
     deinit {
         for continuation in songPoolContinuations.values {
+            continuation.finish()
+        }
+        for continuation in algorithmContinuations.values {
             continuation.finish()
         }
     }
@@ -39,6 +49,20 @@ final class SessionDraftStore {
             continuation.onTermination = { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.songPoolContinuations.removeValue(forKey: id)
+                }
+            }
+        }
+    }
+
+    /// Each read returns a new stream that yields the algorithm whenever a
+    /// different one is staged, starting with the next change.
+    var algorithmChanges: AsyncStream<ShuffleAlgorithm> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            algorithmContinuations[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.algorithmContinuations.removeValue(forKey: id)
                 }
             }
         }
@@ -79,6 +103,8 @@ final class SessionDraftStore {
         draft = draft.removingAll()
     }
 
+    /// Chooses the algorithm for the next shuffle. The listening session
+    /// already playing keeps its order.
     func stage(_ algorithm: ShuffleAlgorithm) {
         draft = draft.using(algorithm)
     }

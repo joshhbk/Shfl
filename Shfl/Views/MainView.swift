@@ -1,40 +1,35 @@
 import SwiftUI
 
 struct MainView: View {
-    @Bindable var viewModel: AppViewModel
-    let appSettings: AppSettings
+    let model: AppModel
+    let libraryPreferences: LibraryPreferences
+    let appearanceSettings: AppearanceSettings
 
+    @Environment(\.scenePhase) private var scenePhase
+
+    @State private var showingPicker = false
+    @State private var showingSettings = false
+    @State private var showingAuthorizationAlert = false
     @State private var hasStartedInitialLoad = false
     @State private var hasCompletedInitialLoad = false
     @State private var hasCompletedSplashTimeline = false
     @State private var hasDismissedStartupSplash = false
 
     init(
-        viewModel: AppViewModel,
-        appSettings: AppSettings,
+        model: AppModel,
+        libraryPreferences: LibraryPreferences,
+        appearanceSettings: AppearanceSettings,
         showsStartupSplash: Bool = true
     ) {
-        self.viewModel = viewModel
-        self.appSettings = appSettings
+        self.model = model
+        self.libraryPreferences = libraryPreferences
+        self.appearanceSettings = appearanceSettings
         _hasCompletedSplashTimeline = State(initialValue: !showsStartupSplash)
         _hasDismissedStartupSplash = State(initialValue: !showsStartupSplash)
     }
 
-    private enum LaunchPhase: Int {
-        case loading
-        case unauthorized
-        case ready
-    }
-
     private var loadingTheme: ShuffleTheme {
-        ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
-    }
-
-    private var launchPhase: LaunchPhase {
-        if viewModel.isLoading {
-            return .loading
-        }
-        return viewModel.isAuthorized ? .ready : .unauthorized
+        ShuffleTheme.theme(byId: appearanceSettings.currentThemeId) ?? .pink
     }
 
     private var shouldShowStartupSplash: Bool {
@@ -53,7 +48,7 @@ struct MainView: View {
 
             if shouldRenderLaunchContent {
                 launchContent
-                    .animation(.easeInOut(duration: 0.35), value: launchPhase)
+                    .animation(.easeInOut(duration: 0.35), value: model.launchPhase)
                     .zIndex(0)
             }
 
@@ -67,30 +62,31 @@ struct MainView: View {
             }
         }
         .tint(deviceAccentColor)
-        .environment(\.appSettings, appSettings)
+        .environment(\.libraryPreferences, libraryPreferences)
+        .environment(\.appearanceSettings, appearanceSettings)
         .task {
             await startInitialLoadIfNeeded()
         }
-        .onChange(of: viewModel.isLoading) { _, _ in
+        .onChange(of: model.launchPhase) { _, _ in
             dismissSplashIfReady()
         }
-        .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
-            viewModel.sessionDraft.stage(newAlgorithm)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                model.sceneDidLeaveForeground()
+            }
         }
-        .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
-            songPickerSheet(onDismiss: { viewModel.closePicker() })
+        .sheet(isPresented: $showingPicker) {
+            songPickerSheet(onDismiss: { showingPicker = false })
         }
-        .sheet(isPresented: $viewModel.showingSettings) {
+        .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .tint(deviceAccentColor)
-                .environment(\.appSettings, appSettings)
-                .environment(\.shufflePlayer, viewModel.player)
-                .environment(\.lastFMTransport, viewModel.lastFMTransport)
+                .environment(\.libraryPreferences, libraryPreferences)
+                .environment(\.appearanceSettings, appearanceSettings)
+                .environment(\.shufflePlayer, model.player)
+                .environment(\.lastFMTransport, model.lastFMTransport)
         }
-        .alert("Authorization Required", isPresented: .init(
-            get: { viewModel.authorizationError != nil },
-            set: { if !$0 { viewModel.authorizationError = nil } }
-        )) {
+        .alert("Authorization Required", isPresented: $showingAuthorizationAlert) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -98,55 +94,55 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            if let error = viewModel.authorizationError {
-                Text(error)
-            }
+            Text("Apple Music access is required to use Shuffled. Please enable it in Settings.")
         }
         // Kept last so the sheets above can read them too.
-        .environment(\.sessionDraft, viewModel.sessionDraft)
-        .environment(\.listeningSessionHost, viewModel.sessionHost)
+        .environment(\.sessionDraft, model.sessionDraft)
+        .environment(\.listeningSessionHost, model.sessionHost)
     }
 
     @ViewBuilder
     private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
         SongPickerView(
-            libraryCatalog: viewModel.library,
-            initialSortOption: appSettings.librarySortOption,
+            libraryCatalog: model.library,
+            libraryPreferences: libraryPreferences,
             onDismiss: onDismiss
         )
         .tint(deviceAccentColor)
         .environment(\.shuffleTheme, currentTheme)
-        .environment(\.appSettings, appSettings)
+        .environment(\.libraryPreferences, libraryPreferences)
+        .environment(\.appearanceSettings, appearanceSettings)
     }
 
     private var currentTheme: ShuffleTheme {
-        ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
+        ShuffleTheme.theme(byId: appearanceSettings.currentThemeId) ?? .pink
     }
 
     private var deviceAccentColor: Color {
-        (ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink).accentColor
+        (ShuffleTheme.theme(byId: appearanceSettings.currentThemeId) ?? .pink).accentColor
     }
 
     @ViewBuilder
     private var launchContent: some View {
-        if viewModel.isLoading {
+        switch model.launchPhase {
+        case .loading:
             LoadingView(message: "Loading...")
                 .environment(\.shuffleTheme, loadingTheme)
                 .transition(.opacity)
-        } else if viewModel.isAuthorized {
+        case .ready:
             PlayerView(
-                player: viewModel.player,
-                playbackTransport: viewModel.playbackTransport,
-                initialThemeId: appSettings.currentThemeId,
-                onAddTapped: { viewModel.openPicker() },
-                onSettingsTapped: { viewModel.openSettings() },
-                onSkipForwardTapped: { Task { try? await viewModel.player.skipToNext() } },
-                onSkipBackTapped: { Task { try? await viewModel.player.restartOrSkipToPrevious() } }
+                player: model.player,
+                playbackTransport: model.playbackTransport,
+                initialThemeId: appearanceSettings.currentThemeId,
+                onAddTapped: { showingPicker = true },
+                onSettingsTapped: { showingSettings = true },
+                onSkipForwardTapped: { Task { try? await model.player.skipToNext() } },
+                onSkipBackTapped: { Task { try? await model.player.restartOrSkipToPrevious() } }
             )
             .transition(.opacity)
-        } else {
+        case .needsAuthorization, .authorizationDenied:
             WelcomeView {
-                Task { await viewModel.requestAuthorization() }
+                Task { await requestAuthorization() }
             }
             .transition(.opacity)
         }
@@ -158,10 +154,17 @@ struct MainView: View {
         hasStartedInitialLoad = true
 
         await Task.yield()
-        await viewModel.onAppear()
+        await model.onAppear()
         hasCompletedInitialLoad = true
         VolumeController.initialize()
         dismissSplashIfReady()
+    }
+
+    private func requestAuthorization() async {
+        await model.requestAuthorization()
+        if model.launchPhase == .authorizationDenied {
+            showingAuthorizationAlert = true
+        }
     }
 
     @MainActor
@@ -169,7 +172,7 @@ struct MainView: View {
         guard !hasDismissedStartupSplash,
               hasCompletedSplashTimeline,
               hasCompletedInitialLoad,
-              !viewModel.isLoading else { return }
+              model.launchPhase != .loading else { return }
         withAnimation(.easeOut(duration: 0.2)) {
             hasDismissedStartupSplash = true
         }

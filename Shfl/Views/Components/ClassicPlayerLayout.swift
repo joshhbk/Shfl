@@ -4,7 +4,7 @@ import SwiftUI
 struct ClassicPlayerLayout: View {
     let playbackState: PlaybackState
     let hasSongs: Bool
-    let progressState: PlayerProgressState?
+    let playbackClock: PlaybackClock?
     let onPlayPause: () -> Void
     let onSkipForward: () -> Void
     let onSkipBack: () -> Void
@@ -72,7 +72,7 @@ struct ClassicPlayerLayout: View {
             SongInfoDisplay(
                 playbackState: playbackState,
                 hasSongs: hasSongs,
-                progressState: progressState,
+                playbackClock: playbackClock,
                 onSeek: onSeek,
                 isShuffling: isShuffling
             )

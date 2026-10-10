@@ -12,8 +12,9 @@ struct AppComposition {
     static let deterministicLaunchArgument = "--deterministic"
 
     let modelContainer: ModelContainer
-    let appSettings: AppSettings
-    let appViewModel: AppViewModel
+    let libraryPreferences: LibraryPreferences
+    let appearanceSettings: AppearanceSettings
+    let appModel: AppModel
     let showsStartupSplash: Bool
 
     static func selectedMode(
@@ -42,15 +43,17 @@ struct AppComposition {
                 for: schema,
                 configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)]
             )
-            let appSettings = AppSettings()
+            let libraryPreferences = LibraryPreferences()
             return AppComposition(
                 modelContainer: modelContainer,
-                appSettings: appSettings,
-                appViewModel: AppViewModel(
+                libraryPreferences: libraryPreferences,
+                appearanceSettings: AppearanceSettings(),
+                appModel: AppModel(
                     library: AppleMusicService(),
                     playbackTransport: MusicKitTransport(),
                     modelContext: modelContainer.mainContext,
-                    appSettings: appSettings
+                    libraryPreferences: libraryPreferences,
+                    savedAlgorithm: SavedShuffleAlgorithm()
                 ),
                 showsStartupSplash: true
             )
@@ -61,10 +64,12 @@ struct AppComposition {
                 configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
             )
             let defaults = isolatedDefaults()
-            let appSettings = AppSettings(defaults: defaults)
-            appSettings.currentThemeId = "silver"
-            appSettings.shuffleAlgorithm = .weightedByPlayCount
-            appSettings.autofillAlgorithm = .random
+            let libraryPreferences = LibraryPreferences(defaults: defaults)
+            libraryPreferences.autofillAlgorithm = .random
+            let appearanceSettings = AppearanceSettings(defaults: defaults)
+            appearanceSettings.currentThemeId = "silver"
+            let savedAlgorithm = SavedShuffleAlgorithm(defaults: defaults)
+            savedAlgorithm.save(.weightedByPlayCount)
 
             let musicService = DeterministicMusicService(
                 configuration: .init(
@@ -76,12 +81,14 @@ struct AppComposition {
             )
             return AppComposition(
                 modelContainer: modelContainer,
-                appSettings: appSettings,
-                appViewModel: AppViewModel(
+                libraryPreferences: libraryPreferences,
+                appearanceSettings: appearanceSettings,
+                appModel: AppModel(
                     library: musicService,
                     playbackTransport: musicService,
                     modelContext: modelContainer.mainContext,
-                    appSettings: appSettings,
+                    libraryPreferences: libraryPreferences,
+                    savedAlgorithm: savedAlgorithm,
                     scrobblingEnabled: false
                 ),
                 showsStartupSplash: false

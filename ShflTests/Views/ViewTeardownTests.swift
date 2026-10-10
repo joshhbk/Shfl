@@ -9,11 +9,14 @@ import XCTest
 @MainActor
 final class ViewTeardownTests: XCTestCase {
     func test_closingTheSongPickerReleasesItsStateWithoutCrashing() async throws {
+        let suiteName = "ViewTeardownTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
         let draft = SessionDraftStore()
         try await showThenTearDown(
             SongPickerView(
                 libraryCatalog: DeterministicMusicService(),
-                initialSortOption: .mostPlayed,
+                libraryPreferences: LibraryPreferences(defaults: defaults),
                 onDismiss: {}
             )
             .environment(\.sessionDraft, draft)

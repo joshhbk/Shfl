@@ -10,8 +10,9 @@ import SwiftData
 
 @main
 struct ShuffledApp: App {
-    @State private var appSettings: AppSettings
-    @State private var appViewModel: AppViewModel
+    @State private var libraryPreferences: LibraryPreferences
+    @State private var appearanceSettings: AppearanceSettings
+    @State private var appModel: AppModel
 
     private let composition: AppComposition
 
@@ -19,8 +20,9 @@ struct ShuffledApp: App {
         do {
             let composition = try AppComposition.make()
             self.composition = composition
-            _appSettings = State(wrappedValue: composition.appSettings)
-            _appViewModel = State(wrappedValue: composition.appViewModel)
+            _libraryPreferences = State(wrappedValue: composition.libraryPreferences)
+            _appearanceSettings = State(wrappedValue: composition.appearanceSettings)
+            _appModel = State(wrappedValue: composition.appModel)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
@@ -29,8 +31,9 @@ struct ShuffledApp: App {
     var body: some Scene {
         WindowGroup {
             MainView(
-                viewModel: appViewModel,
-                appSettings: appSettings,
+                model: appModel,
+                libraryPreferences: libraryPreferences,
+                appearanceSettings: appearanceSettings,
                 showsStartupSplash: composition.showsStartupSplash
             )
         }

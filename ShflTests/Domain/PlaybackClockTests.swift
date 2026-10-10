@@ -2,9 +2,9 @@ import Foundation
 import Testing
 @testable import Shfl
 
-@Suite("PlayerProgressState Tests")
+@Suite("PlaybackClock Tests")
 @MainActor
-struct PlayerProgressStateTests {
+struct PlaybackClockTests {
     private let song = Song(
         id: "song-1",
         title: "Test Song",
@@ -19,7 +19,7 @@ struct PlayerProgressStateTests {
         let boostUntil = now.addingTimeInterval(5)
 
         #expect(
-            PlayerProgressState.resolvePollingMode(
+            PlaybackClock.resolvePollingMode(
                 isTrackingEnabled: true,
                 playbackState: .paused(song),
                 now: now,
@@ -27,7 +27,7 @@ struct PlayerProgressStateTests {
             ) == .disabled
         )
         #expect(
-            PlayerProgressState.resolvePollingMode(
+            PlaybackClock.resolvePollingMode(
                 isTrackingEnabled: true,
                 playbackState: .stopped,
                 now: now,
@@ -35,7 +35,7 @@ struct PlayerProgressStateTests {
             ) == .disabled
         )
         #expect(
-            PlayerProgressState.resolvePollingMode(
+            PlaybackClock.resolvePollingMode(
                 isTrackingEnabled: false,
                 playbackState: .playing(song),
                 now: now,
@@ -47,7 +47,7 @@ struct PlayerProgressStateTests {
     @Test("Transitions from boosted polling to steady polling after boost window")
     func transitionsBoostedToSteady() async {
         let musicService = DeterministicMusicService()
-        let state = PlayerProgressState(
+        let state = PlaybackClock(
             playbackTransport: musicService,
             boostedUpdateInterval: 0.05,
             steadyUpdateInterval: 0.25,
@@ -70,7 +70,7 @@ struct PlayerProgressStateTests {
     func seekAndPauseTransitions() async {
         let musicService = DeterministicMusicService()
         await musicService.setPlaybackDuration(240)
-        let state = PlayerProgressState(
+        let state = PlaybackClock(
             playbackTransport: musicService,
             boostedUpdateInterval: 0.05,
             steadyUpdateInterval: 0.2,

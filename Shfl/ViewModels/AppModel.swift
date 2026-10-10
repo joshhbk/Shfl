@@ -1,24 +1,29 @@
+import Foundation
 import SwiftData
-import SwiftUI
 
 @Observable
 @MainActor
-final class AppViewModel {
+final class AppModel {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     @ObservationIgnored let library: MusicAuthorizing & LibraryCatalog
     @ObservationIgnored let playbackTransport: PlaybackTransport
     @ObservationIgnored let lastFMTransport: LastFMTransport?
 
     @ObservationIgnored let sessionHost: ListeningSessionHost
-    @ObservationIgnored private let appSettings: AppSettings
+    @ObservationIgnored private let libraryPreferences: LibraryPreferences
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
-    var showingPicker = false
-    var showingSettings = false
+    /// Where this launch is on the way to a playable library.
+    enum LaunchPhase: Equatable {
+        /// Restoring the saved session and checking Apple Music access.
+        case loading
+        case needsAuthorization
+        /// The listener was asked for Apple Music access and declined.
+        case authorizationDenied
+        case ready
+    }
 
-    var isAuthorized = false
-    var isLoading = true
-    var authorizationError: String?
+    private(set) var launchPhase: LaunchPhase = .loading
 
     var player: ShufflePlayer { sessionHost.player }
     var sessionDraft: SessionDraftStore { sessionHost.sessionDraft }
@@ -27,21 +32,23 @@ final class AppViewModel {
         library: MusicAuthorizing & LibraryCatalog,
         playbackTransport: PlaybackTransport,
         modelContext: ModelContext,
-        appSettings: AppSettings,
+        libraryPreferences: LibraryPreferences,
+        savedAlgorithm: SavedShuffleAlgorithm,
         lifecyclePersistenceHook: (() -> Void)? = nil,
         scrobblingEnabled: Bool = true
     ) {
         self.library = library
         self.playbackTransport = playbackTransport
-        self.appSettings = appSettings
+        self.libraryPreferences = libraryPreferences
         self.sessionHost = ListeningSessionHost(
             playbackTransport: playbackTransport,
             archive: SessionArchive(modelContext: modelContext),
             autofillSource: WarmedLibraryAutofillSource(
                 libraryCatalog: library,
-                algorithm: { [appSettings] in appSettings.autofillAlgorithm }
+                algorithm: { [libraryPreferences] in libraryPreferences.autofillAlgorithm }
             ),
-            initialAlgorithm: appSettings.shuffleAlgorithm,
+            initialAlgorithm: savedAlgorithm.load(),
+            saveAlgorithm: { savedAlgorithm.save($0) },
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
 
@@ -65,30 +72,17 @@ final class AppViewModel {
     func onAppear() async {
         async let authStatus = library.isAuthorized
         await sessionHost.restoreSavedSession()
-        isAuthorized = await authStatus
-        isLoading = false
+        launchPhase = await authStatus ? .ready : .needsAuthorization
     }
 
+    /// Saves the live playback position on the active session.
+    func sceneDidLeaveForeground() {
+        sessionHost.sceneDidLeaveForeground()
+    }
+
+    /// Asks for Apple Music access. Afterwards the launch phase is `.ready`
+    /// or `.authorizationDenied`.
     func requestAuthorization() async {
-        isAuthorized = await library.requestAuthorization()
-        if !isAuthorized {
-            authorizationError = "Apple Music access is required to use Shuffled. Please enable it in Settings."
-        }
-    }
-
-    func openPicker() {
-        showingPicker = true
-    }
-
-    func closePicker() {
-        showingPicker = false
-    }
-
-    func openSettings() {
-        showingSettings = true
-    }
-
-    func closeSettings() {
-        showingSettings = false
+        launchPhase = await library.requestAuthorization() ? .ready : .authorizationDenied
     }
 }

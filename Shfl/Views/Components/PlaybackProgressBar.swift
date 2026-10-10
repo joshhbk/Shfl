@@ -162,16 +162,15 @@ struct PlaybackProgressBar: View {
     }
 }
 
-/// Wrapper that reads time/duration from PlayerProgressState directly,
-/// isolating the timer-driven observation to this subtree only.
+/// Reads the clock itself so its timer-driven updates re-render only this subtree.
 struct LivePlaybackProgressBar: View {
-    var progressState: PlayerProgressState
+    var playbackClock: PlaybackClock
     let onSeek: (TimeInterval) -> Void
 
     var body: some View {
         PlaybackProgressBar(
-            currentTime: progressState.currentTime,
-            duration: progressState.duration,
+            currentTime: playbackClock.currentTime,
+            duration: playbackClock.duration,
             onSeek: onSeek
         )
     }

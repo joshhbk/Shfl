@@ -1,16 +1,15 @@
 import Foundation
-import SwiftUI
 
-/// Reference box so sortOption can be captured by closures during init without capturing self.
-private final class SortOptionRef {
-    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    var value: SortOption
-    init(_ value: SortOption) { self.value = value }
+/// The library catalog lanes a listener can browse and search.
+enum LibraryLaneKind: Equatable, CaseIterable {
+    case songs
+    case artists
+    case playlists
 }
 
 @Observable
 @MainActor
-final class LibraryBrowserViewModel {
+final class LibraryBrowser {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     enum Mode: Equatable {
         case browse
@@ -34,25 +33,20 @@ final class LibraryBrowserViewModel {
 
     private(set) var autofillState: AutofillState = .idle
 
-    // MARK: - Song sort (wrapped in ref box for closure capture during init)
+    // MARK: - Song sort
 
-    @ObservationIgnored private let _sortOption: SortOptionRef
+    var sortOption: SortOption { preferences.sortOption }
 
-    var sortOption: SortOption {
-        get { _sortOption.value }
-        set {
-            _sortOption.value = newValue
-            Task { await songsLane.loadInitial(force: true) }
-        }
-    }
+    // MARK: - Active lane
 
-    // MARK: - Browse mode
-
-    var browseMode: BrowseMode = .songs {
+    /// The lane being browsed and searched, or nil while the listener looks
+    /// at something other than the catalog, such as their picks. Switching
+    /// lanes loads the new lane's first page, or runs the current search on it.
+    var activeLane: LibraryLaneKind? = .songs {
         didSet {
-            guard browseMode != oldValue else { return }
+            guard activeLane != oldValue else { return }
             if searchText.isEmpty {
-                loadBrowseData(for: browseMode)
+                loadBrowseData(for: activeLane)
             } else {
                 handleSearchTextChanged()
             }
@@ -66,7 +60,7 @@ final class LibraryBrowserViewModel {
             guard searchText != oldValue else { return }
             handleSearchTextChanged()
             if searchText.isEmpty {
-                loadBrowseData(for: browseMode)
+                loadBrowseData(for: activeLane)
             }
         }
     }
@@ -131,19 +125,21 @@ final class LibraryBrowserViewModel {
     // MARK: - Dependencies
 
     @ObservationIgnored private let libraryCatalog: LibraryCatalog
+    @ObservationIgnored private let preferences: LibraryPreferences
 
     // MARK: - Init
 
-    init(libraryCatalog: LibraryCatalog, initialSortOption: SortOption = .mostPlayed) {
+    /// - Parameter preferences: Supplies the song sort order and the autofill
+    ///   algorithm, and saves a newly chosen sort order.
+    init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
         self.libraryCatalog = libraryCatalog
-        let sortRef = SortOptionRef(initialSortOption)
-        self._sortOption = sortRef
+        self.preferences = preferences
 
-        // Songs lane — captures sortRef instead of self to avoid "used before initialized"
+        // Captures preferences rather than self, which isn't initialized yet.
         self.songsLane = LibraryLane<Song>(
-            fetchPage: { [libraryCatalog, sortRef] offset, limit in
+            fetchPage: { [libraryCatalog, preferences] offset, limit in
                 let page = try await libraryCatalog.fetchLibrarySongs(
-                    sortedBy: sortRef.value,
+                    sortedBy: preferences.sortOption,
                     limit: limit,
                     offset: offset
                 )
@@ -194,9 +190,12 @@ final class LibraryBrowserViewModel {
 
     // MARK: - Sort
 
-    /// Called when sort option changes. Views should call this via onChange(of: appSettings.librarySortOption).
-    func handleSortOptionChanged(_ newOption: SortOption) {
-        sortOption = newOption
+    /// Saves `option` as the song sort order and reloads the songs lane in
+    /// that order. Choosing the current order does nothing.
+    func chooseSortOption(_ option: SortOption) {
+        guard option != preferences.sortOption else { return }
+        preferences.sortOption = option
+        Task { await songsLane.loadInitial(force: true) }
     }
 
     // MARK: - Search
@@ -212,12 +211,11 @@ final class LibraryBrowserViewModel {
             return
         }
 
-        // Forward to the current lane based on browse mode
-        switch browseMode {
+        switch activeLane {
         case .songs: songsLane.handleSearchTextChanged(query)
         case .artists: artistsLane.handleSearchTextChanged(query)
         case .playlists: playlistsLane.handleSearchTextChanged(query)
-        case .selected: break
+        case nil: break
         }
     }
 
@@ -227,14 +225,14 @@ final class LibraryBrowserViewModel {
         await songsLane.loadInitial(force: false)
     }
 
-    /// Loads a mode's browse page when it has not been loaded yet.
-    func loadBrowseData(for mode: BrowseMode) {
+    /// Loads a lane's browse page when it has not been loaded yet.
+    func loadBrowseData(for lane: LibraryLaneKind?) {
         Task { @MainActor in
-            switch mode {
+            switch lane {
             case .songs: await songsLane.loadInitial(force: false)
             case .artists: await artistsLane.loadInitial(force: false)
             case .playlists: await playlistsLane.loadInitial(force: false)
-            case .selected: break
+            case nil: break
             }
         }
     }
@@ -300,7 +298,12 @@ final class LibraryBrowserViewModel {
 
     // MARK: - Autofill
 
-    func autofill(into draft: SessionDraftStore, using source: AutofillSource) async {
+    /// Fills the draft from the library with the saved autofill algorithm.
+    func autofill(into draft: SessionDraftStore) async {
+        let source = LibraryAutofillSource(
+            libraryCatalog: libraryCatalog,
+            algorithm: preferences.autofillAlgorithm
+        )
         guard draft.remainingCapacity > 0 else {
             autofillState = .completed(count: 0)
             return
