@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import XCTest
 @testable import Shfl
@@ -38,10 +39,27 @@ final class ViewTeardownTests: XCTestCase {
     }
 
     func test_leavingLastFMSettingsReleasesItsStateWithoutCrashing() async throws {
+        let container = try ModelContainer(
+            for: PersistedSession.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let suiteName = "ViewTeardownTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = DeterministicMusicService()
+        let model = AppModel(
+            library: service,
+            playbackTransport: service,
+            modelContext: container.mainContext,
+            libraryPreferences: LibraryPreferences(defaults: defaults),
+            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
+            scrobblingEnabled: false
+        )
         try await showThenTearDown(
             NavigationStack {
                 LastFMSettingsView()
             }
+            .environment(model)
         )
     }
 

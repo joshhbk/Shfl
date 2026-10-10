@@ -2,13 +2,13 @@ import Foundation
 import Network
 import ShflCore
 
-nonisolated struct LastFMRecentTrack: Identifiable, Equatable, Sendable {
-    let id: String
-    let title: String
-    let artist: String
-    let artworkURL: URL?
-    let playedAt: Date?
-    let isNowPlaying: Bool
+public nonisolated struct LastFMRecentTrack: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let title: String
+    public let artist: String
+    public let artworkURL: URL?
+    public let playedAt: Date?
+    public let isNowPlaying: Bool
 
     init(
         title: String,
@@ -39,7 +39,7 @@ nonisolated enum LastFMNowPlayingState: Equatable, Sendable {
     case failed(ScrobbleEvent, updatedAt: Date)
 }
 
-actor LastFMTransport: ScrobbleTransport {
+public actor LastFMTransport {
     private let apiKey: String
     private let client: LastFMClient
     private let authenticator: LastFMAuthenticator
@@ -52,7 +52,7 @@ actor LastFMTransport: ScrobbleTransport {
     private let flushRetryDelayNanoseconds: UInt64 = 5_000_000_000
     private var nowPlayingState: LastFMNowPlayingState = .idle
 
-    init(
+    public init(
         apiKey: String,
         sharedSecret: String,
         keychainService: String = "com.shfl.lastfm.session",
@@ -73,13 +73,13 @@ actor LastFMTransport: ScrobbleTransport {
         }
     }
 
-    var isAuthenticated: Bool {
+    public var isAuthenticated: Bool {
         get async {
             await authenticator.isAuthenticated
         }
     }
 
-    func scrobble(_ event: ScrobbleEvent) async {
+    public func scrobble(_ event: ScrobbleEvent) async {
         guard await isAuthenticated else {
             await queue.enqueue(event)
             return
@@ -96,7 +96,7 @@ actor LastFMTransport: ScrobbleTransport {
         }
     }
 
-    func sendNowPlaying(_ event: ScrobbleEvent) async {
+    public func sendNowPlaying(_ event: ScrobbleEvent) async {
         guard await isAuthenticated else {
             nowPlayingState = .queued(event, reason: .disconnected, updatedAt: Date())
             return
@@ -123,7 +123,7 @@ actor LastFMTransport: ScrobbleTransport {
         nowPlayingState
     }
 
-    func fetchRecentTracks(limit: Int = 20) async throws -> [LastFMRecentTrack] {
+    public func fetchRecentTracks(limit: Int = 20) async throws -> [LastFMRecentTrack] {
         guard let session = await authenticator.storedSession() else { return [] }
 
         var components = URLComponents(string: "https://ws.audioscrobbler.com/2.0/")
@@ -169,23 +169,24 @@ actor LastFMTransport: ScrobbleTransport {
 
     // MARK: - Authentication
 
-    nonisolated func signIn() throws -> LastFMSignIn {
+    public nonisolated func signIn() throws -> LastFMSignIn {
         try authenticator.signIn()
     }
 
-    /// Also sends scrobbles queued while signed out.
-    func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
+    /// Finishes sign-in with the URL Last.fm redirected to, then sends any
+    /// scrobbles queued while signed out.
+    public func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
         let session = try await authenticator.completeSignIn(callbackURL: callbackURL)
         await client.setSessionKey(session.sessionKey)
         await flushQueue()
         return session
     }
 
-    func storedSession() async -> LastFMSession? {
+    public func storedSession() async -> LastFMSession? {
         await authenticator.storedSession()
     }
 
-    func disconnect() async throws {
+    public func disconnect() async throws {
         try await authenticator.clearSession()
         nowPlayingState = .idle
     }
@@ -313,6 +314,11 @@ actor LastFMTransport: ScrobbleTransport {
         return nil
     }
 }
+
+// Declared in extensions: Xcode 27 infers `nonisolated` onto an actor that
+// lists a nonisolated protocol on its primary declaration, then rejects it.
+extension LastFMTransport: ScrobbleTransport {}
+extension LastFMTransport: LastFMConnection {}
 
 private nonisolated struct LastFMRecentTracksResponse: Decodable {
     let recenttracks: RecentTracks

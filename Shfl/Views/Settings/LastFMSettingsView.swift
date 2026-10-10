@@ -1,10 +1,12 @@
 import AuthenticationServices
+import ShflLastFM
 import SwiftUI
 
 struct LastFMSettingsView: View {
-    @Environment(\.lastFMTransport) private var transport
+    @Environment(AppModel.self) private var model
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
-    @State private var account = LastFMAccount()
+
+    private var account: LastFMAccount { model.lastFM }
 
     var body: some View {
         List {
@@ -33,7 +35,6 @@ struct LastFMSettingsView: View {
             }
         }
         .task {
-            account.transport = transport
             await account.syncConnectionStatusOnly()
             await account.refreshActivity(showLoading: true)
         }

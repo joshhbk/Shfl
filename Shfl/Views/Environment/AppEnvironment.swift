@@ -8,8 +8,8 @@ extension EnvironmentValues {
 
     @Entry var shufflePlayer: ShufflePlayer? = nil
 
-    @Entry var lastFMTransport: LastFMTransport? = nil
-
+    /// The session draft that views read and edit. `MainView` provides the
+    /// app's store; previews get an empty one.
     @Entry var sessionDraft = SessionDraftStore()
 
     @Entry var listeningSessionHost: ListeningSessionHost? = nil

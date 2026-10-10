@@ -46,6 +46,13 @@
         "identifier" : "ShflAppleMusicUITests",
         "name" : "ShflAppleMusicUITests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflLastFMTests",
+        "name" : "ShflLastFMTests"
+      }
     }
   ],
   "version" : 1

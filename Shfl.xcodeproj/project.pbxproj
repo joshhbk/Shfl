@@ -12,6 +12,7 @@
 		DCAA00112F10000000000011 /* ShflDeterministic in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00102F10000000000010 /* ShflDeterministic */; };
 		DCAA00132F10000000000013 /* ShflAppleMusic in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00122F10000000000012 /* ShflAppleMusic */; };
 		DCAA00152F10000000000015 /* ShflAppleMusicUI in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00142F10000000000014 /* ShflAppleMusicUI */; };
+		DCAA00172F10000000000017 /* ShflLastFM in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00162F10000000000016 /* ShflLastFM */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -76,6 +77,7 @@
 			files = (
 				DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */,
 				DCAA00042F10000000000004 /* ShflCore in Frameworks */,
+				DCAA00172F10000000000017 /* ShflLastFM in Frameworks */,
 				DCAA00152F10000000000015 /* ShflAppleMusicUI in Frameworks */,
 				DCAA00132F10000000000013 /* ShflAppleMusic in Frameworks */,
 				DCAA00112F10000000000011 /* ShflDeterministic in Frameworks */,
@@ -150,6 +152,7 @@
 			packageProductDependencies = (
 				DCAA00022F10000000000002 /* Vortex */,
 				DCAA00032F10000000000003 /* ShflCore */,
+				DCAA00162F10000000000016 /* ShflLastFM */,
 				DCAA00142F10000000000014 /* ShflAppleMusicUI */,
 				DCAA00122F10000000000012 /* ShflAppleMusic */,
 				DCAA00102F10000000000010 /* ShflDeterministic */,
@@ -712,6 +715,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
 			productName = ShflAppleMusicUI;
+		};
+		DCAA00162F10000000000016 /* ShflLastFM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflLastFM;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

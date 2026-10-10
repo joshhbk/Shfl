@@ -32,6 +32,7 @@ let package = Package(
         .library(name: "ShflAppleMusic", targets: ["ShflAppleMusic"]),
         .library(name: "ShflAppleMusicUI", targets: ["ShflAppleMusicUI"]),
         .library(name: "ShflDeterministic", targets: ["ShflDeterministic"]),
+        .library(name: "ShflLastFM", targets: ["ShflLastFM"]),
     ],
     targets: [
         // Foundation, Observation and SwiftData only; scripts/check-core-imports.sh enforces it.
@@ -78,6 +79,17 @@ let package = Package(
         .testTarget(
             name: "ShflAppleMusicUITests",
             dependencies: ["ShflAppleMusicUI"],
+            swiftSettings: testSettings
+        ),
+        /// Scrobbling to Last.fm and the listener's Last.fm account.
+        .target(
+            name: "ShflLastFM",
+            dependencies: ["ShflCore"],
+            swiftSettings: librarySettings
+        ),
+        .testTarget(
+            name: "ShflLastFMTests",
+            dependencies: ["ShflLastFM"],
             swiftSettings: testSettings
         ),
         /// Helpers shared by the test targets. No product, so nothing ships it.

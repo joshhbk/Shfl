@@ -85,7 +85,6 @@ struct MainView: View {
                 .environment(\.libraryPreferences, libraryPreferences)
                 .environment(\.appearanceSettings, appearanceSettings)
                 .environment(\.shufflePlayer, model.player)
-                .environment(\.lastFMTransport, model.lastFMTransport)
         }
         .alert("Authorization Required", isPresented: $showingAuthorizationAlert) {
             Button("Open Settings") {
@@ -100,6 +99,7 @@ struct MainView: View {
         // Kept last so the sheets above can read them too.
         .environment(\.sessionDraft, model.sessionDraft)
         .environment(\.listeningSessionHost, model.sessionHost)
+        .environment(model)
     }
 
     @ViewBuilder

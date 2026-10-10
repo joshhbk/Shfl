@@ -1,5 +1,6 @@
 import Foundation
 import ShflCore
+import ShflLastFM
 import SwiftData
 
 @Observable
@@ -8,7 +9,7 @@ final class AppModel {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     @ObservationIgnored let library: MusicAuthorizing & LibraryCatalog
     @ObservationIgnored let playbackTransport: PlaybackTransport
-    @ObservationIgnored let lastFMTransport: LastFMTransport?
+    @ObservationIgnored let lastFM: LastFMAccount
 
     @ObservationIgnored let sessionHost: ListeningSessionHost
     @ObservationIgnored private let libraryPreferences: LibraryPreferences
@@ -56,10 +57,10 @@ final class AppModel {
                 apiKey: LastFMConfig.apiKey,
                 sharedSecret: LastFMConfig.sharedSecret
             )
-            self.lastFMTransport = lastFMTransport
+            self.lastFM = LastFMAccount(connection: lastFMTransport)
             scrobbleTransports = [lastFMTransport]
         } else {
-            self.lastFMTransport = nil
+            self.lastFM = LastFMAccount(connection: nil)
             scrobbleTransports = []
         }
         let scrobbleManager = ScrobbleManager(transports: scrobbleTransports)

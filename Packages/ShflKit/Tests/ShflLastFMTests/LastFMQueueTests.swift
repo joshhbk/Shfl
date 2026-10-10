@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import Shfl
+@testable import ShflLastFM
 @testable import ShflCore
 
 @Suite("LastFMQueue Tests")
