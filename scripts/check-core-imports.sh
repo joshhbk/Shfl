@@ -15,7 +15,7 @@ core_paths=(
     Shfl/Services/Scrobbling
 )
 
-forbidden='^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+(SwiftUI|UIKit|AppKit|MusicKit|MediaPlayer)([[:space:]]|$)'
+forbidden='^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+((typealias|struct|class|enum|protocol|var|func)[[:space:]]+)?(SwiftUI|UIKit|AppKit|MusicKit|MediaPlayer)([.[:space:]]|$)'
 
 # Files that still import a forbidden framework and are fixed in a later PR.
 # PR 2 (artwork and Last.fm seams) owns artwork and Last.fm sign-in; none of
