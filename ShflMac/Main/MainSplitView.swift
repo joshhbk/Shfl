@@ -2,6 +2,7 @@ import ShflCore
 import SwiftUI
 
 struct MainSplitView: View {
+    let makePlaybackClock: () -> PlaybackClock
     let makeArtistSongs: (Artist) -> ArtistDetailViewModel
     let makePlaylistSongs: (Playlist) -> PlaylistDetailViewModel
 
@@ -25,6 +26,7 @@ struct MainSplitView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 DraftFailureMessage()
+                NowPlayingBar(makePlaybackClock: makePlaybackClock)
             }
         }
         .onChange(of: selection, initial: true) {
