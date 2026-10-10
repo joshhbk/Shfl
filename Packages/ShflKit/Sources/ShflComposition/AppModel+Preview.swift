@@ -5,8 +5,9 @@ import ShflDeterministic
 extension AppModel {
     /// A model for previews and view tests. It browses and plays `library`
     /// without Apple Music, starts with `draft` in the session draft, and has
-    /// no saved session, Last.fm or artwork. Its settings are its own, so
-    /// nothing it does leaks into the app's.
+    /// no saved session, Last.fm or artwork. Its settings live in a preview
+    /// suite that is emptied each time a preview model is made, so nothing
+    /// leaks into the app's settings or piles up between runs.
     ///
     /// Lives here rather than in ShflDeterministic, which composition
     /// depends on, so it can build an `AppModel`.
@@ -15,8 +16,8 @@ extension AppModel {
         playback: DeterministicPlayback = DeterministicPlayback(),
         draft: [Song] = []
     ) -> AppModel {
-        let suiteName = "com.joshuahughes.shuffled.preview.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        let defaults = UserDefaults(suiteName: previewSuiteName) ?? .standard
+        defaults.removePersistentDomain(forName: previewSuiteName)
         let service = DeterministicMusicService(library: library, playback: playback)
         let model = AppModel(
             library: service,
@@ -31,4 +32,6 @@ extension AppModel {
         try? model.sessionDraft.add(Array(draft.prefix(model.sessionDraft.capacity)))
         return model
     }
+
+    private static let previewSuiteName = "com.joshuahughes.shuffled.preview"
 }

@@ -78,7 +78,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ShflAppleMusicUITests",
-            dependencies: ["ShflAppleMusicUI"],
+            dependencies: ["ShflAppleMusicUI", "ShflAppleMusic", "ShflCore"],
             swiftSettings: testSettings
         ),
         /// Scrobbling to Last.fm and the listener's Last.fm account.
@@ -100,7 +100,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ShflCompositionTests",
-            dependencies: ["ShflComposition", "ShflTestSupport"],
+            dependencies: ["ShflComposition", "ShflCore", "ShflDeterministic", "ShflLastFM", "ShflTestSupport"],
             swiftSettings: testSettings
         ),
         /// Helpers shared by the test targets. No product, so nothing ships it.
