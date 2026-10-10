@@ -1,11 +1,6 @@
 import Foundation
 
-/// The one place the session draft is edited: which songs are in the pool,
-/// the shuffle algorithm, and filling the pool from the library.
-///
-/// Edits here apply to the next shuffle. `ShufflePlayer` reads the draft when
-/// it starts a new shuffle, and `ListeningSessionHost` saves the pool whenever
-/// `songPoolChanges` fires and the algorithm whenever `algorithmChanges` does.
+/// The only place the session draft is edited.
 @Observable
 @MainActor
 public final class SessionDraftStore {
@@ -56,8 +51,7 @@ public final class SessionDraftStore {
         }
     }
 
-    /// Each read returns a new stream that yields the algorithm whenever a
-    /// different one is staged, starting with the next change.
+    /// Yields only changes made after each read.
     var algorithmChanges: AsyncStream<ShuffleAlgorithm> {
         let id = UUID()
         return AsyncStream { continuation in
@@ -106,8 +100,6 @@ public final class SessionDraftStore {
         draft = draft.removingAll()
     }
 
-    /// Chooses the algorithm for the next shuffle. The listening session
-    /// already playing keeps its order.
     public func stage(_ algorithm: ShuffleAlgorithm) {
         draft = draft.using(algorithm)
     }

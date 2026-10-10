@@ -14,12 +14,9 @@ final class AppModel {
     @ObservationIgnored private let libraryPreferences: LibraryPreferences
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
-    /// Where this launch is on the way to a playable library.
     enum LaunchPhase: Equatable {
-        /// Restoring the saved session and checking Apple Music access.
         case loading
         case needsAuthorization
-        /// The listener was asked for Apple Music access and declined.
         case authorizationDenied
         case ready
     }
@@ -76,13 +73,10 @@ final class AppModel {
         launchPhase = await authStatus ? .ready : .needsAuthorization
     }
 
-    /// Saves the live playback position on the active session.
     func sceneDidLeaveForeground() {
         sessionHost.sceneDidLeaveForeground()
     }
 
-    /// Asks for Apple Music access. Afterwards the launch phase is `.ready`
-    /// or `.authorizationDenied`.
     func requestAuthorization() async {
         launchPhase = await library.requestAuthorization() ? .ready : .authorizationDenied
     }

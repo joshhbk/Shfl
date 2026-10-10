@@ -315,8 +315,7 @@ final class MusicKitTransport {
     }
 }
 
-// Declared in an extension: listed on the class itself, a nonisolated core
-// protocol would make the whole class nonisolated instead of main-actor.
+// In an extension: on the class itself, a nonisolated protocol makes the whole class nonisolated.
 extension MusicKitTransport: PlaybackTransport {}
 
 final class PlaybackEventBroadcaster {

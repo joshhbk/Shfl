@@ -1,12 +1,6 @@
 #!/bin/bash
-# Fails when a ShflCore source imports anything but Foundation, Observation
-# or SwiftData.
-#
-# The package can't enforce this on its own: ShflCore declares no
-# dependencies, but Apple's system frameworks (SwiftUI, UIKit, AppKit,
-# MusicKit, MediaPlayer…) are importable from any target. Run from anywhere
-# in the repo:
-#   scripts/check-core-imports.sh
+# Fails when a ShflCore source imports anything but Foundation, Observation or SwiftData.
+# Packages can import Apple frameworks without declaring them, so the compiler can't catch this.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -15,9 +9,7 @@ core_sources=Packages/ShflKit/Sources/ShflCore
 
 allowed='Foundation|Observation|SwiftData'
 
-# Any import, including attributed (`@preconcurrency import`), scoped
-# (`import struct SwiftUI.Color`) and submodule (`import UIKit.UIColor`) forms.
-# Captures the top-level module name.
+# Matches attributed, scoped and submodule imports; captures the top-level module.
 import_line='^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+((typealias|struct|class|enum|protocol|var|func|let|actor)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)'
 
 violations=0

@@ -1,9 +1,6 @@
 import Foundation
 @testable import ShflCore
 
-// A copy of the mock in ShflCoreTests' ScrobbleTransportTests, kept for
-// ScrobbleTrackerTests, which needs DeterministicMusicService and so stays in
-// the app's tests. Delete it when those tests move into the package.
 actor MockScrobbleTransport {
     private var _isAuthenticated: Bool = true
     var isAuthenticated: Bool { _isAuthenticated }
@@ -23,6 +20,5 @@ actor MockScrobbleTransport {
     }
 }
 
-// Declared in an extension: Xcode 27 infers `nonisolated` onto an actor that
-// lists a nonisolated protocol on its primary declaration, then rejects it.
+// In an extension: on the actor itself Xcode 27 infers nonisolated and rejects it.
 extension MockScrobbleTransport: ScrobbleTransport {}

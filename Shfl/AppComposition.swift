@@ -16,8 +16,6 @@ struct AppComposition {
     let libraryPreferences: LibraryPreferences
     let appearanceSettings: AppearanceSettings
     let appModel: AppModel
-    /// Live launches look artwork up in the Apple Music library; deterministic
-    /// launches have none and show placeholders.
     let artworkStore: ArtworkStore?
     let showsStartupSplash: Bool
 

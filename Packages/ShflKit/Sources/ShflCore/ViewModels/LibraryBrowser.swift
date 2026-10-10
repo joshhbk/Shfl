@@ -1,6 +1,5 @@
 import Foundation
 
-/// The library catalog lanes a listener can browse and search.
 public enum LibraryLaneKind: Equatable, CaseIterable {
     case songs
     case artists
@@ -39,9 +38,7 @@ public final class LibraryBrowser {
 
     // MARK: - Active lane
 
-    /// The lane being browsed and searched, or nil while the listener looks
-    /// at something other than the catalog, such as their picks. Switching
-    /// lanes loads the new lane's first page, or runs the current search on it.
+    /// nil while the listener is outside the catalog, e.g. viewing their picks.
     public var activeLane: LibraryLaneKind? = .songs {
         didSet {
             guard activeLane != oldValue else { return }
@@ -129,8 +126,6 @@ public final class LibraryBrowser {
 
     // MARK: - Init
 
-    /// - Parameter preferences: Supplies the song sort order and the autofill
-    ///   algorithm, and saves a newly chosen sort order.
     public init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
         self.libraryCatalog = libraryCatalog
         self.preferences = preferences
@@ -190,8 +185,6 @@ public final class LibraryBrowser {
 
     // MARK: - Sort
 
-    /// Saves `option` as the song sort order and reloads the songs lane in
-    /// that order. Choosing the current order does nothing.
     public func chooseSortOption(_ option: SortOption) {
         guard option != preferences.sortOption else { return }
         preferences.sortOption = option
@@ -225,7 +218,6 @@ public final class LibraryBrowser {
         await songsLane.loadInitial(force: false)
     }
 
-    /// Loads a lane's browse page when it has not been loaded yet.
     func loadBrowseData(for lane: LibraryLaneKind?) {
         Task { @MainActor in
             switch lane {
@@ -298,7 +290,6 @@ public final class LibraryBrowser {
 
     // MARK: - Autofill
 
-    /// Fills the draft from the library with the saved autofill algorithm.
     public func autofill(into draft: SessionDraftStore) async {
         let source = LibraryAutofillSource(
             libraryCatalog: libraryCatalog,

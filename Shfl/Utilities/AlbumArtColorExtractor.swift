@@ -1,8 +1,7 @@
 import ShflCore
 import SwiftUI
 
-/// Picks a tint colour for the playing song from its album artwork's palette,
-/// rotating through the palette so songs from one album don't repeat a colour.
+/// Rotates through the album's palette so songs from one album don't repeat a colour.
 @Observable
 @MainActor
 final class AlbumArtColorExtractor {
@@ -17,7 +16,6 @@ final class AlbumArtColorExtractor {
     /// cycle through colors rather than randomly repeating.
     @ObservationIgnored private var lastUsedIndex: [Int: Int] = [:]
 
-    /// A nil palette (no artwork store this launch) leaves the theme default.
     func updateColor(for songId: String, palette: ArtworkPalette?) {
         // Skip if already processing this song
         guard songId != currentSongId else { return }

@@ -364,6 +364,5 @@ actor DeterministicMusicService {
     }
 }
 
-// Declared in an extension: listing nonisolated protocols on the actor itself
-// infers `nonisolated` onto its members, which Xcode 27 can reject on clean builds.
+// In an extension: on the actor itself Xcode 27 infers nonisolated members and can reject them.
 extension DeterministicMusicService: MusicService {}

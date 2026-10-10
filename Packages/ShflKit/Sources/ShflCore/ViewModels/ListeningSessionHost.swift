@@ -1,13 +1,6 @@
 import Foundation
 
-/// Owns the listening session for one app launch: the session draft, the
-/// player, starting listening sessions, restoring the last session at launch,
-/// and saving.
-///
-/// Saving happens on its own whenever something changes: songs are added or
-/// removed, a song starts playing, or the scene leaves the foreground. Each
-/// save stores the song pool and the current session together, so they
-/// always match. A newly staged shuffle algorithm is handed to `saveAlgorithm`.
+/// Owns one launch's listening session and saves it whenever it changes.
 @Observable
 @MainActor
 public final class ListeningSessionHost {
@@ -38,14 +31,6 @@ public final class ListeningSessionHost {
     @ObservationIgnored private var algorithmTask: Task<Void, Never>?
 
     // PR 4 → package
-    /// - Parameters:
-    ///   - autofillSource: Where autofill finds songs. It is warmed whenever
-    ///     the draft is empty, ready for the next press of play.
-    ///   - initialAlgorithm: The algorithm the session draft starts with,
-    ///     usually the one last saved.
-    ///   - saveAlgorithm: Keeps each algorithm staged on the draft for the
-    ///     next launch.
-    ///   - makeSeed: The seed for each fresh shuffle.
     public init(
         playbackTransport: PlaybackTransport,
         archive: SessionArchive,
@@ -168,7 +153,6 @@ public final class ListeningSessionHost {
         }
     }
 
-    /// Saves the live playback position on the active session.
     public func sceneDidLeaveForeground() {
         print("📱 Scene left the foreground - checkpointing session...")
         checkpoint(position: playbackTransport.currentPlaybackTime)

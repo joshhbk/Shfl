@@ -1,18 +1,12 @@
 import Foundation
 
-/// What toggling a song did to the session draft.
 public enum DraftEdit: Equatable {
-    /// The song joined the pool, which now holds `songCount` songs.
     case added(songCount: Int, reachedMilestone: Bool)
     case removed
     case rejectedAtCapacity
-    /// The edit failed; the message is also shown as `actionErrorMessage`.
     case failed(String)
 }
 
-/// The song picker's editing state: the error banner, and whether
-/// autofill has run out of songs. Edits go straight to the
-/// `SessionDraftStore` passed in.
 @Observable
 @MainActor
 public final class SessionDraftEditor {
@@ -52,13 +46,10 @@ public final class SessionDraftEditor {
         draft.removeAll()
     }
 
-    /// Autofill is exhausted when it came back short while there was still
-    /// room, so the library has no more songs to offer.
     public func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
         autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
     }
 
-    /// Shows `message` for three seconds.
     func showActionError(_ message: String) {
         actionErrorMessage = message
 

@@ -131,8 +131,7 @@ final class LibraryBrowserTests: XCTestCase {
     }
 
     func test_autofillUsesTheSavedAutofillAlgorithm() async {
-        // Random autofill pages through the whole library (500 per page);
-        // recently added reads a single page, so the fetch count tells them apart.
+        // Random pages through the whole library (500 per page); recently added reads one page.
         let songs = (1...600).map {
             Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
         }

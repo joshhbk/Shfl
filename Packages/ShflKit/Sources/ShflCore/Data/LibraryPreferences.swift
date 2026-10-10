@@ -1,8 +1,5 @@
 import Foundation
 
-/// How the listener likes to browse and fill from their library: the song
-/// sort order and the autofill algorithm. Each change is saved to
-/// UserDefaults straight away.
 @Observable
 @MainActor
 public final class LibraryPreferences {

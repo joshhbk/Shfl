@@ -1,20 +1,14 @@
 import Foundation
 import XCTest
 
-/// Yields enough times for pending async tasks to consume buffered stream
-/// values and update observable state. Unlike a fixed sleep, it doesn't wait
-/// on the clock.
 @MainActor
 func waitForStateUpdate() async {
-    // Multiple yields drain pending observer tasks across actor hops
-    // (mock actor → AsyncStream → player MainActor observer → state update).
-    // 30 yields handles the deepest chains we see in practice.
+    // 30 yields drains the deepest hop chain in the tests (mock actor → stream → main-actor observer).
     for _ in 0..<30 {
         await Task.yield()
     }
 }
 
-/// Fails the test if `condition` is still false after `timeout`.
 @MainActor
 func waitUntil(
     timeout: Duration = .seconds(1),

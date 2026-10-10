@@ -36,8 +36,7 @@ struct AlbumArtCard: View {
         .shadow(color: .black.opacity(0.10), radius: 20, x: 0, y: 10)
     }
 
-    /// Shown until library artwork loads, or when there is none. Draws the web
-    /// artwork URL that songs from the system player's queue (and previews) carry.
+    /// Songs from the system player's queue carry a web artwork URL rather than library artwork.
     @ViewBuilder
     private var fallbackView: some View {
         if let artworkURL, artworkURL.scheme == "https" || artworkURL.scheme == "http" {

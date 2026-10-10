@@ -1,9 +1,7 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-/// Mirrors the app target's settings (SWIFT_APPROACHABLE_CONCURRENCY turns on
-/// the last five), so code is isolated the same way in the app and the
-/// package. Change both together.
+// Must match the app target's Swift settings, so moved code keeps its isolation.
 let upcomingFeatures: [SwiftSetting] = [
     .enableUpcomingFeature("MemberImportVisibility"),
     .enableUpcomingFeature("DisableOutwardActorInference"),
@@ -18,7 +16,6 @@ let librarySettings: [SwiftSetting] = [
     .defaultIsolation(MainActor.self),
 ] + upcomingFeatures
 
-/// No default isolation, matching ShflTests.
 let testSettings: [SwiftSetting] = [
     .swiftLanguageMode(.v5),
 ] + upcomingFeatures
@@ -34,8 +31,7 @@ let package = Package(
         .library(name: "ShflCore", targets: ["ShflCore"]),
     ],
     targets: [
-        /// May import only Foundation, Observation and SwiftData; the compiler
-        /// doesn't enforce that, scripts/check-core-imports.sh does.
+        // Foundation, Observation and SwiftData only; scripts/check-core-imports.sh enforces it.
         .target(
             name: "ShflCore",
             swiftSettings: librarySettings
