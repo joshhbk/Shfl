@@ -1,5 +1,11 @@
 import Foundation
-import SwiftUI
+
+/// The library catalog lanes a listener can browse and search.
+enum LibraryLaneKind: Equatable, CaseIterable {
+    case songs
+    case artists
+    case playlists
+}
 
 /// Reference box so sortOption can be captured by closures during init without capturing self.
 private final class SortOptionRef {
@@ -46,13 +52,16 @@ final class LibraryBrowser {
         }
     }
 
-    // MARK: - Browse mode
+    // MARK: - Active lane
 
-    var browseMode: BrowseMode = .songs {
+    /// The lane being browsed and searched, or nil while the listener looks
+    /// at something other than the catalog, such as their picks. Switching
+    /// lanes loads the new lane's first page, or runs the current search on it.
+    var activeLane: LibraryLaneKind? = .songs {
         didSet {
-            guard browseMode != oldValue else { return }
+            guard activeLane != oldValue else { return }
             if searchText.isEmpty {
-                loadBrowseData(for: browseMode)
+                loadBrowseData(for: activeLane)
             } else {
                 handleSearchTextChanged()
             }
@@ -66,7 +75,7 @@ final class LibraryBrowser {
             guard searchText != oldValue else { return }
             handleSearchTextChanged()
             if searchText.isEmpty {
-                loadBrowseData(for: browseMode)
+                loadBrowseData(for: activeLane)
             }
         }
     }
@@ -212,12 +221,11 @@ final class LibraryBrowser {
             return
         }
 
-        // Forward to the current lane based on browse mode
-        switch browseMode {
+        switch activeLane {
         case .songs: songsLane.handleSearchTextChanged(query)
         case .artists: artistsLane.handleSearchTextChanged(query)
         case .playlists: playlistsLane.handleSearchTextChanged(query)
-        case .selected: break
+        case nil: break
         }
     }
 
@@ -227,14 +235,14 @@ final class LibraryBrowser {
         await songsLane.loadInitial(force: false)
     }
 
-    /// Loads a mode's browse page when it has not been loaded yet.
-    func loadBrowseData(for mode: BrowseMode) {
+    /// Loads a lane's browse page when it has not been loaded yet.
+    func loadBrowseData(for lane: LibraryLaneKind?) {
         Task { @MainActor in
-            switch mode {
+            switch lane {
             case .songs: await songsLane.loadInitial(force: false)
             case .artists: await artistsLane.loadInitial(force: false)
             case .playlists: await playlistsLane.loadInitial(force: false)
-            case .selected: break
+            case nil: break
             }
         }
     }

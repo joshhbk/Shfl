@@ -87,6 +87,35 @@ final class LibraryBrowserTests: XCTestCase {
         XCTAssertEqual(searchResults.first?.title, "Hello World")
     }
 
+    func test_switchingToALaneLoadsItsFirstPage() async {
+        let service = DeterministicMusicService(
+            configuration: .init(libraryPlaylists: [Playlist(id: "p1", name: "Road Trip")])
+        )
+        let browser = LibraryBrowser(libraryCatalog: service)
+        XCTAssertEqual(browser.activeLane, .songs)
+
+        browser.activeLane = .playlists
+        await waitUntil { browser.playlists.map(\.id) == ["p1"] }
+
+        XCTAssertEqual(browser.playlists.map(\.id), ["p1"])
+    }
+
+    func test_leavingTheCatalogLoadsNothing() async {
+        let service = DeterministicMusicService(
+            configuration: .init(libraryPlaylists: [Playlist(id: "p1", name: "Road Trip")])
+        )
+        let browser = LibraryBrowser(libraryCatalog: service)
+
+        browser.activeLane = nil
+        browser.searchText = "Road"
+        // Past the search debounce (300ms), so a search would have run.
+        try? await Task.sleep(nanoseconds: 600_000_000)
+
+        XCTAssertTrue(browser.playlists.isEmpty)
+        XCTAssertTrue(browser.playlistSearchResults.isEmpty)
+        XCTAssertTrue(browser.searchResults.isEmpty)
+    }
+
     func test_autofillState_initiallyIdle() {
         XCTAssertEqual(browser.autofillState, .idle)
     }

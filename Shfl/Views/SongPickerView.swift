@@ -14,6 +14,16 @@ enum BrowseMode: String, CaseIterable {
         case .selected: "checkmark.circle"
         }
     }
+
+    /// The catalog lane this tab browses; the picks aren't a catalog lane.
+    var laneKind: LibraryLaneKind? {
+        switch self {
+        case .songs: .songs
+        case .artists: .artists
+        case .playlists: .playlists
+        case .selected: nil
+        }
+    }
 }
 
 struct SongPickerView: View {
@@ -22,6 +32,7 @@ struct SongPickerView: View {
 
     @State private var browser: LibraryBrowser
     @State private var editor = SessionDraftEditor()
+    @State private var browseMode: BrowseMode = .songs
     @State private var navigationPath = NavigationPath()
     @State private var showingAutofillCompletion = false
     @State private var autofillTapCount = 0
@@ -52,9 +63,9 @@ struct SongPickerView: View {
         NavigationStack(path: $navigationPath) {
             Group {
                 if browser.searchText.isEmpty {
-                    browseContentFor(browser.browseMode)
+                    browseContentFor(browseMode)
                 } else {
-                    searchContentFor(browser.browseMode)
+                    searchContentFor(browseMode)
                 }
             }
             .accessibilityHidden(!navigationPath.isEmpty)
@@ -117,7 +128,7 @@ struct SongPickerView: View {
             modernSearchField
 
             HStack(spacing: 10) {
-                Picker("Browse", selection: $browser.browseMode) {
+                Picker("Browse", selection: browseModeSelection) {
                     ForEach(BrowseMode.allCases, id: \.self) { mode in
                         Text(mode.rawValue).tag(mode)
                     }
@@ -143,7 +154,7 @@ struct SongPickerView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField(browser.browseMode == .selected ? "Search your picks" : "Search your library", text: $browser.searchText)
+            TextField(browseMode == .selected ? "Search your picks" : "Search your library", text: $browser.searchText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -251,6 +262,18 @@ struct SongPickerView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
+    /// Switching tabs also switches the browser's lane in the same update,
+    /// so the new lane starts loading straight away.
+    private var browseModeSelection: Binding<BrowseMode> {
+        Binding(
+            get: { browseMode },
+            set: { mode in
+                browseMode = mode
+                browser.activeLane = mode.laneKind
+            }
+        )
+    }
+
     private var pickerAccentColor: Color {
         shuffleTheme.interactionColor
     }
@@ -341,7 +364,7 @@ struct SongPickerView: View {
     // MARK: - Sort
 
     private var showSortButton: Bool {
-        browser.browseMode == .songs && browser.searchText.isEmpty
+        browseMode == .songs && browser.searchText.isEmpty
     }
 
     // MARK: - Song Browse List
