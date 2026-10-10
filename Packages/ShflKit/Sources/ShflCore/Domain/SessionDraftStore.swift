@@ -84,6 +84,7 @@ public final class SessionDraftStore {
 
     // MARK: - Editing
 
+    // PR 4 → package (previews get a ShflDeterministic fixture)
     /// Adds the songs that aren't already in the pool. If they don't all fit,
     /// throws `.capacityReached` and leaves the pool as it was.
     public func add(_ songs: [Song]) throws {

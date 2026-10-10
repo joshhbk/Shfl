@@ -52,6 +52,7 @@ public final class ShufflePlayer {
             || activeSession.algorithm != draft.algorithm
     }
 
+    // PR 4 → package (previews get a ShflDeterministic fixture)
     /// - Parameter sessionDraft: The songs and algorithm used when a new
     ///   shuffle starts.
     public init(
