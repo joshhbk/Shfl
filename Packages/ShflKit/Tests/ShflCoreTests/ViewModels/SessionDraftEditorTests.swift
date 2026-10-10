@@ -71,6 +71,38 @@ final class SessionDraftEditorTests: XCTestCase {
         XCTAssertEqual(edit, .rejectedAtCapacity)
     }
 
+    func test_addingSeveralSkipsSongsAlreadyInTheDraft() throws {
+        let draft = SessionDraftStore()
+        try draft.add(makeSongs(1))
+        let editor = SessionDraftEditor(draft: draft)
+
+        let edit = editor.add(makeSongs(3))
+
+        XCTAssertEqual(draft.songs.map(\.id), ["1", "2", "3"])
+        XCTAssertEqual(edit, .added(songCount: 3, reachedMilestone: false))
+    }
+
+    func test_addingSeveralPastAMilestoneReachesIt() throws {
+        let draft = SessionDraftStore()
+        try draft.add(makeSongs(48))
+        let editor = SessionDraftEditor(draft: draft)
+
+        let edit = editor.add(makeSongs(3, start: 200))
+
+        XCTAssertEqual(edit, .added(songCount: 51, reachedMilestone: true))
+    }
+
+    func test_addingMoreThanFitsAddsNone() throws {
+        let draft = SessionDraftStore()
+        try draft.add(makeSongs(SessionDraft.maxSongs - 1))
+        let editor = SessionDraftEditor(draft: draft)
+
+        let edit = editor.add(makeSongs(2, start: 500))
+
+        XCTAssertEqual(draft.songCount, SessionDraft.maxSongs - 1)
+        XCTAssertEqual(edit, .rejectedAtCapacity)
+    }
+
     func test_clearAllEmptiesTheDraft() throws {
         let draft = SessionDraftStore()
         try draft.add(makeSongs(3))

@@ -44,6 +44,25 @@ public final class SessionDraftEditor {
         }
     }
 
+    /// All or none: if the songs don't all fit, the draft is unchanged.
+    @discardableResult
+    public func add(_ songs: [Song]) -> DraftEdit {
+        autofillIsExhausted = false
+        let before = draft.songCount
+        do {
+            try draft.add(songs)
+        } catch ShufflePlayerError.capacityReached {
+            return .rejectedAtCapacity
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        let after = draft.songCount
+        return .added(
+            songCount: after,
+            reachedMilestone: SessionDraft.milestones.contains { $0 > before && $0 <= after }
+        )
+    }
+
     public func clearAll() {
         autofillIsExhausted = false
         draft.removeAll()
