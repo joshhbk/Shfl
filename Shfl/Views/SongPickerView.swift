@@ -28,7 +28,7 @@ struct SongPickerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFieldFocused: Bool
 
-    @Environment(\.appSettings) private var appSettings
+    @Environment(\.libraryPreferences) private var libraryPreferences
     @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
     @Environment(\.shuffleTheme) private var shuffleTheme
@@ -88,7 +88,7 @@ struct SongPickerView: View {
             .accessibilityElement(children: .contain)
             .accessibilitySortPriority(-1)
         }
-        .onChange(of: appSettings?.librarySortOption) { _, newOption in
+        .onChange(of: libraryPreferences?.sortOption) { _, newOption in
             if let newOption {
                 browser.handleSortOptionChanged(newOption)
             }
@@ -256,13 +256,13 @@ struct SongPickerView: View {
     }
 
     private var currentSortOption: SortOption {
-        appSettings?.librarySortOption ?? .mostPlayed
+        libraryPreferences?.sortOption ?? .mostPlayed
     }
 
     private var sortSelection: Binding<SortOption> {
         Binding(
             get: { currentSortOption },
-            set: { appSettings?.librarySortOption = $0 }
+            set: { libraryPreferences?.sortOption = $0 }
         )
     }
 
@@ -554,7 +554,7 @@ struct SongPickerView: View {
         HapticFeedback.light.trigger()
         Task { @MainActor in
             let requestedCount = sessionDraft.remainingCapacity
-            let algorithm = appSettings?.autofillAlgorithm ?? .random
+            let algorithm = libraryPreferences?.autofillAlgorithm ?? .random
             let source = LibraryAutofillSource(libraryCatalog: libraryCatalog, algorithm: algorithm)
             await browser.autofill(into: sessionDraft, using: source)
 
@@ -642,7 +642,7 @@ private enum PreviewPickerLibrary {
         initialSortOption: .mostPlayed,
         onDismiss: {}
     )
-    .environment(\.appSettings, AppSettings())
+    .environment(\.libraryPreferences, LibraryPreferences())
 }
 
 #Preview("With Selected Songs") {
@@ -654,7 +654,7 @@ private enum PreviewPickerLibrary {
         initialSortOption: .mostPlayed,
         onDismiss: {}
     )
-    .environment(\.appSettings, AppSettings())
+    .environment(\.libraryPreferences, LibraryPreferences())
     .environment(\.sessionDraft, draft)
 }
 
@@ -664,5 +664,5 @@ private enum PreviewPickerLibrary {
         initialSortOption: .mostPlayed,
         onDismiss: {}
     )
-    .environment(\.appSettings, AppSettings())
+    .environment(\.libraryPreferences, LibraryPreferences())
 }

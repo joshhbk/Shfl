@@ -12,7 +12,8 @@ struct AppComposition {
     static let deterministicLaunchArgument = "--deterministic"
 
     let modelContainer: ModelContainer
-    let appSettings: AppSettings
+    let libraryPreferences: LibraryPreferences
+    let appearanceSettings: AppearanceSettings
     let appModel: AppModel
     let showsStartupSplash: Bool
 
@@ -42,15 +43,16 @@ struct AppComposition {
                 for: schema,
                 configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)]
             )
-            let appSettings = AppSettings()
+            let libraryPreferences = LibraryPreferences()
             return AppComposition(
                 modelContainer: modelContainer,
-                appSettings: appSettings,
+                libraryPreferences: libraryPreferences,
+                appearanceSettings: AppearanceSettings(),
                 appModel: AppModel(
                     library: AppleMusicService(),
                     playbackTransport: MusicKitTransport(),
                     modelContext: modelContainer.mainContext,
-                    appSettings: appSettings,
+                    libraryPreferences: libraryPreferences,
                     savedAlgorithm: SavedShuffleAlgorithm()
                 ),
                 showsStartupSplash: true
@@ -62,9 +64,10 @@ struct AppComposition {
                 configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
             )
             let defaults = isolatedDefaults()
-            let appSettings = AppSettings(defaults: defaults)
-            appSettings.currentThemeId = "silver"
-            appSettings.autofillAlgorithm = .random
+            let libraryPreferences = LibraryPreferences(defaults: defaults)
+            libraryPreferences.autofillAlgorithm = .random
+            let appearanceSettings = AppearanceSettings(defaults: defaults)
+            appearanceSettings.currentThemeId = "silver"
             let savedAlgorithm = SavedShuffleAlgorithm(defaults: defaults)
             savedAlgorithm.save(.weightedByPlayCount)
 
@@ -78,12 +81,13 @@ struct AppComposition {
             )
             return AppComposition(
                 modelContainer: modelContainer,
-                appSettings: appSettings,
+                libraryPreferences: libraryPreferences,
+                appearanceSettings: appearanceSettings,
                 appModel: AppModel(
                     library: musicService,
                     playbackTransport: musicService,
                     modelContext: modelContainer.mainContext,
-                    appSettings: appSettings,
+                    libraryPreferences: libraryPreferences,
                     savedAlgorithm: savedAlgorithm,
                     scrobblingEnabled: false
                 ),

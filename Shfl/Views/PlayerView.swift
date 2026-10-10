@@ -9,7 +9,7 @@ struct PlayerView: View {
     let onSkipForwardTapped: () -> Void
     let onSkipBackTapped: () -> Void
 
-    @Environment(\.appSettings) private var appSettings
+    @Environment(\.appearanceSettings) private var appearanceSettings
     @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
     @State private var themeController: ThemeController
@@ -110,14 +110,14 @@ struct PlayerView: View {
         .onChange(of: colorExtractor.extractedColor) { _, newColor in
             tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)
         }
-        // Bi-directional theme sync: ThemeController ↔ AppSettings
-        // Loop prevention relies on ThemeController.setTheme(byId:) and AppSettings.currentThemeId
+        // Bi-directional theme sync: ThemeController ↔ AppearanceSettings
+        // Loop prevention relies on ThemeController.setTheme(byId:) and AppearanceSettings.currentThemeId
         // both guarding against no-op writes, breaking the onChange cycle.
         .onChange(of: themeController.currentTheme) { _, newTheme in
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: newTheme)
-            appSettings?.currentThemeId = newTheme.id
+            appearanceSettings?.currentThemeId = newTheme.id
         }
-        .onChange(of: appSettings?.currentThemeId) { _, newId in
+        .onChange(of: appearanceSettings?.currentThemeId) { _, newId in
             guard let id = newId else { return }
             themeController.setTheme(byId: id)
         }

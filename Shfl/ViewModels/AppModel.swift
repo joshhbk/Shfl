@@ -10,7 +10,7 @@ final class AppModel {
     @ObservationIgnored let lastFMTransport: LastFMTransport?
 
     @ObservationIgnored let sessionHost: ListeningSessionHost
-    @ObservationIgnored private let appSettings: AppSettings
+    @ObservationIgnored private let libraryPreferences: LibraryPreferences
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
     /// Where this launch is on the way to a playable library.
@@ -33,20 +33,20 @@ final class AppModel {
         library: MusicAuthorizing & LibraryCatalog,
         playbackTransport: PlaybackTransport,
         modelContext: ModelContext,
-        appSettings: AppSettings,
+        libraryPreferences: LibraryPreferences,
         savedAlgorithm: SavedShuffleAlgorithm,
         lifecyclePersistenceHook: (() -> Void)? = nil,
         scrobblingEnabled: Bool = true
     ) {
         self.library = library
         self.playbackTransport = playbackTransport
-        self.appSettings = appSettings
+        self.libraryPreferences = libraryPreferences
         self.sessionHost = ListeningSessionHost(
             playbackTransport: playbackTransport,
             archive: SessionArchive(modelContext: modelContext),
             autofillSource: WarmedLibraryAutofillSource(
                 libraryCatalog: library,
-                algorithm: { [appSettings] in appSettings.autofillAlgorithm }
+                algorithm: { [libraryPreferences] in libraryPreferences.autofillAlgorithm }
             ),
             initialAlgorithm: savedAlgorithm.load(),
             saveAlgorithm: { savedAlgorithm.save($0) },

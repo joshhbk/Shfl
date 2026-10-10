@@ -2,7 +2,8 @@ import SwiftUI
 
 struct MainView: View {
     let model: AppModel
-    let appSettings: AppSettings
+    let libraryPreferences: LibraryPreferences
+    let appearanceSettings: AppearanceSettings
 
     @State private var showingPicker = false
     @State private var showingSettings = false
@@ -14,17 +15,19 @@ struct MainView: View {
 
     init(
         model: AppModel,
-        appSettings: AppSettings,
+        libraryPreferences: LibraryPreferences,
+        appearanceSettings: AppearanceSettings,
         showsStartupSplash: Bool = true
     ) {
         self.model = model
-        self.appSettings = appSettings
+        self.libraryPreferences = libraryPreferences
+        self.appearanceSettings = appearanceSettings
         _hasCompletedSplashTimeline = State(initialValue: !showsStartupSplash)
         _hasDismissedStartupSplash = State(initialValue: !showsStartupSplash)
     }
 
     private var loadingTheme: ShuffleTheme {
-        ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
+        ShuffleTheme.theme(byId: appearanceSettings.currentThemeId) ?? .pink
     }
 
     private var shouldShowStartupSplash: Bool {
@@ -57,7 +60,8 @@ struct MainView: View {
             }
         }
         .tint(deviceAccentColor)
-        .environment(\.appSettings, appSettings)
+        .environment(\.libraryPreferences, libraryPreferences)
+        .environment(\.appearanceSettings, appearanceSettings)
         .task {
             await startInitialLoadIfNeeded()
         }
@@ -70,7 +74,8 @@ struct MainView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .tint(deviceAccentColor)
-                .environment(\.appSettings, appSettings)
+                .environment(\.libraryPreferences, libraryPreferences)
+                .environment(\.appearanceSettings, appearanceSettings)
                 .environment(\.shufflePlayer, model.player)
                 .environment(\.lastFMTransport, model.lastFMTransport)
         }
@@ -93,20 +98,21 @@ struct MainView: View {
     private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
         SongPickerView(
             libraryCatalog: model.library,
-            initialSortOption: appSettings.librarySortOption,
+            initialSortOption: libraryPreferences.sortOption,
             onDismiss: onDismiss
         )
         .tint(deviceAccentColor)
         .environment(\.shuffleTheme, currentTheme)
-        .environment(\.appSettings, appSettings)
+        .environment(\.libraryPreferences, libraryPreferences)
+        .environment(\.appearanceSettings, appearanceSettings)
     }
 
     private var currentTheme: ShuffleTheme {
-        ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
+        ShuffleTheme.theme(byId: appearanceSettings.currentThemeId) ?? .pink
     }
 
     private var deviceAccentColor: Color {
-        (ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink).accentColor
+        (ShuffleTheme.theme(byId: appearanceSettings.currentThemeId) ?? .pink).accentColor
     }
 
     @ViewBuilder
@@ -120,7 +126,7 @@ struct MainView: View {
             PlayerView(
                 player: model.player,
                 playbackTransport: model.playbackTransport,
-                initialThemeId: appSettings.currentThemeId,
+                initialThemeId: appearanceSettings.currentThemeId,
                 onAddTapped: { showingPicker = true },
                 onSettingsTapped: { showingSettings = true },
                 onSkipForwardTapped: { Task { try? await model.player.skipToNext() } },

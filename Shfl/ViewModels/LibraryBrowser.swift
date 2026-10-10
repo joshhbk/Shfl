@@ -194,7 +194,7 @@ final class LibraryBrowser {
 
     // MARK: - Sort
 
-    /// Called when sort option changes. Views should call this via onChange(of: appSettings.librarySortOption).
+    /// Called when sort option changes. Views should call this via onChange(of: libraryPreferences.sortOption).
     func handleSortOptionChanged(_ newOption: SortOption) {
         sortOption = newOption
     }

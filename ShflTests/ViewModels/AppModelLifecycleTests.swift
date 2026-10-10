@@ -8,7 +8,7 @@ final class AppModelLifecycleTests: XCTestCase {
     private var container: ModelContainer!
     private var modelContext: ModelContext!
     private var mockService: DeterministicMusicService!
-    private var appSettings: AppSettings!
+    private var libraryPreferences: LibraryPreferences!
     private var defaults: UserDefaults!
     private var defaultsSuiteName: String!
 
@@ -22,14 +22,14 @@ final class AppModelLifecycleTests: XCTestCase {
         mockService = DeterministicMusicService()
         defaultsSuiteName = "AppModelLifecycleTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: defaultsSuiteName)
-        appSettings = AppSettings(defaults: defaults)
+        libraryPreferences = LibraryPreferences(defaults: defaults)
     }
 
     override func tearDown() {
         container = nil
         modelContext = nil
         mockService = nil
-        appSettings = nil
+        libraryPreferences = nil
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         defaults = nil
     }
@@ -39,7 +39,7 @@ final class AppModelLifecycleTests: XCTestCase {
             library: mockService,
             playbackTransport: mockService,
             modelContext: modelContext,
-            appSettings: appSettings,
+            libraryPreferences: libraryPreferences,
             savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults)
         )
 
@@ -73,7 +73,7 @@ final class AppModelLifecycleTests: XCTestCase {
             library: mockService,
             playbackTransport: mockService,
             modelContext: modelContext,
-            appSettings: appSettings,
+            libraryPreferences: libraryPreferences,
             savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
             lifecyclePersistenceHook: { persistCallCount += 1 }
         )
@@ -124,7 +124,7 @@ final class AppModelLifecycleTests: XCTestCase {
             library: service,
             playbackTransport: service,
             modelContext: modelContext,
-            appSettings: appSettings,
+            libraryPreferences: libraryPreferences,
             savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults)
         )
     }
