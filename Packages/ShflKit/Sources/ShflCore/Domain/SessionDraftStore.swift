@@ -74,7 +74,6 @@ public final class SessionDraftStore {
     public var isEmpty: Bool { draft.songs.isEmpty }
     public var isAtCapacity: Bool { draft.remainingCapacity == 0 }
 
-    /// Every song when `query` is empty.
     public func songs(matching query: String) -> [Song] {
         guard !query.isEmpty else { return songs }
         return songs.filter {

@@ -76,7 +76,6 @@ public final class ListeningSessionHost {
         await startSession(autofillingEmptyDraft: true)
     }
 
-    /// False while there is no session to move through, or one is loading.
     public var canSkip: Bool { player.activeSession != nil && !isStartingSession }
 
     public func skipToNext() async {
