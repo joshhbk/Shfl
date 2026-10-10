@@ -11,11 +11,6 @@ extension EnvironmentValues {
 
     @Entry var lastFMTransport: LastFMTransport? = nil
 
-    /// The launch's artwork store. `ShuffledApp` provides it for live
-    /// launches; deterministic launches and previews leave it nil, so artwork
-    /// views show placeholders.
-    @Entry var artworkStore: ArtworkStore? = nil
-
     /// The session draft that views read and edit. `MainView` provides the
     /// app's store; previews get an empty one.
     @Entry var sessionDraft = SessionDraftStore()
