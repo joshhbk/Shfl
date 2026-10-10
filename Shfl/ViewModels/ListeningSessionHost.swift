@@ -8,7 +8,7 @@ import UIKit
 /// Saving happens on its own whenever something changes: songs are added or
 /// removed, a song starts playing, or the app goes to the background. Each
 /// save stores the song pool and the current session together, so they
-/// always match.
+/// always match. A newly staged shuffle algorithm is handed to `saveAlgorithm`.
 @Observable
 @MainActor
 final class ListeningSessionHost {
@@ -26,6 +26,7 @@ final class ListeningSessionHost {
     @ObservationIgnored private let autofillSource: WarmableAutofillSource
     @ObservationIgnored private let makeSeed: () -> UInt64
     @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let saveAlgorithm: (ShuffleAlgorithm) -> Void
     @ObservationIgnored private let lifecyclePersistenceHook: (() -> Void)?
 
     /// The session record the archive currently holds, so a pool-only commit
@@ -35,17 +36,23 @@ final class ListeningSessionHost {
 
     @ObservationIgnored private var transitionTask: Task<Void, Never>?
     @ObservationIgnored private var songPoolTask: Task<Void, Never>?
+    @ObservationIgnored private var algorithmTask: Task<Void, Never>?
     @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
 
     /// - Parameters:
     ///   - autofillSource: Where autofill finds songs. It is warmed whenever
     ///     the draft is empty, ready for the next press of play.
+    ///   - initialAlgorithm: The algorithm the session draft starts with,
+    ///     usually the one last saved.
+    ///   - saveAlgorithm: Keeps each algorithm staged on the draft for the
+    ///     next launch.
     ///   - makeSeed: The seed for each fresh shuffle.
     init(
         playbackTransport: PlaybackTransport,
         archive: SessionArchive,
         autofillSource: WarmableAutofillSource,
         initialAlgorithm: ShuffleAlgorithm = .noRepeat,
+        saveAlgorithm: @escaping (ShuffleAlgorithm) -> Void = { _ in },
         makeSeed: @escaping () -> UInt64 = { UInt64.random(in: UInt64.min ... UInt64.max) },
         now: @escaping () -> Date = Date.init,
         lifecyclePersistenceHook: (() -> Void)? = nil
@@ -61,6 +68,7 @@ final class ListeningSessionHost {
         self.autofillSource = autofillSource
         self.makeSeed = makeSeed
         self.now = now
+        self.saveAlgorithm = saveAlgorithm
         self.lifecyclePersistenceHook = lifecyclePersistenceHook
 
         startRecording()
@@ -70,6 +78,7 @@ final class ListeningSessionHost {
     deinit {
         transitionTask?.cancel()
         songPoolTask?.cancel()
+        algorithmTask?.cancel()
         if let observer = backgroundObserver {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -193,6 +202,14 @@ final class ListeningSessionHost {
                 if self.sessionDraft.isEmpty {
                     self.autofillSource.warm()
                 }
+            }
+        }
+
+        let algorithmChanges = sessionDraft.algorithmChanges
+        algorithmTask = Task { @MainActor [weak self] in
+            for await algorithm in algorithmChanges {
+                guard !Task.isCancelled, let self else { return }
+                self.saveAlgorithm(algorithm)
             }
         }
     }

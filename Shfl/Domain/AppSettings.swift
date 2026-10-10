@@ -9,13 +9,6 @@ final class AppSettings {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     @ObservationIgnored private let defaults: UserDefaults
 
-    var shuffleAlgorithm: ShuffleAlgorithm {
-        didSet {
-            guard shuffleAlgorithm != oldValue else { return }
-            defaults.set(shuffleAlgorithm.rawValue, forKey: "shuffleAlgorithm")
-        }
-    }
-
     var librarySortOption: SortOption {
         didSet {
             guard librarySortOption != oldValue else { return }
@@ -39,9 +32,6 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-
-        let algorithmRaw = defaults.string(forKey: "shuffleAlgorithm") ?? ShuffleAlgorithm.noRepeat.rawValue
-        self.shuffleAlgorithm = ShuffleAlgorithm(rawValue: algorithmRaw) ?? .noRepeat
 
         let sortRaw = defaults.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue
         self.librarySortOption = SortOption(rawValue: sortRaw) ?? .mostPlayed

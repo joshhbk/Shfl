@@ -110,6 +110,25 @@ final class SessionDraftStoreTests: XCTestCase {
 
         XCTAssertEqual(fired, 2)
     }
+
+    func test_algorithmChangesYieldsEachDifferentAlgorithmButNotMembership() async throws {
+        let draft = SessionDraftStore(algorithm: .noRepeat)
+        var staged: [ShuffleAlgorithm] = []
+        let changes = draft.algorithmChanges
+        let task = Task { @MainActor in
+            for await algorithm in changes { staged.append(algorithm) }
+        }
+        defer { task.cancel() }
+
+        draft.stage(.noRepeat)
+        try draft.add(makeSongs(2))
+        draft.stage(.artistSpacing)
+        draft.stage(.artistSpacing)
+        draft.stage(.weightedByPlayCount)
+        await waitForStateUpdate()
+
+        XCTAssertEqual(staged, [.artistSpacing, .weightedByPlayCount])
+    }
 }
 
 @MainActor

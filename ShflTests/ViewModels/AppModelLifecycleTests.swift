@@ -9,6 +9,8 @@ final class AppModelLifecycleTests: XCTestCase {
     private var modelContext: ModelContext!
     private var mockService: DeterministicMusicService!
     private var appSettings: AppSettings!
+    private var defaults: UserDefaults!
+    private var defaultsSuiteName: String!
 
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -18,7 +20,9 @@ final class AppModelLifecycleTests: XCTestCase {
         )
         modelContext = container.mainContext
         mockService = DeterministicMusicService()
-        appSettings = AppSettings()
+        defaultsSuiteName = "AppModelLifecycleTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuiteName)
+        appSettings = AppSettings(defaults: defaults)
     }
 
     override func tearDown() {
@@ -26,6 +30,8 @@ final class AppModelLifecycleTests: XCTestCase {
         modelContext = nil
         mockService = nil
         appSettings = nil
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defaults = nil
     }
 
     func testHandleDidEnterBackgroundPersistsSongsAndPlaybackState() async throws {
@@ -33,7 +39,8 @@ final class AppModelLifecycleTests: XCTestCase {
             library: mockService,
             playbackTransport: mockService,
             modelContext: modelContext,
-            appSettings: appSettings
+            appSettings: appSettings,
+            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults)
         )
 
         let song = Song(
@@ -67,6 +74,7 @@ final class AppModelLifecycleTests: XCTestCase {
             playbackTransport: mockService,
             modelContext: modelContext,
             appSettings: appSettings,
+            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
             lifecyclePersistenceHook: { persistCallCount += 1 }
         )
         _ = model
@@ -100,12 +108,24 @@ final class AppModelLifecycleTests: XCTestCase {
         XCTAssertEqual(model.launchPhase, .authorizationDenied)
     }
 
+    func testDraftStartsWithTheSavedAlgorithmAndSavesEachNewOne() async {
+        SavedShuffleAlgorithm(defaults: defaults).save(.artistSpacing)
+        let model = makeModel(service: mockService)
+        XCTAssertEqual(model.sessionDraft.algorithm, .artistSpacing)
+
+        model.sessionDraft.stage(.weightedByRecency)
+
+        await waitUntil { self.defaults.string(forKey: "shuffleAlgorithm") == "weightedByRecency" }
+        XCTAssertEqual(SavedShuffleAlgorithm(defaults: defaults).load(), .weightedByRecency)
+    }
+
     private func makeModel(service: DeterministicMusicService) -> AppModel {
         AppModel(
             library: service,
             playbackTransport: service,
             modelContext: modelContext,
-            appSettings: appSettings
+            appSettings: appSettings,
+            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults)
         )
     }
 }

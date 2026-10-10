@@ -34,6 +34,7 @@ final class AppModel {
         playbackTransport: PlaybackTransport,
         modelContext: ModelContext,
         appSettings: AppSettings,
+        savedAlgorithm: SavedShuffleAlgorithm,
         lifecyclePersistenceHook: (() -> Void)? = nil,
         scrobblingEnabled: Bool = true
     ) {
@@ -47,7 +48,8 @@ final class AppModel {
                 libraryCatalog: library,
                 algorithm: { [appSettings] in appSettings.autofillAlgorithm }
             ),
-            initialAlgorithm: appSettings.shuffleAlgorithm,
+            initialAlgorithm: savedAlgorithm.load(),
+            saveAlgorithm: { savedAlgorithm.save($0) },
             lifecyclePersistenceHook: lifecyclePersistenceHook
         )
 

@@ -50,7 +50,8 @@ struct AppComposition {
                     library: AppleMusicService(),
                     playbackTransport: MusicKitTransport(),
                     modelContext: modelContainer.mainContext,
-                    appSettings: appSettings
+                    appSettings: appSettings,
+                    savedAlgorithm: SavedShuffleAlgorithm()
                 ),
                 showsStartupSplash: true
             )
@@ -63,8 +64,9 @@ struct AppComposition {
             let defaults = isolatedDefaults()
             let appSettings = AppSettings(defaults: defaults)
             appSettings.currentThemeId = "silver"
-            appSettings.shuffleAlgorithm = .weightedByPlayCount
             appSettings.autofillAlgorithm = .random
+            let savedAlgorithm = SavedShuffleAlgorithm(defaults: defaults)
+            savedAlgorithm.save(.weightedByPlayCount)
 
             let musicService = DeterministicMusicService(
                 configuration: .init(
@@ -82,6 +84,7 @@ struct AppComposition {
                     playbackTransport: musicService,
                     modelContext: modelContainer.mainContext,
                     appSettings: appSettings,
+                    savedAlgorithm: savedAlgorithm,
                     scrobblingEnabled: false
                 ),
                 showsStartupSplash: false

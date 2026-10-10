@@ -64,9 +64,6 @@ struct MainView: View {
         .onChange(of: model.launchPhase) { _, _ in
             dismissSplashIfReady()
         }
-        .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
-            model.sessionDraft.stage(newAlgorithm)
-        }
         .sheet(isPresented: $showingPicker) {
             songPickerSheet(onDismiss: { showingPicker = false })
         }

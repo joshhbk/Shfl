@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ShuffleAlgorithmSettingsView: View {
-    @Environment(\.appSettings) private var appSettings
+    @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
 
     private let columns = [
@@ -31,8 +31,7 @@ struct ShuffleAlgorithmSettingsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button {
-                // MainView has already applied the chosen algorithm to the
-                // next shuffle.
+                // The chosen algorithm is already staged on the draft.
                 Task { await sessionHost?.startFreshShuffle() }
             } label: {
                 if sessionHost?.isStartingSession == true {
@@ -55,11 +54,11 @@ struct ShuffleAlgorithmSettingsView: View {
             ForEach(ShuffleAlgorithm.allCases, id: \.self) { algorithm in
                 AlgorithmCard(
                     algorithm: algorithm,
-                    isSelected: appSettings?.shuffleAlgorithm == algorithm,
+                    isSelected: sessionDraft.algorithm == algorithm,
                     action: {
-                        guard appSettings?.shuffleAlgorithm != algorithm else { return }
+                        guard sessionDraft.algorithm != algorithm else { return }
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            appSettings?.shuffleAlgorithm = algorithm
+                            sessionDraft.stage(algorithm)
                         }
                     }
                 )
@@ -67,15 +66,12 @@ struct ShuffleAlgorithmSettingsView: View {
         }
     }
 
-    @ViewBuilder
     private var descriptionSection: some View {
-        if let algorithm = appSettings?.shuffleAlgorithm {
-            Text(algorithm.description)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 4)
-        }
+        Text(sessionDraft.algorithm.description)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
     }
 }
 
@@ -135,5 +131,4 @@ private struct SelectionCardGlassStyle: ViewModifier {
     NavigationStack {
         ShuffleAlgorithmSettingsView()
     }
-    .environment(\.appSettings, AppSettings())
 }

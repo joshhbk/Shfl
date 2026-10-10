@@ -181,6 +181,16 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(try archive.load().session, validRecord)
     }
 
+    func testStagingAnAlgorithmSavesIt() async {
+        var saved: [ShuffleAlgorithm] = []
+        let host = makeHost(saveAlgorithm: { saved.append($0) })
+
+        host.sessionDraft.stage(.artistSpacing)
+        await waitUntil { saved == [.artistSpacing] }
+
+        XCTAssertEqual(saved, [.artistSpacing])
+    }
+
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
         var persistCallCount = 0
         let host = makeHost(lifecyclePersistenceHook: { persistCallCount += 1 })
@@ -433,6 +443,7 @@ final class ListeningSessionHostTests: XCTestCase {
         autofillSource: StubAutofillSource? = nil,
         makeSeed: @escaping () -> UInt64 = { 1 },
         now: @escaping () -> Date = Date.init,
+        saveAlgorithm: @escaping (ShuffleAlgorithm) -> Void = { _ in },
         lifecyclePersistenceHook: (() -> Void)? = nil
     ) -> ListeningSessionHost {
         let autofillSource = autofillSource ?? StubAutofillSource(songs: [])
@@ -440,6 +451,7 @@ final class ListeningSessionHostTests: XCTestCase {
             playbackTransport: mockService,
             archive: archive,
             autofillSource: autofillSource,
+            saveAlgorithm: saveAlgorithm,
             makeSeed: makeSeed,
             now: now,
             lifecyclePersistenceHook: lifecyclePersistenceHook

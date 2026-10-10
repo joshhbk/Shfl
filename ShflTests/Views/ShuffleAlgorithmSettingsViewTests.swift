@@ -4,23 +4,26 @@ import SwiftUI
 
 final class ShuffleAlgorithmSettingsViewTests: XCTestCase {
 
+    private let suiteName = "ShuffleAlgorithmSettingsViewTests"
+
     override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: "shuffleAlgorithm")
+        UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
         super.tearDown()
     }
 
-    func testDefaultAlgorithmIsNoRepeat() {
-        UserDefaults.standard.removeObject(forKey: "shuffleAlgorithm")
-        let raw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")
-        let algorithm = raw.flatMap { ShuffleAlgorithm(rawValue: $0) } ?? .noRepeat
-        XCTAssertEqual(algorithm, .noRepeat)
+    @MainActor
+    func testDefaultAlgorithmIsNoRepeat() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        XCTAssertEqual(SavedShuffleAlgorithm(defaults: defaults).load(), .noRepeat)
     }
 
-    func testAlgorithmPersistsToUserDefaults() {
-        UserDefaults.standard.set(ShuffleAlgorithm.artistSpacing.rawValue, forKey: "shuffleAlgorithm")
-        let raw = UserDefaults.standard.string(forKey: "shuffleAlgorithm")!
-        let algorithm = ShuffleAlgorithm(rawValue: raw)
-        XCTAssertEqual(algorithm, .artistSpacing)
+    @MainActor
+    func testAlgorithmPersistsToTheShuffleAlgorithmKey() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        SavedShuffleAlgorithm(defaults: defaults).save(.artistSpacing)
+
+        XCTAssertEqual(defaults.string(forKey: "shuffleAlgorithm"), "artistSpacing")
+        XCTAssertEqual(SavedShuffleAlgorithm(defaults: defaults).load(), .artistSpacing)
     }
 
     func testAllAlgorithmsHaveDescriptions() {
