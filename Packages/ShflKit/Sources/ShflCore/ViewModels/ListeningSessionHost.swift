@@ -4,8 +4,8 @@ import Foundation
 @Observable
 @MainActor
 public final class ListeningSessionHost {
-    @ObservationIgnored public let sessionDraft: SessionDraftStore
-    @ObservationIgnored public let player: ShufflePlayer
+    @ObservationIgnored package let sessionDraft: SessionDraftStore
+    @ObservationIgnored package let player: ShufflePlayer
 
     /// True from the moment a listening session is asked for until it has
     /// loaded, including any autofill beforehand.
@@ -119,7 +119,7 @@ public final class ListeningSessionHost {
     /// Reinstates the saved song pool and, when still valid, the saved session.
     /// Returns whether a saved session was loaded into the player.
     @discardableResult
-    public func restoreSavedSession() async -> Bool {
+    package func restoreSavedSession() async -> Bool {
         let archived = (try? await archive.loadAsync()) ?? .empty
         committedSession = archived.session
 
@@ -160,7 +160,8 @@ public final class ListeningSessionHost {
         }
     }
 
-    public func sceneDidLeaveForeground() {
+    /// Saves the live playback position on the active session.
+    package func sceneDidLeaveForeground() {
         print("📱 Scene left the foreground - checkpointing session...")
         checkpoint(position: playbackTransport.currentPlaybackTime)
         lifecyclePersistenceHook?()

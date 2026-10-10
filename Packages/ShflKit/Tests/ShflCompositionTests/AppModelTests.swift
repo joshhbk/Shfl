@@ -16,11 +16,34 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.sessionDraft.songs, [song])
     }
 
+    func testDraftEditorShowsTheDraftItEdits() {
+        let picked = DeterministicLibrary.sample.songs[0]
+        let model = AppModel.preview(draft: [picked])
+        let editor = model.makeDraftEditor()
+
+        XCTAssertTrue(editor.draft === model.sessionDraft)
+        XCTAssertEqual(editor.draft.songs, [picked])
+
+        editor.toggle(DeterministicLibrary.sample.songs[1])
+        XCTAssertEqual(model.sessionDraft.songCount, 2)
+        XCTAssertEqual(editor.draft.remainingCapacity, model.sessionDraft.remainingCapacity)
+    }
+
+    func testEditorAutofillFillsAnEmptyDraftFromTheLibrary() async {
+        let model = AppModel.preview(library: .launch)
+        let editor = model.makeDraftEditor()
+
+        await editor.autofill(using: model.makeLibraryBrowser())
+
+        XCTAssertEqual(Set(model.sessionDraft.songs.map(\.id)), Set(DeterministicLibrary.launch.songs.map(\.id)))
+        XCTAssertTrue(editor.autofillIsExhausted)
+    }
+
     func testScreensBrowseTheLaunchesLibrary() async {
         let model = AppModel.preview(library: .sample)
         let playlist = DeterministicLibrary.sample.playlists[0]
 
-        let artistSongs = model.makeSongs(by: "Pink Floyd")
+        let artistSongs = model.makeSongs(by: Artist(id: "Pink Floyd", name: "Pink Floyd"))
         let playlistSongs = model.makeSongs(in: playlist)
         await artistSongs.loadInitialPage()
         await playlistSongs.loadInitialPage()

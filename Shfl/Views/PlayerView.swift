@@ -7,25 +7,28 @@ import Vortex
 
 struct PlayerView: View {
     var player: ShufflePlayer
+    let draft: SessionDraftStore
+    /// Called once, when the player first appears.
+    let makePlaybackClock: () -> PlaybackClock
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
     let onSkipForwardTapped: () -> Void
     let onSkipBackTapped: () -> Void
 
     @Environment(\.appearanceSettings) private var appearanceSettings
-    @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
     @Environment(\.artworkStore) private var artworkStore
     @State private var themeController: ThemeController
     @State private var tintProvider: TintedThemeProvider
-    @State private var playbackClock: PlaybackClock
+    @State private var playbackClock: PlaybackClock?
     @State private var colorExtractor = AlbumArtColorExtractor()
     @State private var showError = false
     @State private var errorMessage = ""
 
     init(
         player: ShufflePlayer,
-        playbackClock: PlaybackClock,
+        draft: SessionDraftStore,
+        makePlaybackClock: @escaping () -> PlaybackClock,
         initialThemeId: String? = nil,
         onAddTapped: @escaping () -> Void = {},
         onSettingsTapped: @escaping () -> Void = {},
@@ -33,7 +36,8 @@ struct PlayerView: View {
         onSkipBackTapped: @escaping () -> Void = {}
     ) {
         self.player = player
-        self._playbackClock = State(wrappedValue: playbackClock)
+        self.draft = draft
+        self.makePlaybackClock = makePlaybackClock
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
         self.onSkipForwardTapped = onSkipForwardTapped
@@ -58,7 +62,7 @@ struct PlayerView: View {
 
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
-                    hasSongs: !sessionDraft.isEmpty,
+                    hasSongs: !draft.isEmpty,
                     playbackClock: playbackClock,
                     onPlayPause: { Task { await sessionHost?.togglePlayback() } },
                     onSkipForward: onSkipForwardTapped,
@@ -66,7 +70,7 @@ struct PlayerView: View {
                     onAdd: onAddTapped,
                     onSettings: onSettingsTapped,
                     onSeek: { time in
-                        playbackClock.handleUserSeek(to: time)
+                        playbackClock?.handleUserSeek(to: time)
                         player.seek(to: time)
                     },
                     isShuffling: isStartingSession,
@@ -86,7 +90,10 @@ struct PlayerView: View {
         .simultaneousGesture(themeController.makeSwipeGesture())
         .environment(\.shuffleTheme, tintProvider.computedTheme)
         .onAppear {
-            playbackClock.startUpdating(playbackState: player.playbackState)
+            if playbackClock == nil {
+                playbackClock = makePlaybackClock()
+            }
+            playbackClock?.startUpdating(playbackState: player.playbackState)
 
             // Initialize tint provider with current theme
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
@@ -96,7 +103,7 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
-            playbackClock.stopUpdating()
+            playbackClock?.stopUpdating()
         }
         .onChange(of: player.playbackState) { _, newState in
             handlePlaybackStateChange(newState)
@@ -136,7 +143,7 @@ struct PlayerView: View {
             }
         }
 
-        playbackClock.handlePlaybackStateChange(newState)
+        playbackClock?.handlePlaybackStateChange(newState)
 
         if let song = newState.currentSong {
             colorExtractor.updateColor(for: song.id, lookUpColors: artworkColorLookup)
@@ -256,14 +263,14 @@ private struct PlayerViewPreviewHost: View {
     var body: some View {
         PlayerView(
             player: model.player,
-            playbackClock: model.makePlaybackClock(),
+            draft: model.sessionDraft,
+            makePlaybackClock: model.makePlaybackClock,
             initialThemeId: themeId,
             onAddTapped: {},
             onSettingsTapped: {},
             onSkipForwardTapped: {},
             onSkipBackTapped: {}
         )
-        .environment(\.sessionDraft, model.sessionDraft)
     }
 }
 

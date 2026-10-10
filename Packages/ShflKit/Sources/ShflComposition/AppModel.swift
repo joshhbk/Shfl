@@ -107,8 +107,8 @@ public final class AppModel {
         LibraryBrowser(libraryCatalog: library, preferences: libraryPreferences)
     }
 
-    public func makeSongs(by artistName: String) -> ArtistDetailViewModel {
-        ArtistDetailViewModel(artistName: artistName, libraryCatalog: library)
+    public func makeSongs(by artist: Artist) -> ArtistDetailViewModel {
+        ArtistDetailViewModel(artistName: artist.name, libraryCatalog: library)
     }
 
     public func makeSongs(in playlist: Playlist) -> PlaylistDetailViewModel {

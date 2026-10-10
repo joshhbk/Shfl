@@ -1,9 +1,11 @@
+import ShflComposition
 import ShflCore
 import SwiftUI
 
 struct ShuffleAlgorithmSettingsView: View {
-    @Environment(\.sessionDraft) private var sessionDraft
+    @Environment(SessionDraftStore.self) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
+    @Environment(\.shufflePlayer) private var player
 
     private let columns = [
         GridItem(.flexible()),
@@ -15,7 +17,7 @@ struct ShuffleAlgorithmSettingsView: View {
             VStack(spacing: 24) {
                 algorithmGrid
                 descriptionSection
-                if sessionHost?.player.activeSession != nil {
+                if player?.activeSession != nil {
                     nextShuffleSection
                 }
             }
@@ -132,4 +134,5 @@ private struct SelectionCardGlassStyle: ViewModifier {
     NavigationStack {
         ShuffleAlgorithmSettingsView()
     }
+    .environment(AppModel.preview().sessionDraft)
 }

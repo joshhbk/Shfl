@@ -4,6 +4,7 @@ import XCTest
 import ShflComposition
 import ShflCore
 import ShflDeterministic
+import ShflLastFM
 
 /// Builds real screens in a window and lets SwiftUI tear them down, the way
 /// closing a sheet or popping a screen does. Under Xcode 27, a main-actor class
@@ -17,10 +18,10 @@ final class ViewTeardownTests: XCTestCase {
             SongPickerView(
                 browser: model.makeLibraryBrowser(),
                 editor: model.makeDraftEditor(),
+                makeArtistSongs: model.makeSongs(by:),
+                makePlaylistSongs: model.makeSongs(in:),
                 onDismiss: {}
             )
-            .environment(\.sessionDraft, model.sessionDraft)
-            .environment(model)
         )
     }
 
@@ -29,9 +30,9 @@ final class ViewTeardownTests: XCTestCase {
         try await showThenTearDown(
             PlayerView(
                 player: model.player,
-                playbackClock: model.makePlaybackClock()
+                draft: model.sessionDraft,
+                makePlaybackClock: model.makePlaybackClock
             )
-            .environment(\.sessionDraft, model.sessionDraft)
         )
     }
 
@@ -40,7 +41,7 @@ final class ViewTeardownTests: XCTestCase {
             NavigationStack {
                 LastFMSettingsView()
             }
-            .environment(AppModel.preview(library: .empty))
+            .environment(LastFMAccount.preview())
         )
     }
 

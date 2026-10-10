@@ -82,7 +82,6 @@ struct MainView: View {
                 .tint(deviceAccentColor)
                 .environment(\.libraryPreferences, model.libraryPreferences)
                 .environment(\.appearanceSettings, appearanceSettings)
-                .environment(\.shufflePlayer, model.player)
         }
         .alert("Authorization Required", isPresented: $showingAuthorizationAlert) {
             Button("Open Settings") {
@@ -95,9 +94,10 @@ struct MainView: View {
             Text("Apple Music access is required to use Shuffled. Please enable it in Settings.")
         }
         // Kept last so the sheets above can read them too.
-        .environment(\.sessionDraft, model.sessionDraft)
+        .environment(\.shufflePlayer, model.player)
         .environment(\.listeningSessionHost, model.sessionHost)
-        .environment(model)
+        .environment(model.sessionDraft)
+        .environment(model.lastFM)
     }
 
     @ViewBuilder
@@ -105,6 +105,8 @@ struct MainView: View {
         SongPickerView(
             browser: model.makeLibraryBrowser(),
             editor: model.makeDraftEditor(),
+            makeArtistSongs: model.makeSongs(by:),
+            makePlaylistSongs: model.makeSongs(in:),
             onDismiss: onDismiss
         )
         .tint(deviceAccentColor)
@@ -131,7 +133,8 @@ struct MainView: View {
         case .ready:
             PlayerView(
                 player: model.player,
-                playbackClock: model.makePlaybackClock(),
+                draft: model.sessionDraft,
+                makePlaybackClock: model.makePlaybackClock,
                 initialThemeId: appearanceSettings.currentThemeId,
                 onAddTapped: { showingPicker = true },
                 onSettingsTapped: { showingSettings = true },

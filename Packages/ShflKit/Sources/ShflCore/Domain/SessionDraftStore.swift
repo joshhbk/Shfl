@@ -24,7 +24,7 @@ public final class SessionDraftStore {
 
     public nonisolated static let defaultAlgorithm = SessionDraft.defaultAlgorithm
 
-    public init(algorithm: ShuffleAlgorithm = SessionDraftStore.defaultAlgorithm) {
+    package init(algorithm: ShuffleAlgorithm = SessionDraftStore.defaultAlgorithm) {
         draft = SessionDraft(algorithm: algorithm)
     }
 

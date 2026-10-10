@@ -18,7 +18,7 @@ struct DebugQueueView: View {
 private struct DebugListeningSessionContent: View {
     let player: ShufflePlayer
 
-    @Environment(\.sessionDraft) private var sessionDraft
+    @Environment(SessionDraftStore.self) private var sessionDraft
     @State private var showingResetConfirmation = false
     @State private var copiedAt: Date?
 
@@ -146,6 +146,6 @@ private struct DebugListeningSessionContent: View {
     return NavigationStack {
         DebugQueueView()
             .environment(\.shufflePlayer, model.player)
-            .environment(\.sessionDraft, model.sessionDraft)
+            .environment(model.sessionDraft)
     }
 }

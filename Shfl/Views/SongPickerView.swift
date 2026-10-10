@@ -38,33 +38,39 @@ enum BrowseMode: String, CaseIterable {
 }
 
 struct SongPickerView: View {
+    let makeArtistSongs: (Artist) -> ArtistDetailViewModel
+    let makePlaylistSongs: (Playlist) -> PlaylistDetailViewModel
     let onDismiss: () -> Void
 
     @State private var browser: LibraryBrowser
     @State private var editor: SessionDraftEditor
     /// Why the last edit failed, shown for three seconds.
-    @State private var draftEditFailure: String?
+    @State private var draftEditFailure: DraftEditFailure?
     @State private var navigationPath = NavigationPath()
     @State private var showingAutofillCompletion = false
     @State private var autofillTapCount = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFieldFocused: Bool
 
-    @Environment(\.sessionDraft) private var sessionDraft
-    @Environment(\.listeningSessionHost) private var sessionHost
+    @Environment(\.shufflePlayer) private var player
     @Environment(\.shuffleTheme) private var shuffleTheme
 
-    /// - Parameter editor: Edits the draft the environment's `sessionDraft`
-    ///   shows.
     init(
         browser: LibraryBrowser,
         editor: SessionDraftEditor,
+        makeArtistSongs: @escaping (Artist) -> ArtistDetailViewModel,
+        makePlaylistSongs: @escaping (Playlist) -> PlaylistDetailViewModel,
         onDismiss: @escaping () -> Void
     ) {
+        self.makeArtistSongs = makeArtistSongs
+        self.makePlaylistSongs = makePlaylistSongs
         self.onDismiss = onDismiss
         self._browser = State(wrappedValue: browser)
         self._editor = State(wrappedValue: editor)
     }
+
+    /// The draft the editor edits; the picker reads no other.
+    private var sessionDraft: SessionDraftStore { editor.draft }
 
     private var browseMode: BrowseMode {
         BrowseMode(lane: browser.activeLane)
@@ -143,9 +149,9 @@ struct SongPickerView: View {
                 .accessibilityIdentifier("songPicker.scope")
             }
 
-            SessionChangesBanner()
+            SessionChangesBanner(draft: sessionDraft)
         }
-        .animation(reduceMotion ? nil : .snappy, value: sessionHost?.player.hasPendingSessionChanges)
+        .animation(reduceMotion ? nil : .snappy, value: player?.hasPendingSessionChanges)
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 12)
@@ -304,6 +310,7 @@ struct SongPickerView: View {
         case .artists:
             ArtistListView(
                 browser: browser,
+                makeArtistSongs: makeArtistSongs,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
                 onToggleSong: toggle
@@ -311,6 +318,7 @@ struct SongPickerView: View {
         case .playlists:
             PlaylistListView(
                 browser: browser,
+                makePlaylistSongs: makePlaylistSongs,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
                 onToggleSong: toggle
@@ -437,6 +445,7 @@ struct SongPickerView: View {
     private var artistSearchResultsList: some View {
         ArtistListView(
             browser: browser,
+            makeArtistSongs: makeArtistSongs,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
             onToggleSong: toggle,
@@ -460,6 +469,7 @@ struct SongPickerView: View {
     private var playlistSearchResultsList: some View {
         PlaylistListView(
             browser: browser,
+            makePlaylistSongs: makePlaylistSongs,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
             onToggleSong: toggle,
@@ -510,7 +520,7 @@ struct SongPickerView: View {
         if hasOverlayMessage {
             VStack(spacing: 8) {
                 if let draftEditFailure {
-                    Text(draftEditFailure)
+                    Text(draftEditFailure.message)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(.white)
@@ -563,7 +573,7 @@ struct SongPickerView: View {
         case .added(_, reachedMilestone: true):
             HapticFeedback.milestone.trigger()
         case .failed(let message):
-            draftEditFailure = message
+            draftEditFailure = DraftEditFailure(message: message)
         case .added, .removed, .rejectedAtCapacity:
             // SongRow plays its own feedback, including the nope animation
             // at capacity.
@@ -575,16 +585,9 @@ struct SongPickerView: View {
         autofillTapCount += 1
         HapticFeedback.light.trigger()
         Task { @MainActor in
-            let requestedCount = sessionDraft.remainingCapacity
-            await browser.autofill(into: sessionDraft)
-
+            await editor.autofill(using: browser)
             if case .completed(let count) = browser.autofillState {
                 showingAutofillCompletion = count > 0
-                editor.noteAutofillCompleted(
-                    addedCount: count,
-                    requestedCount: requestedCount,
-                    remainingCapacity: sessionDraft.remainingCapacity
-                )
             }
         }
     }
@@ -619,6 +622,13 @@ struct SongPickerView: View {
     }
 }
 
+/// One failed edit. Each gets its own identity, so failing the same way twice
+/// shows the pill for another full three seconds.
+private struct DraftEditFailure: Equatable {
+    let id = UUID()
+    let message: String
+}
+
 // MARK: - Previews
 
 private struct SongPickerPreview: View {
@@ -632,10 +642,10 @@ private struct SongPickerPreview: View {
         SongPickerView(
             browser: model.makeLibraryBrowser(),
             editor: model.makeDraftEditor(),
+            makeArtistSongs: model.makeSongs(by:),
+            makePlaylistSongs: model.makeSongs(in:),
             onDismiss: {}
         )
-        .environment(\.sessionDraft, model.sessionDraft)
-        .environment(model)
     }
 }
 

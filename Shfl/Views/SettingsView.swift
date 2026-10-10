@@ -1,3 +1,4 @@
+import ShflComposition
 import SwiftUI
 
 struct SettingsView: View {
@@ -65,5 +66,9 @@ struct SettingsView: View {
 }
 
 #Preview {
-    SettingsView()
+    let model = AppModel.preview()
+    return SettingsView()
+        .environment(\.shufflePlayer, model.player)
+        .environment(model.sessionDraft)
+        .environment(model.lastFM)
 }

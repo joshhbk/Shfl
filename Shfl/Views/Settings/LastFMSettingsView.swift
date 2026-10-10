@@ -1,13 +1,10 @@
 import AuthenticationServices
-import ShflComposition
 import ShflLastFM
 import SwiftUI
 
 struct LastFMSettingsView: View {
-    @Environment(AppModel.self) private var model
+    @Environment(LastFMAccount.self) private var account
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
-
-    private var account: LastFMAccount { model.lastFM }
 
     var body: some View {
         List {
@@ -37,7 +34,7 @@ struct LastFMSettingsView: View {
         }
         .task {
             await account.syncConnectionStatusOnly()
-            await account.refreshActivity(showLoading: true)
+            await account.refreshActivity(showLoading: !account.recentTracksState.hasLoadedTracks)
         }
     }
 
@@ -270,5 +267,5 @@ private struct RecentTrackRow: View {
     NavigationStack {
         LastFMSettingsView()
     }
-    .environment(AppModel.preview())
+    .environment(LastFMAccount.preview())
 }

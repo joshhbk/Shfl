@@ -10,14 +10,15 @@ public enum DraftEdit: Equatable {
 }
 
 /// The song picker's edits to one session draft, and whether autofill has run
-/// out of songs.
+/// out of songs. The picker reads the draft here too, so it always shows the
+/// draft it edits.
 @Observable
 @MainActor
 public final class SessionDraftEditor {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     public private(set) var autofillIsExhausted = false
 
-    @ObservationIgnored private let draft: SessionDraftStore
+    @ObservationIgnored public let draft: SessionDraftStore
 
     package init(draft: SessionDraftStore) {
         self.draft = draft
@@ -52,7 +53,23 @@ public final class SessionDraftEditor {
         draft.removeAll()
     }
 
-    public func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
+    /// Fills the draft from `browser`'s library, which reports progress and
+    /// the outcome in its `autofillState`.
+    public func autofill(using browser: LibraryBrowser) async {
+        let requestedCount = draft.remainingCapacity
+        await browser.autofill(into: draft)
+        if case .completed(let count) = browser.autofillState {
+            noteAutofillCompleted(
+                addedCount: count,
+                requestedCount: requestedCount,
+                remainingCapacity: draft.remainingCapacity
+            )
+        }
+    }
+
+    /// Autofill is exhausted when it came back short while there was still
+    /// room, so the library has no more songs to offer.
+    func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
         autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
     }
 }
