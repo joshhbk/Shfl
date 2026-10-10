@@ -1,4 +1,5 @@
 import ShflCore
+import ShflDeterministic
 import SwiftUI
 
 enum BrowseMode: String, CaseIterable {
@@ -618,44 +619,9 @@ struct SongPickerView: View {
 
 // MARK: - Previews
 
-private enum PreviewPickerLibrary {
-    static let sampleSongs: [Song] = [
-        Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil, playCount: 142),
-        Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil, playCount: 98),
-        Song(id: "3", title: "Hotel California", artist: "Eagles", albumTitle: "Hotel California", artworkURL: nil, playCount: 76),
-        Song(id: "4", title: "Comfortably Numb", artist: "Pink Floyd", albumTitle: "The Wall", artworkURL: nil, playCount: 63),
-        Song(id: "5", title: "Sweet Child O' Mine", artist: "Guns N' Roses", albumTitle: "Appetite for Destruction", artworkURL: nil, playCount: 55),
-        Song(id: "6", title: "Wish You Were Here", artist: "Pink Floyd", albumTitle: "Wish You Were Here", artworkURL: nil, playCount: 49),
-        Song(id: "7", title: "Back in Black", artist: "AC/DC", albumTitle: "Back in Black", artworkURL: nil, playCount: 41),
-        Song(id: "8", title: "Imagine", artist: "John Lennon", albumTitle: "Imagine", artworkURL: nil, playCount: 37),
-        Song(id: "9", title: "Hey Jude", artist: "The Beatles", albumTitle: "Hey Jude", artworkURL: nil, playCount: 30),
-        Song(id: "10", title: "Smells Like Teen Spirit", artist: "Nirvana", albumTitle: "Nevermind", artworkURL: nil, playCount: 25),
-    ]
-
-    static let samplePlaylists: [Playlist] = [
-        Playlist(id: "p1", name: "Classic Rock Hits"),
-        Playlist(id: "p2", name: "Road Trip Mix"),
-        Playlist(id: "p3", name: "Chill Vibes"),
-    ]
-
-    static func makeService() -> DeterministicMusicService {
-        DeterministicMusicService(
-            configuration: .init(
-                librarySongs: sampleSongs,
-                libraryPlaylists: samplePlaylists,
-                playlistSongs: [
-                    "p1": Array(sampleSongs.prefix(3)),
-                    "p2": Array(sampleSongs.dropFirst(3).prefix(3)),
-                    "p3": Array(sampleSongs.dropFirst(6).prefix(3))
-                ]
-            )
-        )
-    }
-}
-
 #Preview("Songs Tab") {
     SongPickerView(
-        libraryCatalog: PreviewPickerLibrary.makeService(),
+        libraryCatalog: DeterministicMusicService(library: .sample),
         libraryPreferences: LibraryPreferences(),
         onDismiss: {}
     )
@@ -663,10 +629,10 @@ private enum PreviewPickerLibrary {
 
 #Preview("With Selected Songs") {
     let draft = SessionDraftStore()
-    try? draft.add(Array(PreviewPickerLibrary.sampleSongs.prefix(5)))
+    try? draft.add(Array(DeterministicLibrary.sample.songs.prefix(5)))
 
     return SongPickerView(
-        libraryCatalog: PreviewPickerLibrary.makeService(),
+        libraryCatalog: DeterministicMusicService(library: .sample),
         libraryPreferences: LibraryPreferences(),
         onDismiss: {}
     )

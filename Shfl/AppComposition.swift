@@ -1,5 +1,6 @@
 import Foundation
 import ShflCore
+import ShflDeterministic
 import SwiftData
 
 /// The single place where Shfl chooses concrete adapters and storage.
@@ -74,14 +75,7 @@ struct AppComposition {
             let savedAlgorithm = SavedShuffleAlgorithm(defaults: defaults)
             savedAlgorithm.save(.weightedByPlayCount)
 
-            let musicService = DeterministicMusicService(
-                configuration: .init(
-                    librarySongs: deterministicSongs,
-                    libraryPlaylists: deterministicPlaylists,
-                    playlistSongs: ["scenario-playlist": deterministicSongs],
-                    playbackDuration: 180
-                )
-            )
+            let musicService = DeterministicMusicService(library: .launch)
             return AppComposition(
                 modelContainer: modelContainer,
                 libraryPreferences: libraryPreferences,
@@ -106,35 +100,4 @@ struct AppComposition {
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
     }
-
-    private static let deterministicSongs = [
-        Song(
-            id: "scenario-low-tide",
-            title: "Low Tide",
-            artist: "Harbour Lights",
-            albumTitle: "Deterministic Sessions",
-            artworkURL: nil,
-            playCount: 0
-        ),
-        Song(
-            id: "scenario-second-wind",
-            title: "Second Wind",
-            artist: "Northern Static",
-            albumTitle: "Deterministic Sessions",
-            artworkURL: nil,
-            playCount: 1
-        ),
-        Song(
-            id: "scenario-afterglow",
-            title: "Afterglow",
-            artist: "Paper Satellites",
-            albumTitle: "Deterministic Sessions",
-            artworkURL: nil,
-            playCount: 2
-        )
-    ]
-
-    private static let deterministicPlaylists = [
-        Playlist(id: "scenario-playlist", name: "Deterministic Sessions")
-    ]
 }

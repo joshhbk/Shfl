@@ -1,6 +1,7 @@
 import XCTest
 @testable import Shfl
 @testable import ShflCore
+@testable import ShflDeterministic
 
 @MainActor
 final class ShufflePlayerTests: XCTestCase {

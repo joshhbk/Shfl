@@ -2,6 +2,7 @@ import SwiftUI
 import XCTest
 @testable import Shfl
 @testable import ShflCore
+@testable import ShflDeterministic
 
 /// Builds real screens in a window and lets SwiftUI tear them down, the way
 /// closing a sheet or popping a screen does. Under Xcode 27, a main-actor class

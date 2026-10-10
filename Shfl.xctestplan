@@ -25,6 +25,13 @@
         "identifier" : "ShflCoreTests",
         "name" : "ShflCoreTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflDeterministicTests",
+        "name" : "ShflDeterministicTests"
+      }
     }
   ],
   "version" : 1

@@ -29,6 +29,7 @@ let package = Package(
     ],
     products: [
         .library(name: "ShflCore", targets: ["ShflCore"]),
+        .library(name: "ShflDeterministic", targets: ["ShflDeterministic"]),
     ],
     targets: [
         // Foundation, Observation and SwiftData only; scripts/check-core-imports.sh enforces it.
@@ -39,6 +40,18 @@ let package = Package(
         .testTarget(
             name: "ShflCoreTests",
             dependencies: ["ShflCore"],
+            swiftSettings: testSettings
+        ),
+        /// An in-memory library and transport for tests, previews and
+        /// `--deterministic` launches.
+        .target(
+            name: "ShflDeterministic",
+            dependencies: ["ShflCore"],
+            swiftSettings: librarySettings
+        ),
+        .testTarget(
+            name: "ShflDeterministicTests",
+            dependencies: ["ShflDeterministic"],
             swiftSettings: testSettings
         ),
     ]

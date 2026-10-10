@@ -1,4 +1,5 @@
 import ShflCore
+import ShflDeterministic
 import SwiftUI
 import UIKit
 

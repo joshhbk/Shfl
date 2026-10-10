@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import Shfl
 @testable import ShflCore
+@testable import ShflDeterministic
 
 /// Playback scenarios that run unchanged against both transports: the
 /// deterministic adapter, and the MusicKit adapter over a fake player that

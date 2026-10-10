@@ -7,15 +7,33 @@ import Synchronization
 /// It uses the same music seam as MusicKit. Catalog results are supplied at
 /// construction time, and playback time advances only when `advance(by:)` is
 /// called. No Apple Music account, network, or wall clock is involved.
-actor DeterministicMusicService {
-    nonisolated struct Configuration: Sendable {
-        var isAuthorized = true
-        var librarySongs: [Song] = []
-        var libraryPlaylists: [Playlist] = []
-        var playlistSongs: [String: [Song]] = [:]
-        var playbackDuration: TimeInterval = 180
-        var playbackTime: TimeInterval = 0
-        var playbackState: PlaybackState = .empty
+public actor DeterministicMusicService {
+    public nonisolated struct Configuration: Sendable {
+        public var isAuthorized = true
+        public var librarySongs: [Song] = []
+        public var libraryPlaylists: [Playlist] = []
+        public var playlistSongs: [String: [Song]] = [:]
+        public var playbackDuration: TimeInterval = 180
+        public var playbackTime: TimeInterval = 0
+        public var playbackState: PlaybackState = .empty
+
+        public init(
+            isAuthorized: Bool = true,
+            librarySongs: [Song] = [],
+            libraryPlaylists: [Playlist] = [],
+            playlistSongs: [String: [Song]] = [:],
+            playbackDuration: TimeInterval = 180,
+            playbackTime: TimeInterval = 0,
+            playbackState: PlaybackState = .empty
+        ) {
+            self.isAuthorized = isAuthorized
+            self.librarySongs = librarySongs
+            self.libraryPlaylists = libraryPlaylists
+            self.playlistSongs = playlistSongs
+            self.playbackDuration = playbackDuration
+            self.playbackTime = playbackTime
+            self.playbackState = playbackState
+        }
     }
 
     private nonisolated struct PlaybackSnapshot: Sendable {
@@ -41,7 +59,7 @@ actor DeterministicMusicService {
     private var sessionHasEnded = false
     private nonisolated let playbackSnapshot: Mutex<PlaybackSnapshot>
 
-    init(configuration: Configuration = Configuration()) {
+    public init(configuration: Configuration = Configuration()) {
         authorizationResult = configuration.isAuthorized
         librarySongs = configuration.librarySongs
         libraryPlaylists = configuration.libraryPlaylists
@@ -56,7 +74,7 @@ actor DeterministicMusicService {
         )
     }
 
-    nonisolated var playbackEvents: AsyncStream<PlaybackEvent> {
+    public nonisolated var playbackEvents: AsyncStream<PlaybackEvent> {
         AsyncStream { continuation in
             let id = UUID()
             Task { await self.addContinuation(continuation, id: id) }
@@ -66,25 +84,25 @@ actor DeterministicMusicService {
         }
     }
 
-    nonisolated var currentPlaybackTime: TimeInterval {
+    public nonisolated var currentPlaybackTime: TimeInterval {
         playbackSnapshot.withLock { $0.time }
     }
 
-    nonisolated var currentSongDuration: TimeInterval {
+    public nonisolated var currentSongDuration: TimeInterval {
         playbackSnapshot.withLock { $0.duration }
     }
 
-    nonisolated var currentSongId: String? {
+    public nonisolated var currentSongId: String? {
         playbackSnapshot.withLock { $0.currentSongID }
     }
 
-    var isAuthorized: Bool { authorizationResult }
+    public var isAuthorized: Bool { authorizationResult }
 
-    func requestAuthorization() async -> Bool {
+    public func requestAuthorization() async -> Bool {
         authorizationResult
     }
 
-    func fetchLibrarySongs(
+    public func fetchLibrarySongs(
         sortedBy sortOption: SortOption,
         limit: Int,
         offset: Int
@@ -93,7 +111,7 @@ actor DeterministicMusicService {
         return page(sorted(librarySongs, by: sortOption), limit: limit, offset: offset)
     }
 
-    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    public func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
         let matches = librarySongs.filter {
             $0.title.localizedCaseInsensitiveContains(query)
                 || $0.artist.localizedCaseInsensitiveContains(query)
@@ -101,39 +119,39 @@ actor DeterministicMusicService {
         return page(matches, limit: limit, offset: offset)
     }
 
-    func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
+    public func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
         let matches = artists.filter { $0.name.localizedCaseInsensitiveContains(query) }
         let bounds = pageBounds(count: matches.count, limit: limit, offset: offset)
         return ArtistPage(artists: Array(matches[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
+    public func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
         let matches = libraryPlaylists.filter { $0.name.localizedCaseInsensitiveContains(query) }
         let bounds = pageBounds(count: matches.count, limit: limit, offset: offset)
         return PlaylistPage(playlists: Array(matches[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
+    public func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
         let artists = self.artists
         let bounds = pageBounds(count: artists.count, limit: limit, offset: offset)
         return ArtistPage(artists: Array(artists[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
+    public func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
         let bounds = pageBounds(count: libraryPlaylists.count, limit: limit, offset: offset)
         return PlaylistPage(playlists: Array(libraryPlaylists[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    public func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
         let songs = librarySongs.filter { $0.artist == artistName }
         return page(songs, limit: limit, offset: offset)
     }
 
-    func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    public func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
         page(playlistSongs[playlistId] ?? [], limit: limit, offset: offset)
     }
 
-    func load(_ request: PlaybackLoadRequest) async throws {
+    public func load(_ request: PlaybackLoadRequest) async throws {
         if let nextLoadError {
             self.nextLoadError = nil
             throw nextLoadError
@@ -159,17 +177,17 @@ actor DeterministicMusicService {
         )
     }
 
-    func play() async throws {
+    public func play() async throws {
         guard queuedSongs.indices.contains(currentIndex) else { return }
         publish(.stateChanged(.playing(queuedSongs[currentIndex])))
     }
 
-    func pause() async {
+    public func pause() async {
         guard let song = currentState.currentSong else { return }
         publish(.stateChanged(.paused(song)))
     }
 
-    func skipToNext() async throws {
+    public func skipToNext() async throws {
         guard !queuedSongs.isEmpty else { return }
         guard currentIndex + 1 < queuedSongs.count else {
             finishSession()
@@ -181,7 +199,7 @@ actor DeterministicMusicService {
         publish(.stateChanged(.playing(queuedSongs[currentIndex])))
     }
 
-    func skipToPrevious() async throws {
+    public func skipToPrevious() async throws {
         guard !queuedSongs.isEmpty else { return }
         currentIndex = max(0, currentIndex - 1)
         updateSnapshot(time: 0)
@@ -189,7 +207,7 @@ actor DeterministicMusicService {
         publish(.stateChanged(.playing(queuedSongs[currentIndex])))
     }
 
-    func restartOrSkipToPrevious() async throws {
+    public func restartOrSkipToPrevious() async throws {
         if currentPlaybackTime > 3 {
             seek(to: 0)
         } else {
@@ -197,11 +215,11 @@ actor DeterministicMusicService {
         }
     }
 
-    nonisolated func seek(to time: TimeInterval) {
+    public nonisolated func seek(to time: TimeInterval) {
         playbackSnapshot.withLock { $0.time = max(0, time) }
     }
 
-    func clear() async {
+    public func clear() async {
         queuedSongs = []
         currentIndex = 0
         sessionHasEnded = false

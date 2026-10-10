@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Shfl
 @testable import ShflCore
+@testable import ShflDeterministic
 
 @Suite("PlaybackClock Tests")
 @MainActor
