@@ -1,0 +1,45 @@
+// swift-tools-version: 6.2
+import PackageDescription
+
+// Must match the app target's Swift settings, so moved code keeps its isolation.
+let upcomingFeatures: [SwiftSetting] = [
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("DisableOutwardActorInference"),
+    .enableUpcomingFeature("InferSendableFromCaptures"),
+    .enableUpcomingFeature("GlobalActorIsolatedTypesUsability"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+]
+
+let librarySettings: [SwiftSetting] = [
+    .swiftLanguageMode(.v5),
+    .defaultIsolation(MainActor.self),
+] + upcomingFeatures
+
+let testSettings: [SwiftSetting] = [
+    .swiftLanguageMode(.v5),
+] + upcomingFeatures
+
+let package = Package(
+    name: "ShflKit",
+    platforms: [
+        .iOS(.v26),
+        .macOS(.v26),
+        .visionOS("26.2"),
+    ],
+    products: [
+        .library(name: "ShflCore", targets: ["ShflCore"]),
+    ],
+    targets: [
+        // Foundation, Observation and SwiftData only; scripts/check-core-imports.sh enforces it.
+        .target(
+            name: "ShflCore",
+            swiftSettings: librarySettings
+        ),
+        .testTarget(
+            name: "ShflCoreTests",
+            dependencies: ["ShflCore"],
+            swiftSettings: testSettings
+        ),
+    ]
+)

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Shfl
+@testable import ShflCore
 
 @Suite("AutofillSource Protocol Tests")
 struct AutofillSourceTests {

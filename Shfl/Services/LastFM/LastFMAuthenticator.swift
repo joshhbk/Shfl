@@ -6,9 +6,6 @@ nonisolated struct LastFMSession: Codable, Equatable, Sendable {
     let username: String
 }
 
-/// Where the listener approves Shfl, and the URL scheme Last.fm redirects to
-/// afterwards. Run it in a web authentication session that watches for
-/// `callbackURLScheme`.
 nonisolated struct LastFMSignIn: Equatable, Sendable {
     let url: URL
     let callbackURLScheme: String
@@ -33,11 +30,7 @@ extension LastFMAuthError: LocalizedError {
     }
 }
 
-/// Signs the listener in to Last.fm and keeps their session in the keychain.
-///
-/// Sign-in is two steps around a web authentication session the shell runs:
-/// run `signIn()`, then hand the URL Last.fm redirects to back to
-/// `completeSignIn(callbackURL:)`.
+/// Run signIn() in a web authentication session, then pass the redirect URL to completeSignIn(callbackURL:).
 actor LastFMAuthenticator {
     typealias Fetch = @Sendable (URL) async throws -> Data
 
@@ -131,8 +124,6 @@ actor LastFMAuthenticator {
 
     // MARK: - Sign-in
 
-    /// The Last.fm page where the listener approves Shfl, which redirects to
-    /// the callback scheme with a token.
     nonisolated func signIn() throws -> LastFMSignIn {
         let authURLString = "https://www.last.fm/api/auth/?api_key=\(apiKey)&cb=\(Self.callbackURLScheme)://lastfm"
         guard let authURL = URL(string: authURLString) else {
@@ -141,8 +132,6 @@ actor LastFMAuthenticator {
         return LastFMSignIn(url: authURL, callbackURLScheme: Self.callbackURLScheme)
     }
 
-    /// Finishes sign-in with the URL Last.fm redirected to: trades its token
-    /// for a session and stores the session in the keychain.
     func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
         guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
               let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {

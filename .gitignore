@@ -10,7 +10,7 @@ DerivedData/
 
 # Swift Package Manager
 .build/
-Packages/
+.swiftpm/
 Package.resolved
 
 # CocoaPods

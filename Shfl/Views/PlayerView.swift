@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 import Vortex
 
@@ -111,8 +112,7 @@ struct PlayerView: View {
         .onChange(of: colorExtractor.extractedColor) { _, newColor in
             tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)
         }
-        // Two-way theme sync with AppearanceSettings; the onChange cycle ends only because
-        // ThemeController.setTheme(byId:) and AppearanceSettings.currentThemeId both ignore no-op writes.
+        // This two-way sync only terminates because both sides ignore no-op writes.
         .onChange(of: themeController.currentTheme) { _, newTheme in
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: newTheme)
             appearanceSettings?.currentThemeId = newTheme.id

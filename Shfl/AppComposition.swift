@@ -1,4 +1,5 @@
 import Foundation
+import ShflCore
 import SwiftData
 
 /// The single place where Shfl chooses concrete adapters and storage.
@@ -15,8 +16,6 @@ struct AppComposition {
     let libraryPreferences: LibraryPreferences
     let appearanceSettings: AppearanceSettings
     let appModel: AppModel
-    /// Live launches look artwork up in the Apple Music library; deterministic
-    /// launches have none and show placeholders.
     let artworkStore: ArtworkStore?
     let showsStartupSplash: Bool
 

@@ -1,50 +1,32 @@
 #!/bin/bash
-# Fails when a core-bound file imports a UI or Apple Music framework.
-#
-# Core-bound files move into the ShflCore package, which may import only
-# Foundation, Observation and SwiftData. Run from anywhere in the repo:
-#   scripts/check-core-imports.sh
+# Fails when a ShflCore source imports anything but Foundation, Observation or SwiftData.
+# Packages can import Apple frameworks without declaring them, so the compiler can't catch this.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-core_paths=(
-    Shfl/Domain
-    Shfl/Data
-    Shfl/ViewModels
-    Shfl/Services/Scrobbling
-)
+core_sources=Packages/ShflKit/Sources/ShflCore
 
-forbidden='^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+((typealias|struct|class|enum|protocol|var|func)[[:space:]]+)?(SwiftUI|UIKit|AppKit|MusicKit|MediaPlayer)([.[:space:]]|$)'
+allowed='Foundation|Observation|SwiftData'
 
-# Core-bound files allowed a forbidden import until a scheduled PR removes it;
-# name that PR beside each path.
-known_exceptions=()
-
-is_known_exception() {
-    local file=$1
-    local exception
-    for exception in ${known_exceptions[@]+"${known_exceptions[@]}"}; do
-        [[ "$file" == "$exception" ]] && return 0
-    done
-    return 1
-}
+# Matches attributed, scoped and submodule imports; captures the top-level module.
+import_line='^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+((typealias|struct|class|enum|protocol|var|func|let|actor)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)'
 
 violations=0
 while IFS= read -r -d '' file; do
-    if matches=$(grep -nE "$forbidden" "$file"); then
-        if is_known_exception "$file"; then
-            continue
+    while IFS= read -r match; do
+        [[ -z "$match" ]] && continue
+        line=${match#*:}
+        module=$(sed -E "s/${import_line}.*/\4/" <<< "$line")
+        if ! [[ "$module" =~ ^($allowed)$ ]]; then
+            echo "$file:$match"
+            violations=$((violations + 1))
         fi
-        while IFS= read -r line; do
-            echo "$file:$line"
-        done <<< "$matches"
-        violations=$((violations + 1))
-    fi
-done < <(find "${core_paths[@]}" -name '*.swift' -print0 | sort -z)
+    done <<< "$(grep -nE "$import_line" "$file" || true)"
+done < <(find "$core_sources" -name '*.swift' -print0 | sort -z)
 
 if (( violations > 0 )); then
-    echo "error: $violations core-bound file(s) import SwiftUI, UIKit, AppKit, MusicKit or MediaPlayer." >&2
+    echo "error: $violations import(s) in ShflCore outside Foundation, Observation and SwiftData." >&2
     exit 1
 fi
 

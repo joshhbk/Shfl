@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 
 struct PlaylistListView: View {
