@@ -1,40 +1,25 @@
-import MusicKit
 import SwiftUI
 
+/// A 44pt rounded artwork tile for list rows, with an icon for the kind of
+/// item until its artwork loads.
 struct EntityArtwork: View {
-    let entityId: String
-    let type: ArtworkCache.ArtworkType
-
-    @State private var artwork: Artwork?
+    let subject: ArtworkSubject
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
             .fill(Color.gray.opacity(0.2))
             .frame(width: 44, height: 44)
             .overlay {
-                if let artwork {
-                    ArtworkImage(artwork, width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                } else {
+                ArtworkView(subject: subject, size: 44) {
                     Image(systemName: iconName)
                         .foregroundStyle(.gray)
                 }
-            }
-            .task(id: entityId) {
-                artwork = ArtworkCache.shared.artwork(for: entityId)
-                guard artwork == nil else { return }
-
-                ArtworkCache.shared.requestArtwork(for: entityId, type: type)
-
-                for await loadedArtwork in ArtworkCache.shared.artworkUpdates(for: entityId) {
-                    artwork = loadedArtwork
-                    break
-                }
+                .clipShape(RoundedRectangle(cornerRadius: 4))
             }
     }
 
     private var iconName: String {
-        switch type {
+        switch subject {
         case .song: "music.note"
         case .artist: "person.fill"
         case .playlist: "music.note.list"

@@ -168,9 +168,14 @@ actor LastFMTransport: ScrobbleTransport {
 
     // MARK: - Authentication
 
-    @MainActor
-    func authenticate() async throws -> LastFMSession {
-        let session = try await authenticator.authenticate()
+    nonisolated func signIn() throws -> LastFMSignIn {
+        try authenticator.signIn()
+    }
+
+    /// Finishes sign-in with the URL Last.fm redirected to, then sends any
+    /// scrobbles queued while signed out.
+    func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
+        let session = try await authenticator.completeSignIn(callbackURL: callbackURL)
         await client.setSessionKey(session.sessionKey)
         await flushQueue()
         return session

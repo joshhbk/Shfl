@@ -35,6 +35,13 @@ final class ViewTeardownTests: XCTestCase {
         )
     }
 
+    func test_leavingLastFMSettingsReleasesItsStateWithoutCrashing() async throws {
+        try await showThenTearDown(
+            NavigationStack {
+                LastFMSettingsView()
+            }
+        )
+    }
 
     private func showThenTearDown(_ view: some View) async throws {
         let window = UIWindow(frame: UIScreen.main.bounds)

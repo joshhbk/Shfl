@@ -15,6 +15,9 @@ struct AppComposition {
     let libraryPreferences: LibraryPreferences
     let appearanceSettings: AppearanceSettings
     let appModel: AppModel
+    /// Live launches look artwork up in the Apple Music library; deterministic
+    /// launches have none and show placeholders.
+    let artworkStore: ArtworkStore?
     let showsStartupSplash: Bool
 
     static func selectedMode(
@@ -55,6 +58,7 @@ struct AppComposition {
                     libraryPreferences: libraryPreferences,
                     savedAlgorithm: SavedShuffleAlgorithm()
                 ),
+                artworkStore: ArtworkStore(),
                 showsStartupSplash: true
             )
 
@@ -91,6 +95,7 @@ struct AppComposition {
                     savedAlgorithm: savedAlgorithm,
                     scrobblingEnabled: false
                 ),
+                artworkStore: nil,
                 showsStartupSplash: false
             )
         }
