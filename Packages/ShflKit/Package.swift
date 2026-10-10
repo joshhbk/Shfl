@@ -29,7 +29,6 @@ let package = Package(
     ],
     products: [
         .library(name: "ShflCore", targets: ["ShflCore"]),
-        .library(name: "ShflAppleMusic", targets: ["ShflAppleMusic"]),
         .library(name: "ShflAppleMusicUI", targets: ["ShflAppleMusicUI"]),
         .library(name: "ShflComposition", targets: ["ShflComposition"]),
         .library(name: "ShflDeterministic", targets: ["ShflDeterministic"]),
