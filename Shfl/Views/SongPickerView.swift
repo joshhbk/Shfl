@@ -108,6 +108,7 @@ struct SongPickerView: View {
                     modernCompletionBar
                 }
             }
+            .animation(.default, value: editor.actionErrorMessage)
             .accessibilityElement(children: .contain)
             .accessibilitySortPriority(-1)
         }
@@ -124,7 +125,6 @@ struct SongPickerView: View {
                 Text(error)
             }
         }
-        .animation(.default, value: editor.actionErrorMessage)
         .tint(pickerAccentColor)
     }
 
