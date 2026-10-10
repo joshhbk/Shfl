@@ -25,7 +25,6 @@ struct LaunchRootView: View {
             AuthorizationDeniedView()
         case .ready:
             MainSplitView(
-                makePlaybackClock: model.makePlaybackClock,
                 makeArtistSongs: model.makeSongs(by:),
                 makePlaylistSongs: model.makeSongs(in:)
             )
