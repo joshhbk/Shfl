@@ -7,25 +7,25 @@ struct PlaybackCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Playback") {
+            // No Space equivalent here: MainSplitView handles Space so text fields keep it.
             Button(player.playbackState.isPlaying ? "Pause" : "Play") {
                 Task { await sessionHost.togglePlayback() }
             }
-            .keyboardShortcut(.space, modifiers: [])
             .disabled(sessionHost.isStartingSession)
 
             Divider()
 
             Button("Previous") {
-                Task { try? await player.restartOrSkipToPrevious() }
+                Task { await sessionHost.skipToPrevious() }
             }
-            .keyboardShortcut(.leftArrow, modifiers: .command)
-            .disabled(player.activeSession == nil)
+            .keyboardShortcut(.leftArrow, modifiers: [.option, .command])
+            .disabled(!sessionHost.canSkip)
 
             Button("Next") {
-                Task { try? await player.skipToNext() }
+                Task { await sessionHost.skipToNext() }
             }
-            .keyboardShortcut(.rightArrow, modifiers: .command)
-            .disabled(player.activeSession == nil)
+            .keyboardShortcut(.rightArrow, modifiers: [.option, .command])
+            .disabled(!sessionHost.canSkip)
 
             Divider()
 

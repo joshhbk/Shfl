@@ -1,46 +1,37 @@
+import AppKit
 import ShflCore
 import SwiftUI
 
 struct MainSplitView: View {
-    let makePlaybackClock: () -> PlaybackClock
-    let makeArtistSongs: (Artist) -> ArtistDetailViewModel
-    let makePlaylistSongs: (Playlist) -> PlaylistDetailViewModel
-
     @State private var selection: SidebarItem? = .songs
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @FocusState private var isSearchFocused: Bool
     @Environment(LibraryBrowser.self) private var browser
+    @Environment(ListeningSessionHost.self) private var sessionHost
 
     var body: some View {
-        @Bindable var browser = browser
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(selection: $selection)
         } detail: {
-            DetailColumn(
-                item: selection ?? .songs,
-                makeArtistSongs: makeArtistSongs,
-                makePlaylistSongs: makePlaylistSongs
-            )
-            .toolbar { LibraryToolbar() }
+            DetailColumn(place: selection ?? .songs, isSearchFocused: $isSearchFocused)
+                .toolbar { LibraryToolbar() }
         }
-        .searchable(text: $browser.searchText, placement: .toolbar, prompt: searchPrompt)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 DraftFailureMessage()
-                NowPlayingBar(makePlaybackClock: makePlaybackClock)
+                NowPlayingBar()
             }
         }
+        .onKeyPress(.space, action: playPauseFromSpace)
         .onChange(of: selection, initial: true) {
             browser.activeLane = (selection ?? .songs).libraryLane
         }
     }
 
-    private var searchPrompt: String {
-        switch selection ?? .songs {
-        case .songs: "Search Songs"
-        case .artists: "Search Artists"
-        case .playlists: "Search Playlists"
-        case .selected: "Search Selected"
-        case .upNext: "Search"
-        }
+    // A menu key equivalent for Space would also take the spaces typed into text fields.
+    private func playPauseFromSpace() -> KeyPress.Result {
+        guard !isSearchFocused, !(NSApp.keyWindow?.firstResponder is NSText) else { return .ignored }
+        Task { await sessionHost.togglePlayback() }
+        return .handled
     }
 }
