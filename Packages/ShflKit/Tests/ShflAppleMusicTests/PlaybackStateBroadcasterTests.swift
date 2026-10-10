@@ -1,5 +1,5 @@
 import XCTest
-@testable import Shfl
+@testable import ShflAppleMusic
 @testable import ShflCore
 
 @MainActor

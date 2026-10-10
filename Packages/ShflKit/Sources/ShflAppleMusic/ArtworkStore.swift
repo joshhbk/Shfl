@@ -4,7 +4,7 @@ import ShflCore
 
 /// Batches library lookups so artwork-heavy lists don't overwhelm MusicKit.
 @MainActor
-final class ArtworkStore {
+public final class ArtworkStore {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
 
     typealias Loader = @MainActor ([ArtworkSubject]) async -> [ArtworkSubject: Artwork]
@@ -21,14 +21,22 @@ final class ArtworkStore {
     private var waiters: [ArtworkSubject: [UUID: AsyncStream<Artwork?>.Continuation]] = [:]
 
     init(
-        load: @escaping Loader = ArtworkStore.loadFromLibrary,
+        load: @escaping Loader,
         pauseBetweenBatches: Duration = .milliseconds(100)
     ) {
         self.load = load
         self.pauseBetweenBatches = pauseBetweenBatches
     }
 
-    func artwork(for subject: ArtworkSubject) async -> Artwork? {
+    /// Looks artwork up in the Apple Music library.
+    public convenience init() {
+        self.init(load: ArtworkStore.loadFromLibrary)
+    }
+
+    /// The subject's artwork, looking it up if this launch hasn't yet.
+    /// Returns nil when the subject has no artwork, the lookup fails, or the
+    /// calling task is cancelled while waiting.
+    public func artwork(for subject: ArtworkSubject) async -> Artwork? {
         if let cached = cache[subject] {
             return cached
         }

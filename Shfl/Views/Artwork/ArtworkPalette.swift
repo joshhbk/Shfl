@@ -1,4 +1,5 @@
 import MusicKit
+import ShflAppleMusic
 import ShflCore
 import SwiftUI
 

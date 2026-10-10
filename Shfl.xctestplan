@@ -32,6 +32,13 @@
         "identifier" : "ShflDeterministicTests",
         "name" : "ShflDeterministicTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflAppleMusicTests",
+        "name" : "ShflAppleMusicTests"
+      }
     }
   ],
   "version" : 1

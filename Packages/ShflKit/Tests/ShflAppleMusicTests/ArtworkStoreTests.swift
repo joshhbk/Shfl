@@ -1,7 +1,7 @@
 import Foundation
 import MusicKit
 import Testing
-@testable import Shfl
+@testable import ShflAppleMusic
 @testable import ShflCore
 
 @Suite("ArtworkStore Tests")

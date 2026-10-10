@@ -1,5 +1,5 @@
 import Foundation
-@testable import Shfl
+@testable import ShflAppleMusic
 @testable import ShflCore
 
 /// A stand-in for MusicKit's application player that reproduces the behaviour

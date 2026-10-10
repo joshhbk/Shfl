@@ -29,6 +29,7 @@ let package = Package(
     ],
     products: [
         .library(name: "ShflCore", targets: ["ShflCore"]),
+        .library(name: "ShflAppleMusic", targets: ["ShflAppleMusic"]),
         .library(name: "ShflDeterministic", targets: ["ShflDeterministic"]),
     ],
     targets: [
@@ -39,7 +40,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ShflCoreTests",
-            dependencies: ["ShflCore"],
+            dependencies: ["ShflCore", "ShflTestSupport"],
             swiftSettings: testSettings
         ),
         /// An in-memory library and transport for tests, previews and
@@ -52,6 +53,23 @@ let package = Package(
         .testTarget(
             name: "ShflDeterministicTests",
             dependencies: ["ShflDeterministic"],
+            swiftSettings: testSettings
+        ),
+        /// The MusicKit adapters: library catalog, playback transport and
+        /// artwork lookup.
+        .target(
+            name: "ShflAppleMusic",
+            dependencies: ["ShflCore"],
+            swiftSettings: librarySettings
+        ),
+        .testTarget(
+            name: "ShflAppleMusicTests",
+            dependencies: ["ShflAppleMusic", "ShflDeterministic", "ShflTestSupport"],
+            swiftSettings: testSettings
+        ),
+        /// Helpers shared by the test targets. No product, so nothing ships it.
+        .target(
+            name: "ShflTestSupport",
             swiftSettings: testSettings
         ),
     ]

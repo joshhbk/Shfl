@@ -2,15 +2,17 @@ import Foundation
 import XCTest
 
 @MainActor
-func waitForStateUpdate() async {
-    // 30 yields drains the deepest hop chain in the tests (mock actor → stream → main-actor observer).
+public func waitForStateUpdate() async {
+    // Multiple yields drain pending observer tasks across actor hops
+    // (mock actor → AsyncStream → player MainActor observer → state update).
+    // 30 yields handles the deepest chains we see in practice.
     for _ in 0..<30 {
         await Task.yield()
     }
 }
 
 @MainActor
-func waitUntil(
+public func waitUntil(
     timeout: Duration = .seconds(1),
     _ condition: @MainActor () -> Bool,
     file: StaticString = #filePath,

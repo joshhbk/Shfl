@@ -1,3 +1,4 @@
+import ShflAppleMusic
 import SwiftUI
 
 extension EnvironmentValues {

@@ -49,6 +49,20 @@
                ReferencedContainer = "container:Packages/ShflKit">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ShflAppleMusicTests"
+               BuildableName = "ShflAppleMusicTests"
+               BlueprintName = "ShflAppleMusicTests"
+               ReferencedContainer = "container:Packages/ShflKit">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

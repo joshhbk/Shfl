@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
-@testable import Shfl
+@testable import ShflAppleMusic
 @testable import ShflCore
 @testable import ShflDeterministic
 

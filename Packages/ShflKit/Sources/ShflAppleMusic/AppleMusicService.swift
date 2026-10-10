@@ -2,20 +2,26 @@ import Foundation
 import MusicKit
 import ShflCore
 
-/// Nonisolated: stateless, and MusicKit's library requests don't need the main actor.
-nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
-    var isAuthorized: Bool {
+/// MusicKit authorization and library catalog. Playback lives in
+/// `MusicKitTransport`.
+///
+/// Nonisolated: it holds no state, and MusicKit's library requests don't need
+/// the main actor.
+public nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
+    public init() {}
+
+    public var isAuthorized: Bool {
         get async {
             MusicAuthorization.currentStatus == .authorized
         }
     }
 
-    func requestAuthorization() async -> Bool {
+    public func requestAuthorization() async -> Bool {
         let status = await MusicAuthorization.request()
         return status == .authorized
     }
 
-    func fetchLibrarySongs(
+    public func fetchLibrarySongs(
         sortedBy: SortOption,
         limit: Int,
         offset: Int
@@ -55,7 +61,7 @@ nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
         return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
-    func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
+    public func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
         var request = MusicLibraryRequest<MusicKit.Artist>()
         request.limit = limit
         request.offset = offset
@@ -74,7 +80,7 @@ nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
         return ArtistPage(artists: artists, hasMore: hasMore)
     }
 
-    func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
+    public func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
         var request = MusicLibraryRequest<MusicKit.Playlist>()
         request.limit = limit
         request.offset = offset
@@ -93,7 +99,7 @@ nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
         return PlaylistPage(playlists: playlists, hasMore: hasMore)
     }
 
-    func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    public func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
         var request = MusicLibraryRequest<MusicKit.Song>()
         request.limit = limit
         request.offset = offset
@@ -118,7 +124,7 @@ nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
         return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
-    func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    public func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
         // Fetch the playlist by ID, then get its tracks
         var request = MusicLibraryRequest<MusicKit.Playlist>()
         request.filter(matching: \.id, equalTo: MusicItemID(playlistId))
@@ -158,7 +164,7 @@ nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
         return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
-    func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    public func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
         // Note: MusicLibrarySearchRequest doesn't support offset-based pagination.
         // We fetch with a higher limit and slice the results to simulate offset.
         // This is a workaround since MusicKit's nextBatch() requires storing the collection.
@@ -190,7 +196,7 @@ nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
         return LibraryPage(songs: songs, hasMore: hasMore)
     }
 
-    func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
+    public func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
         var request = MusicLibrarySearchRequest(term: query, types: [MusicKit.Artist.self])
         request.limit = offset + limit
 
@@ -211,7 +217,7 @@ nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
         return ArtistPage(artists: artists, hasMore: hasMore)
     }
 
-    func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
+    public func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
         var request = MusicLibrarySearchRequest(term: query, types: [MusicKit.Playlist.self])
         request.limit = offset + limit
 

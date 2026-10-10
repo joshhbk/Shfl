@@ -1,4 +1,5 @@
 import Foundation
+import ShflAppleMusic
 import ShflCore
 import ShflDeterministic
 import SwiftData
