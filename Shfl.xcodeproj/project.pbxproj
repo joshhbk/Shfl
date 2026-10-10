@@ -32,6 +32,7 @@
 		DC1306952EFDBDA300200F38 /* Shfl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shfl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCAA00062F10000000000006 /* ShflKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = ShflKit; path = Packages/ShflKit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -96,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				DCBD255D2F0CCD9E00E57867 /* Resources */,
+				DCAA00062F10000000000006 /* ShflKit */,
 				DC1306972EFDBDA300200F38 /* Shfl */,
 				DC1306A72EFDBDA400200F38 /* ShflTests */,
 				DC1306B12EFDBDA400200F38 /* ShflUITests */,

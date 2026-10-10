@@ -1,0 +1,31 @@
+{
+  "configurations" : [
+    {
+      "id" : "6B1C3E0A-5F2D-4C1B-9E0F-3A7D2B8C4E11",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Shfl.xcodeproj",
+        "identifier" : "DC1306A32EFDBDA400200F38",
+        "name" : "ShflTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflCoreTests",
+        "name" : "ShflCoreTests"
+      }
+    }
+  ],
+  "version" : 1
+}
