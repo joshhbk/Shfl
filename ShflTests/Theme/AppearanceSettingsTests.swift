@@ -19,10 +19,12 @@ final class AppearanceSettingsTests: XCTestCase {
     func testThemeIsSavedUnderTheExistingKey() throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         let settings = AppearanceSettings(defaults: defaults)
+        // The first-launch theme is random, and setting the current value saves nothing.
+        let chosen = try XCTUnwrap(ShuffleTheme.allThemes.first { $0.id != settings.currentThemeId }).id
 
-        settings.currentThemeId = "silver"
+        settings.currentThemeId = chosen
 
-        XCTAssertEqual(defaults.string(forKey: "currentThemeId"), "silver")
-        XCTAssertEqual(AppearanceSettings(defaults: defaults).currentThemeId, "silver")
+        XCTAssertEqual(defaults.string(forKey: "currentThemeId"), chosen)
+        XCTAssertEqual(AppearanceSettings(defaults: defaults).currentThemeId, chosen)
     }
 }
