@@ -1,4 +1,5 @@
 import Foundation
+import ShflCore
 
 /// What the MusicKit transport adapter needs from MusicKit's application player.
 ///
@@ -60,7 +61,7 @@ enum PlayerStatus: Equatable {
 /// - While a session is loaded, the brief empty and stopped reports MusicKit
 ///   makes between entries are not published. Completion is published once, as
 ///   `.sessionEnded`, after the player stays stopped on the final song.
-final class MusicKitTransport: PlaybackTransport {
+final class MusicKitTransport {
     private let player: MusicPlayerSurface
     private let confirmationDelay: () async -> Void
     private let playbackEventBroadcaster = PlaybackEventBroadcaster()
@@ -313,6 +314,9 @@ final class MusicKitTransport: PlaybackTransport {
         }
     }
 }
+
+// In an extension: on the class itself, a nonisolated protocol makes the whole class nonisolated.
+extension MusicKitTransport: PlaybackTransport {}
 
 final class PlaybackEventBroadcaster {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.

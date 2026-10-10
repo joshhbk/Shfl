@@ -1,19 +1,12 @@
 import Foundation
 import MusicKit
+import ShflCore
 
-/// Hands out MusicKit artwork for library items and remembers what it found
-/// for the rest of the launch.
-///
-/// Callers waiting on the same subject share one lookup, and lookups go to the
-/// library in small batches so artwork-heavy lists don't overwhelm MusicKit.
-/// Each caller awaits only its own subject, so a list of rows never fans out
-/// through global observation.
+/// Batches library lookups so artwork-heavy lists don't overwhelm MusicKit.
 @MainActor
 final class ArtworkStore {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
 
-    /// Looks up artwork for one batch of subjects. Subjects missing from the
-    /// result have no artwork (or could not be looked up).
     typealias Loader = @MainActor ([ArtworkSubject]) async -> [ArtworkSubject: Artwork]
 
     static let batchSize = 5
@@ -27,7 +20,6 @@ final class ArtworkStore {
     private var isProcessing = false
     private var waiters: [ArtworkSubject: [UUID: AsyncStream<Artwork?>.Continuation]] = [:]
 
-    /// - Parameter pauseBetweenBatches: Breathing room for MusicKit between batches.
     init(
         load: @escaping Loader = ArtworkStore.loadFromLibrary,
         pauseBetweenBatches: Duration = .milliseconds(100)
@@ -36,9 +28,6 @@ final class ArtworkStore {
         self.pauseBetweenBatches = pauseBetweenBatches
     }
 
-    /// The subject's artwork, looking it up if this launch hasn't yet.
-    /// Returns nil when the subject has no artwork, the lookup fails, or the
-    /// calling task is cancelled while waiting.
     func artwork(for subject: ArtworkSubject) async -> Artwork? {
         if let cached = cache[subject] {
             return cached

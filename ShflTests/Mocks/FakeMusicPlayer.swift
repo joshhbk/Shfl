@@ -1,5 +1,6 @@
 import Foundation
 @testable import Shfl
+@testable import ShflCore
 
 /// A stand-in for MusicKit's application player that reproduces the behaviour
 /// `MusicKitTransport` exists to absorb:

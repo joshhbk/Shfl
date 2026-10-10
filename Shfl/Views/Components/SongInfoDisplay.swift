@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 
 /// Displays song title, artist, and optional progress bar based on playback state

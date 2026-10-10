@@ -1,4 +1,5 @@
 import Foundation
+import ShflCore
 
 /// Best-effort persistent queue for Last.fm scrobbles.
 /// If the app terminates during flush, in-flight events are replayed on next launch.

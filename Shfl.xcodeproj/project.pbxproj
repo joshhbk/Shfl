@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00022F10000000000002 /* Vortex */; };
+		DCAA00042F10000000000004 /* ShflCore in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00032F10000000000003 /* ShflCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,7 @@
 		DC1306952EFDBDA300200F38 /* Shfl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shfl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCAA00062F10000000000006 /* ShflKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = ShflKit; path = Packages/ShflKit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -70,6 +72,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */,
+				DCAA00042F10000000000004 /* ShflCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				DCBD255D2F0CCD9E00E57867 /* Resources */,
+				DCAA00062F10000000000006 /* ShflKit */,
 				DC1306972EFDBDA300200F38 /* Shfl */,
 				DC1306A72EFDBDA400200F38 /* ShflTests */,
 				DC1306B12EFDBDA400200F38 /* ShflUITests */,
@@ -139,6 +143,7 @@
 			name = Shfl;
 			packageProductDependencies = (
 				DCAA00022F10000000000002 /* Vortex */,
+				DCAA00032F10000000000003 /* ShflCore */,
 			);
 			productName = Shfl;
 			productReference = DC1306952EFDBDA300200F38 /* Shfl.app */;
@@ -224,6 +229,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				DCAA00012F10000000000001 /* XCRemoteSwiftPackageReference "Vortex" */,
+				DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DC1306962EFDBDA300200F38 /* Products */;
@@ -654,6 +660,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ShflKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		DCAA00012F10000000000001 /* XCRemoteSwiftPackageReference "Vortex" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -670,6 +683,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DCAA00012F10000000000001 /* XCRemoteSwiftPackageReference "Vortex" */;
 			productName = Vortex;
+		};
+		DCAA00032F10000000000003 /* ShflCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

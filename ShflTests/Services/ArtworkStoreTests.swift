@@ -2,6 +2,7 @@ import Foundation
 import MusicKit
 import Testing
 @testable import Shfl
+@testable import ShflCore
 
 @Suite("ArtworkStore Tests")
 @MainActor
@@ -75,8 +76,7 @@ struct ArtworkStoreTests {
         let store = library.makeStore()
         let subjects = (1...7).map { ArtworkSubject.song(id: "song-\($0)") }
 
-        // Callers start in order on the main actor, ahead of the store's
-        // first batch, so the queue holds all seven when lookups begin.
+        // All seven callers enqueue before the first batch starts.
         let callers = subjects.map { subject in Task { await store.artwork(for: subject) } }
         for caller in callers {
             _ = await caller.value
@@ -113,8 +113,6 @@ struct ArtworkStoreTests {
     }
 }
 
-/// Stands in for the Apple Music library: answers each batch from a fixed
-/// table and records what it was asked for.
 @MainActor
 private final class FakeArtworkLibrary {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.

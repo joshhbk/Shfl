@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 
 enum BrowseMode: String, CaseIterable {
@@ -15,7 +16,6 @@ enum BrowseMode: String, CaseIterable {
         }
     }
 
-    /// The tab showing `lane`; nil means the picks.
     init(lane: LibraryLaneKind?) {
         switch lane {
         case .songs: self = .songs
@@ -25,7 +25,6 @@ enum BrowseMode: String, CaseIterable {
         }
     }
 
-    /// The catalog lane this tab browses, or nil for the picks.
     var laneKind: LibraryLaneKind? {
         switch self {
         case .songs: .songs
@@ -564,8 +563,7 @@ struct SongPickerView: View {
         case .added(_, reachedMilestone: true):
             HapticFeedback.milestone.trigger()
         case .added, .removed, .rejectedAtCapacity, .failed:
-            // SongRow plays its own feedback, including the nope animation
-            // at capacity; a failure shows the error pill.
+            // SongRow plays its own feedback; failures show the error pill.
             break
         }
     }

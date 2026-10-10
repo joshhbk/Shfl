@@ -1,7 +1,5 @@
 import Foundation
 
-/// The iOS app's look: which iPod theme is showing. A first launch picks a
-/// random theme. Each change is saved to UserDefaults straight away.
 @Observable
 @MainActor
 final class AppearanceSettings {

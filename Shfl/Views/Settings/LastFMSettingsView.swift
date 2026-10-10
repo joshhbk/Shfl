@@ -91,7 +91,6 @@ struct LastFMSettingsView: View {
         }
     }
 
-    /// Returns nil when the listener cancels.
     private func runWebSignIn(_ signIn: LastFMSignIn) async throws -> URL? {
         do {
             return try await webAuthenticationSession.authenticate(
