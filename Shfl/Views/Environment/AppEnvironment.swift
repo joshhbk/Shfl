@@ -15,8 +15,7 @@ extension EnvironmentValues {
     /// app's store; previews get an empty one.
     @Entry var sessionDraft = SessionDraftStore()
 
-    /// The launch's listening session host. `MainView` provides it; without
-    /// it there is nothing to start, so views do nothing rather than drive a
-    /// stand-in.
+    /// The launch's listening session host, provided by `MainView`. When it
+    /// is nil, such as in previews, controls that start playback do nothing.
     @Entry var listeningSessionHost: ListeningSessionHost? = nil
 }
