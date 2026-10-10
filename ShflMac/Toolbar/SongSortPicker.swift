@@ -2,16 +2,19 @@ import ShflCore
 import SwiftUI
 
 struct SongSortPicker: View {
-    @Environment(LibraryBrowser.self) private var browser
+    let selection: Binding<SortOption>
 
     var body: some View {
-        Picker(
-            "Sort Songs By",
-            selection: Binding(get: { browser.sortOption }, set: browser.chooseSortOption)
-        ) {
+        Picker("Sort Songs By", selection: selection) {
             ForEach(SortOption.allCases, id: \.self) { option in
                 Text(option.displayName).tag(option)
             }
         }
+    }
+}
+
+extension LibraryBrowser {
+    var sortSelection: Binding<SortOption> {
+        Binding(get: { self.sortOption }, set: { self.chooseSortOption($0) })
     }
 }

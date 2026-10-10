@@ -4,6 +4,8 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selection: SidebarItem?
 
+    @Environment(DraftEditing.self) private var drafting
+
     var body: some View {
         List(selection: $selection) {
             Section("Library") {
@@ -12,7 +14,7 @@ struct SidebarView: View {
                 }
             }
             Section("Session") {
-                SelectedSidebarRow()
+                SelectedSidebarRow(songCount: drafting.draft.songCount, capacity: drafting.draft.capacity)
                 SidebarRow(item: .upNext)
             }
         }
@@ -30,11 +32,13 @@ private struct SidebarRow: View {
     }
 }
 
+// Rows get values, not environment objects: rows AppKit builds for accessibility lack the environment.
 private struct SelectedSidebarRow: View {
-    @Environment(DraftEditing.self) private var drafting
+    let songCount: Int
+    let capacity: Int
 
     var body: some View {
         SidebarRow(item: .selected)
-            .badge(Text("\(drafting.draft.songCount) / \(drafting.draft.capacity)").monospacedDigit())
+            .badge(Text("\(songCount) / \(capacity)").monospacedDigit())
     }
 }
