@@ -14,7 +14,7 @@ struct PlayerView: View {
     @Environment(\.listeningSessionHost) private var sessionHost
     @State private var themeController: ThemeController
     @State private var tintProvider: TintedThemeProvider
-    @State private var progressState: PlayerProgressState?
+    @State private var playbackClock: PlaybackClock?
     @State private var colorExtractor = AlbumArtColorExtractor()
     @State private var showError = false
     @State private var errorMessage = ""
@@ -55,14 +55,14 @@ struct PlayerView: View {
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
                     hasSongs: !sessionDraft.isEmpty,
-                    progressState: progressState,
+                    playbackClock: playbackClock,
                     onPlayPause: { Task { await sessionHost?.togglePlayback() } },
                     onSkipForward: onSkipForwardTapped,
                     onSkipBack: onSkipBackTapped,
                     onAdd: onAddTapped,
                     onSettings: onSettingsTapped,
                     onSeek: { time in
-                        progressState?.handleUserSeek(to: time)
+                        playbackClock?.handleUserSeek(to: time)
                         player.seek(to: time)
                     },
                     isShuffling: isStartingSession,
@@ -82,10 +82,10 @@ struct PlayerView: View {
         .simultaneousGesture(themeController.makeSwipeGesture())
         .environment(\.shuffleTheme, tintProvider.computedTheme)
         .onAppear {
-            if progressState == nil {
-                progressState = PlayerProgressState(playbackTransport: playbackTransport)
+            if playbackClock == nil {
+                playbackClock = PlaybackClock(playbackTransport: playbackTransport)
             }
-            progressState?.startUpdating(playbackState: player.playbackState)
+            playbackClock?.startUpdating(playbackState: player.playbackState)
 
             // Initialize tint provider with current theme
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
@@ -95,7 +95,7 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
-            progressState?.stopUpdating()
+            playbackClock?.stopUpdating()
         }
         .onChange(of: player.playbackState) { _, newState in
             handlePlaybackStateChange(newState)
@@ -133,7 +133,7 @@ struct PlayerView: View {
             }
         }
 
-        progressState?.handlePlaybackStateChange(newState)
+        playbackClock?.handlePlaybackStateChange(newState)
 
         if let song = newState.currentSong {
             colorExtractor.updateColor(for: song.id)

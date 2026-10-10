@@ -4,7 +4,7 @@ import XCTest
 @testable import Shfl
 
 @MainActor
-final class AppViewModelLifecycleTests: XCTestCase {
+final class AppModelLifecycleTests: XCTestCase {
     private var container: ModelContainer!
     private var modelContext: ModelContext!
     private var mockService: DeterministicMusicService!
@@ -29,7 +29,7 @@ final class AppViewModelLifecycleTests: XCTestCase {
     }
 
     func testHandleDidEnterBackgroundPersistsSongsAndPlaybackState() async throws {
-        let viewModel = AppViewModel(
+        let model = AppModel(
             library: mockService,
             playbackTransport: mockService,
             modelContext: modelContext,
@@ -44,8 +44,8 @@ final class AppViewModelLifecycleTests: XCTestCase {
             artworkURL: nil
         )
 
-        try viewModel.sessionDraft.add(song)
-        await viewModel.sessionHost.startFreshShuffle()
+        try model.sessionDraft.add(song)
+        await model.sessionHost.startFreshShuffle()
         await mockService.setPlaybackTime(42)
 
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
@@ -62,14 +62,14 @@ final class AppViewModelLifecycleTests: XCTestCase {
 
     func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
         var persistCallCount = 0
-        let viewModel = AppViewModel(
+        let model = AppModel(
             library: mockService,
             playbackTransport: mockService,
             modelContext: modelContext,
             appSettings: appSettings,
             lifecyclePersistenceHook: { persistCallCount += 1 }
         )
-        _ = viewModel
+        _ = model
 
         NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
 

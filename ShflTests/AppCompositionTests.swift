@@ -23,24 +23,24 @@ final class AppCompositionTests: XCTestCase {
 
     func testDeterministicCompositionRunsKnownPlaybackScenario() async throws {
         let composition = try AppComposition.make(mode: .deterministic)
-        let viewModel = composition.appViewModel
+        let model = composition.appModel
         let transport = try XCTUnwrap(
-            viewModel.playbackTransport as? DeterministicMusicService
+            model.playbackTransport as? DeterministicMusicService
         )
 
         XCTAssertFalse(composition.showsStartupSplash)
 
-        await viewModel.onAppear()
-        XCTAssertTrue(viewModel.isAuthorized)
+        await model.onAppear()
+        XCTAssertTrue(model.isAuthorized)
 
         // Play on an empty draft autofills it from the library first.
-        await viewModel.sessionHost.togglePlayback()
-        XCTAssertEqual(viewModel.sessionDraft.songCount, 3)
-        XCTAssertEqual(viewModel.player.playbackState.currentSong?.title, "Low Tide")
+        await model.sessionHost.togglePlayback()
+        XCTAssertEqual(model.sessionDraft.songCount, 3)
+        XCTAssertEqual(model.player.playbackState.currentSong?.title, "Low Tide")
 
-        try await viewModel.player.skipToNext()
+        try await model.player.skipToNext()
         await waitUntil {
-            viewModel.player.playbackState.currentSong?.title == "Second Wind"
+            model.player.playbackState.currentSong?.title == "Second Wind"
         }
 
         let request = await transport.lastLoadRequest

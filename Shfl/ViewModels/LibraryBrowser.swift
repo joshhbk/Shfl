@@ -10,7 +10,7 @@ private final class SortOptionRef {
 
 @Observable
 @MainActor
-final class LibraryBrowserViewModel {
+final class LibraryBrowser {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     enum Mode: Equatable {
         case browse

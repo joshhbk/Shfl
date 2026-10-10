@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PlaylistListView: View {
-    @Bindable var viewModel: LibraryBrowserViewModel
+    @Bindable var browser: LibraryBrowser
     let libraryCatalog: LibraryCatalog
     let selectedSongIds: Set<String>
     let isAtCapacity: Bool
@@ -13,15 +13,15 @@ struct PlaylistListView: View {
     var onLoadMore: (() -> Void)? = nil
 
     private var displayedPlaylists: [Playlist] {
-        searchResults ?? viewModel.playlists
+        searchResults ?? browser.playlists
     }
 
     private var hasMore: Bool {
-        searchResults != nil ? hasMoreSearchResults : viewModel.hasMorePlaylists
+        searchResults != nil ? hasMoreSearchResults : browser.hasMorePlaylists
     }
 
     var body: some View {
-        if searchResults == nil && viewModel.playlistsLoading && viewModel.playlists.isEmpty {
+        if searchResults == nil && browser.playlistsLoading && browser.playlists.isEmpty {
             skeletonList
         } else if displayedPlaylists.isEmpty {
             ContentUnavailableView(
@@ -52,7 +52,7 @@ struct PlaylistListView: View {
                             if let onLoadMore {
                                 onLoadMore()
                             } else {
-                                Task { await viewModel.loadMorePlaylists() }
+                                Task { await browser.loadMorePlaylists() }
                             }
                         }
                 }

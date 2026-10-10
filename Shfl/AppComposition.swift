@@ -13,7 +13,7 @@ struct AppComposition {
 
     let modelContainer: ModelContainer
     let appSettings: AppSettings
-    let appViewModel: AppViewModel
+    let appModel: AppModel
     let showsStartupSplash: Bool
 
     static func selectedMode(
@@ -46,7 +46,7 @@ struct AppComposition {
             return AppComposition(
                 modelContainer: modelContainer,
                 appSettings: appSettings,
-                appViewModel: AppViewModel(
+                appModel: AppModel(
                     library: AppleMusicService(),
                     playbackTransport: MusicKitTransport(),
                     modelContext: modelContainer.mainContext,
@@ -77,7 +77,7 @@ struct AppComposition {
             return AppComposition(
                 modelContainer: modelContainer,
                 appSettings: appSettings,
-                appViewModel: AppViewModel(
+                appModel: AppModel(
                     library: musicService,
                     playbackTransport: musicService,
                     modelContext: modelContainer.mainContext,

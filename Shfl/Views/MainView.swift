@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MainView: View {
-    @Bindable var viewModel: AppViewModel
+    @Bindable var model: AppModel
     let appSettings: AppSettings
 
     @State private var hasStartedInitialLoad = false
@@ -10,11 +10,11 @@ struct MainView: View {
     @State private var hasDismissedStartupSplash = false
 
     init(
-        viewModel: AppViewModel,
+        model: AppModel,
         appSettings: AppSettings,
         showsStartupSplash: Bool = true
     ) {
-        self.viewModel = viewModel
+        self.model = model
         self.appSettings = appSettings
         _hasCompletedSplashTimeline = State(initialValue: !showsStartupSplash)
         _hasDismissedStartupSplash = State(initialValue: !showsStartupSplash)
@@ -31,10 +31,10 @@ struct MainView: View {
     }
 
     private var launchPhase: LaunchPhase {
-        if viewModel.isLoading {
+        if model.isLoading {
             return .loading
         }
-        return viewModel.isAuthorized ? .ready : .unauthorized
+        return model.isAuthorized ? .ready : .unauthorized
     }
 
     private var shouldShowStartupSplash: Bool {
@@ -71,25 +71,25 @@ struct MainView: View {
         .task {
             await startInitialLoadIfNeeded()
         }
-        .onChange(of: viewModel.isLoading) { _, _ in
+        .onChange(of: model.isLoading) { _, _ in
             dismissSplashIfReady()
         }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
-            viewModel.sessionDraft.stage(newAlgorithm)
+            model.sessionDraft.stage(newAlgorithm)
         }
-        .sheet(isPresented: $viewModel.showingPicker, onDismiss: { viewModel.closePicker() }) {
-            songPickerSheet(onDismiss: { viewModel.closePicker() })
+        .sheet(isPresented: $model.showingPicker, onDismiss: { model.closePicker() }) {
+            songPickerSheet(onDismiss: { model.closePicker() })
         }
-        .sheet(isPresented: $viewModel.showingSettings) {
+        .sheet(isPresented: $model.showingSettings) {
             SettingsView()
                 .tint(deviceAccentColor)
                 .environment(\.appSettings, appSettings)
-                .environment(\.shufflePlayer, viewModel.player)
-                .environment(\.lastFMTransport, viewModel.lastFMTransport)
+                .environment(\.shufflePlayer, model.player)
+                .environment(\.lastFMTransport, model.lastFMTransport)
         }
         .alert("Authorization Required", isPresented: .init(
-            get: { viewModel.authorizationError != nil },
-            set: { if !$0 { viewModel.authorizationError = nil } }
+            get: { model.authorizationError != nil },
+            set: { if !$0 { model.authorizationError = nil } }
         )) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -98,19 +98,19 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            if let error = viewModel.authorizationError {
+            if let error = model.authorizationError {
                 Text(error)
             }
         }
         // Kept last so the sheets above can read them too.
-        .environment(\.sessionDraft, viewModel.sessionDraft)
-        .environment(\.listeningSessionHost, viewModel.sessionHost)
+        .environment(\.sessionDraft, model.sessionDraft)
+        .environment(\.listeningSessionHost, model.sessionHost)
     }
 
     @ViewBuilder
     private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
         SongPickerView(
-            libraryCatalog: viewModel.library,
+            libraryCatalog: model.library,
             initialSortOption: appSettings.librarySortOption,
             onDismiss: onDismiss
         )
@@ -129,24 +129,24 @@ struct MainView: View {
 
     @ViewBuilder
     private var launchContent: some View {
-        if viewModel.isLoading {
+        if model.isLoading {
             LoadingView(message: "Loading...")
                 .environment(\.shuffleTheme, loadingTheme)
                 .transition(.opacity)
-        } else if viewModel.isAuthorized {
+        } else if model.isAuthorized {
             PlayerView(
-                player: viewModel.player,
-                playbackTransport: viewModel.playbackTransport,
+                player: model.player,
+                playbackTransport: model.playbackTransport,
                 initialThemeId: appSettings.currentThemeId,
-                onAddTapped: { viewModel.openPicker() },
-                onSettingsTapped: { viewModel.openSettings() },
-                onSkipForwardTapped: { Task { try? await viewModel.player.skipToNext() } },
-                onSkipBackTapped: { Task { try? await viewModel.player.restartOrSkipToPrevious() } }
+                onAddTapped: { model.openPicker() },
+                onSettingsTapped: { model.openSettings() },
+                onSkipForwardTapped: { Task { try? await model.player.skipToNext() } },
+                onSkipBackTapped: { Task { try? await model.player.restartOrSkipToPrevious() } }
             )
             .transition(.opacity)
         } else {
             WelcomeView {
-                Task { await viewModel.requestAuthorization() }
+                Task { await model.requestAuthorization() }
             }
             .transition(.opacity)
         }
@@ -158,7 +158,7 @@ struct MainView: View {
         hasStartedInitialLoad = true
 
         await Task.yield()
-        await viewModel.onAppear()
+        await model.onAppear()
         hasCompletedInitialLoad = true
         VolumeController.initialize()
         dismissSplashIfReady()
@@ -169,7 +169,7 @@ struct MainView: View {
         guard !hasDismissedStartupSplash,
               hasCompletedSplashTimeline,
               hasCompletedInitialLoad,
-              !viewModel.isLoading else { return }
+              !model.isLoading else { return }
         withAnimation(.easeOut(duration: 0.2)) {
             hasDismissedStartupSplash = true
         }

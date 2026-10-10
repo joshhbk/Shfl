@@ -6,20 +6,20 @@ struct SongInfoDisplay: View {
 
     let playbackState: PlaybackState
     let hasSongs: Bool
-    let progressState: PlayerProgressState?
+    let playbackClock: PlaybackClock?
     let onSeek: (TimeInterval) -> Void
     let isShuffling: Bool
 
     init(
         playbackState: PlaybackState,
         hasSongs: Bool = false,
-        progressState: PlayerProgressState? = nil,
+        playbackClock: PlaybackClock? = nil,
         onSeek: @escaping (TimeInterval) -> Void = { _ in },
         isShuffling: Bool = false
     ) {
         self.playbackState = playbackState
         self.hasSongs = hasSongs
-        self.progressState = progressState
+        self.playbackClock = playbackClock
         self.onSeek = onSeek
         self.isShuffling = isShuffling
     }
@@ -92,9 +92,9 @@ struct SongInfoDisplay: View {
                 .animation(.easeOut(duration: 0.3), value: song.artist)
                 .accessibilityIdentifier("player.songArtist")
 
-            if let progressState {
+            if let playbackClock {
                 LivePlaybackProgressBar(
-                    progressState: progressState,
+                    playbackClock: playbackClock,
                     onSeek: onSeek
                 )
                 .padding(.top, 14)

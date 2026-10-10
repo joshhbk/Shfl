@@ -2,33 +2,33 @@ import XCTest
 @testable import Shfl
 
 @MainActor
-final class LibraryBrowserViewModelTests: XCTestCase {
+final class LibraryBrowserTests: XCTestCase {
     private var mockService: DeterministicMusicService!
-    private var viewModel: LibraryBrowserViewModel!
+    private var browser: LibraryBrowser!
 
     override func setUp() async throws {
         mockService = DeterministicMusicService()
-        viewModel = LibraryBrowserViewModel(libraryCatalog: mockService)
+        browser = LibraryBrowser(libraryCatalog: mockService)
     }
 
     func test_initialState_isCorrect() {
-        XCTAssertTrue(viewModel.browseSongs.isEmpty)
-        XCTAssertTrue(viewModel.searchResults.isEmpty)
-        XCTAssertEqual(viewModel.searchText, "")
-        XCTAssertEqual(viewModel.currentMode, .browse)
-        XCTAssertFalse(viewModel.isLoading)  // Lane starts with isLoading=false until loadInitial
-        XCTAssertEqual(viewModel.sortOption, .mostPlayed)
+        XCTAssertTrue(browser.browseSongs.isEmpty)
+        XCTAssertTrue(browser.searchResults.isEmpty)
+        XCTAssertEqual(browser.searchText, "")
+        XCTAssertEqual(browser.currentMode, .browse)
+        XCTAssertFalse(browser.isLoading)  // Lane starts with isLoading=false until loadInitial
+        XCTAssertEqual(browser.sortOption, .mostPlayed)
     }
 
     func test_currentMode_switchesToSearchWhenTextEntered() {
-        viewModel.searchText = "test"
-        XCTAssertEqual(viewModel.currentMode, .search)
+        browser.searchText = "test"
+        XCTAssertEqual(browser.currentMode, .search)
     }
 
     func test_currentMode_switchesToBrowseWhenTextCleared() {
-        viewModel.searchText = "test"
-        viewModel.searchText = ""
-        XCTAssertEqual(viewModel.currentMode, .browse)
+        browser.searchText = "test"
+        browser.searchText = ""
+        XCTAssertEqual(browser.currentMode, .browse)
     }
 
     func test_loadInitialPage_fetchesSongs() async {
@@ -38,10 +38,10 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         ]
         await mockService.setLibrarySongs(songs)
 
-        await viewModel.loadInitialPage()
+        await browser.loadInitialPage()
 
-        XCTAssertEqual(viewModel.browseSongs.count, 2)
-        XCTAssertFalse(viewModel.browseLoading)
+        XCTAssertEqual(browser.browseSongs.count, 2)
+        XCTAssertFalse(browser.browseLoading)
     }
 
     func test_loadInitialPage_setsHasMorePages() async {
@@ -51,10 +51,10 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
         await mockService.setLibrarySongs(songs)
 
-        await viewModel.loadInitialPage()
+        await browser.loadInitialPage()
 
-        XCTAssertEqual(viewModel.browseSongs.count, 50)
-        XCTAssertTrue(viewModel.hasMorePages)
+        XCTAssertEqual(browser.browseSongs.count, 50)
+        XCTAssertTrue(browser.hasMorePages)
     }
 
     func test_loadNextPage_appendsSongs() async {
@@ -63,11 +63,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
         await mockService.setLibrarySongs(songs)
 
-        await viewModel.loadInitialPage()
-        await viewModel.loadNextPageIfNeeded(currentSong: viewModel.browseSongs.last!)
+        await browser.loadInitialPage()
+        await browser.loadNextPageIfNeeded(currentSong: browser.browseSongs.last!)
 
-        XCTAssertEqual(viewModel.browseSongs.count, 60)
-        XCTAssertFalse(viewModel.hasMorePages)
+        XCTAssertEqual(browser.browseSongs.count, 60)
+        XCTAssertFalse(browser.hasMorePages)
     }
 
     func test_search_fetchesResults() async {
@@ -78,17 +78,17 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         // Search through the songs lane directly (bypasses debounce in view model)
-        viewModel.songsLane.handleSearchTextChanged("Hello")
+        browser.songsLane.handleSearchTextChanged("Hello")
         // Wait for debounce (300ms) + search task to complete
         try? await Task.sleep(nanoseconds: 600_000_000)
 
-        let searchResults = viewModel.searchResults
+        let searchResults = browser.searchResults
         XCTAssertEqual(searchResults.count, 1)
         XCTAssertEqual(searchResults.first?.title, "Hello World")
     }
 
     func test_autofillState_initiallyIdle() {
-        XCTAssertEqual(viewModel.autofillState, .idle)
+        XCTAssertEqual(browser.autofillState, .idle)
     }
 
     // MARK: - Autofill Method Tests
@@ -102,10 +102,10 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         let draft = SessionDraftStore()
         let source = LibraryAutofillSource(libraryCatalog: mockService)
 
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft, using: source)
 
         XCTAssertEqual(draft.songCount, 50)
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 50))
+        XCTAssertEqual(browser.autofillState, .completed(count: 50))
     }
 
     func test_autofill_fillsOnlyRemainingCapacity() async {
@@ -121,11 +121,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft, using: source)
 
         // Should only add 20 more (120 - 100)
         XCTAssertEqual(draft.songCount, 120)
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 20))
+        XCTAssertEqual(browser.autofillState, .completed(count: 20))
     }
 
     func test_autofill_excludesDuplicates() async {
@@ -140,11 +140,11 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         try? draft.add(songs[1])
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft, using: source)
 
         // Should add 8 new songs (10 - 2 already added)
         XCTAssertEqual(draft.songCount, 10)
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 8))
+        XCTAssertEqual(browser.autofillState, .completed(count: 8))
     }
 
     func test_autofill_completesWithZeroWhenFull() async {
@@ -155,9 +155,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         }
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft, using: source)
 
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 0))
+        XCTAssertEqual(browser.autofillState, .completed(count: 0))
     }
 
     func test_autofill_setsLoadingState() async {
@@ -169,13 +169,13 @@ final class LibraryBrowserViewModelTests: XCTestCase {
 
         // Start autofill
         let task = Task {
-            await viewModel.autofill(into: draft, using: source)
+            await browser.autofill(into: draft, using: source)
         }
 
         // Verify it completes correctly
         await task.value
 
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 1))
+        XCTAssertEqual(browser.autofillState, .completed(count: 1))
     }
 
     func test_autofill_whilePlaying_defersTransportAndUpdatesDomainQueue() async throws {
@@ -194,9 +194,9 @@ final class LibraryBrowserViewModelTests: XCTestCase {
         await mockService.resetPlaybackRecording()
 
         let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await viewModel.autofill(into: draft, using: source)
+        await browser.autofill(into: draft, using: source)
 
-        XCTAssertEqual(viewModel.autofillState, .completed(count: 3))
+        XCTAssertEqual(browser.autofillState, .completed(count: 3))
         XCTAssertEqual(draft.songCount, 5)
 
         // Transport sync is deferred to avoid playback interruption

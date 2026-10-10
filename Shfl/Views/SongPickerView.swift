@@ -20,7 +20,7 @@ struct SongPickerView: View {
     let libraryCatalog: LibraryCatalog
     let onDismiss: () -> Void
 
-    @State private var viewModel: LibraryBrowserViewModel
+    @State private var browser: LibraryBrowser
     @State private var editor = SessionDraftEditor()
     @State private var navigationPath = NavigationPath()
     @State private var showingAutofillCompletion = false
@@ -40,8 +40,8 @@ struct SongPickerView: View {
     ) {
         self.libraryCatalog = libraryCatalog
         self.onDismiss = onDismiss
-        self._viewModel = State(
-            wrappedValue: LibraryBrowserViewModel(
+        self._browser = State(
+            wrappedValue: LibraryBrowser(
                 libraryCatalog: libraryCatalog,
                 initialSortOption: initialSortOption
             )
@@ -51,10 +51,10 @@ struct SongPickerView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
-                if viewModel.searchText.isEmpty {
-                    browseContentFor(viewModel.browseMode)
+                if browser.searchText.isEmpty {
+                    browseContentFor(browser.browseMode)
                 } else {
-                    searchContentFor(viewModel.browseMode)
+                    searchContentFor(browser.browseMode)
                 }
             }
             .accessibilityHidden(!navigationPath.isEmpty)
@@ -81,7 +81,7 @@ struct SongPickerView: View {
             VStack(spacing: 0) {
                 overlayPills
 
-                if !isSearchFieldFocused && viewModel.searchText.isEmpty {
+                if !isSearchFieldFocused && browser.searchText.isEmpty {
                     modernCompletionBar
                 }
             }
@@ -90,19 +90,19 @@ struct SongPickerView: View {
         }
         .onChange(of: appSettings?.librarySortOption) { _, newOption in
             if let newOption {
-                viewModel.handleSortOptionChanged(newOption)
+                browser.handleSortOptionChanged(newOption)
             }
         }
         .task {
-            await viewModel.loadInitialPage()
+            await browser.loadInitialPage()
         }
         .alert("Error", isPresented: .init(
-            get: { viewModel.errorMessage != nil },
-            set: { if !$0 { viewModel.clearError() } }
+            get: { browser.errorMessage != nil },
+            set: { if !$0 { browser.clearError() } }
         )) {
-            Button("OK") { viewModel.clearError() }
+            Button("OK") { browser.clearError() }
         } message: {
-            if let error = viewModel.errorMessage {
+            if let error = browser.errorMessage {
                 Text(error)
             }
         }
@@ -116,7 +116,7 @@ struct SongPickerView: View {
             modernSearchField
 
             HStack(spacing: 10) {
-                Picker("Browse", selection: $viewModel.browseMode) {
+                Picker("Browse", selection: $browser.browseMode) {
                     ForEach(BrowseMode.allCases, id: \.self) { mode in
                         Text(mode.rawValue).tag(mode)
                     }
@@ -142,16 +142,16 @@ struct SongPickerView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField(viewModel.browseMode == .selected ? "Search your picks" : "Search your library", text: $viewModel.searchText)
+            TextField(browser.browseMode == .selected ? "Search your picks" : "Search your library", text: $browser.searchText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .focused($isSearchFieldFocused)
                 .accessibilityIdentifier("songPicker.search")
 
-            if !viewModel.searchText.isEmpty {
+            if !browser.searchText.isEmpty {
                 Button {
-                    viewModel.searchText = ""
+                    browser.searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -192,7 +192,7 @@ struct SongPickerView: View {
                 if shouldOfferAutofill || showingAutofillCompletion {
                     Button(action: performAutofill) {
                         HStack(spacing: 6) {
-                            if viewModel.autofillState == .loading {
+                            if browser.autofillState == .loading {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
@@ -212,7 +212,7 @@ struct SongPickerView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .disabled(viewModel.autofillState == .loading || showingAutofillCompletion)
+                    .disabled(browser.autofillState == .loading || showingAutofillCompletion)
                     .task(id: showingAutofillCompletion) {
                         guard showingAutofillCompletion else { return }
                         do {
@@ -282,7 +282,7 @@ struct SongPickerView: View {
             browseList
         case .artists:
             ArtistListView(
-                viewModel: viewModel,
+                browser: browser,
                 libraryCatalog: libraryCatalog,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
@@ -290,7 +290,7 @@ struct SongPickerView: View {
             )
         case .playlists:
             PlaylistListView(
-                viewModel: viewModel,
+                browser: browser,
                 libraryCatalog: libraryCatalog,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
@@ -317,8 +317,8 @@ struct SongPickerView: View {
     /// already in memory, so there is no catalog lane to search.
     private var selectedSearchResults: [Song] {
         sessionDraft.songs.filter {
-            $0.title.localizedStandardContains(viewModel.searchText)
-                || $0.artist.localizedStandardContains(viewModel.searchText)
+            $0.title.localizedStandardContains(browser.searchText)
+                || $0.artist.localizedStandardContains(browser.searchText)
         }
     }
 
@@ -326,37 +326,37 @@ struct SongPickerView: View {
     private func selectedList(songs: [Song]) -> some View {
         if !songs.isEmpty {
             songList(songs: songs, isPaginated: false)
-        } else if viewModel.searchText.isEmpty {
+        } else if browser.searchText.isEmpty {
             ContentUnavailableView(
                 "No Songs Selected",
                 systemImage: BrowseMode.selected.iconName,
                 description: Text("Pick songs from Songs, Artists or Playlists, or use Autofill")
             )
         } else {
-            ContentUnavailableView.search(text: viewModel.searchText)
+            ContentUnavailableView.search(text: browser.searchText)
         }
     }
 
     // MARK: - Sort
 
     private var showSortButton: Bool {
-        viewModel.browseMode == .songs && viewModel.searchText.isEmpty
+        browser.browseMode == .songs && browser.searchText.isEmpty
     }
 
     // MARK: - Song Browse List
 
     @ViewBuilder
     private var browseList: some View {
-        if viewModel.browseLoading && viewModel.browseSongs.isEmpty {
+        if browser.browseLoading && browser.browseSongs.isEmpty {
             skeletonList
-        } else if viewModel.browseSongs.isEmpty {
+        } else if browser.browseSongs.isEmpty {
             ContentUnavailableView(
                 "No Songs in Library",
                 systemImage: "music.note",
                 description: Text("Add songs to your Apple Music library to see them here")
             )
         } else {
-            songList(songs: viewModel.browseSongs, isPaginated: true)
+            songList(songs: browser.browseSongs, isPaginated: true)
         }
     }
 
@@ -364,12 +364,12 @@ struct SongPickerView: View {
 
     @ViewBuilder
     private var songSearchList: some View {
-        if !viewModel.searchResults.isEmpty {
+        if !browser.searchResults.isEmpty {
             songSearchResultsList
-        } else if viewModel.searchLoading || !viewModel.hasSearchedOnce {
+        } else if browser.searchLoading || !browser.hasSearchedOnce {
             skeletonList
         } else {
-            ContentUnavailableView.search(text: viewModel.searchText)
+            ContentUnavailableView.search(text: browser.searchText)
         }
     }
 
@@ -379,7 +379,7 @@ struct SongPickerView: View {
 
         return ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(viewModel.searchResults) { song in
+                ForEach(browser.searchResults) { song in
                     SongRow(
                         song: song,
                         isSelected: selectedSongIds.contains(song.id),
@@ -390,12 +390,12 @@ struct SongPickerView: View {
                     Divider().padding(.leading, 72)
                 }
 
-                if viewModel.hasMoreSearchResults {
+                if browser.hasMoreSearchResults {
                     ProgressView()
                         .padding()
                         .onAppear {
                             Task { @MainActor in
-                                await viewModel.loadMoreSearchResults()
+                                await browser.loadMoreSearchResults()
                             }
                         }
                 }
@@ -406,49 +406,49 @@ struct SongPickerView: View {
 
     @ViewBuilder
     private var artistSearchList: some View {
-        if !viewModel.artistSearchResults.isEmpty {
+        if !browser.artistSearchResults.isEmpty {
             artistSearchResultsList
-        } else if viewModel.artistSearchLoading || !viewModel.hasArtistSearchedOnce {
+        } else if browser.artistSearchLoading || !browser.hasArtistSearchedOnce {
             skeletonList
         } else {
-            ContentUnavailableView.search(text: viewModel.searchText)
+            ContentUnavailableView.search(text: browser.searchText)
         }
     }
 
     private var artistSearchResultsList: some View {
         ArtistListView(
-            viewModel: viewModel,
+            browser: browser,
             libraryCatalog: libraryCatalog,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
             onToggleSong: { editor.toggle($0, in: sessionDraft) },
-            searchResults: viewModel.artistSearchResults,
-            hasMoreSearchResults: viewModel.hasMoreArtistSearchResults,
-            onLoadMore: { Task { @MainActor in await viewModel.loadMoreArtistSearchResults() } }
+            searchResults: browser.artistSearchResults,
+            hasMoreSearchResults: browser.hasMoreArtistSearchResults,
+            onLoadMore: { Task { @MainActor in await browser.loadMoreArtistSearchResults() } }
         )
     }
 
     @ViewBuilder
     private var playlistSearchList: some View {
-        if !viewModel.playlistSearchResults.isEmpty {
+        if !browser.playlistSearchResults.isEmpty {
             playlistSearchResultsList
-        } else if viewModel.playlistSearchLoading || !viewModel.hasPlaylistSearchedOnce {
+        } else if browser.playlistSearchLoading || !browser.hasPlaylistSearchedOnce {
             skeletonList
         } else {
-            ContentUnavailableView.search(text: viewModel.searchText)
+            ContentUnavailableView.search(text: browser.searchText)
         }
     }
 
     private var playlistSearchResultsList: some View {
         PlaylistListView(
-            viewModel: viewModel,
+            browser: browser,
             libraryCatalog: libraryCatalog,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
             onToggleSong: { editor.toggle($0, in: sessionDraft) },
-            searchResults: viewModel.playlistSearchResults,
-            hasMoreSearchResults: viewModel.hasMorePlaylistSearchResults,
-            onLoadMore: { Task { @MainActor in await viewModel.loadMorePlaylistSearchResults() } }
+            searchResults: browser.playlistSearchResults,
+            hasMoreSearchResults: browser.hasMorePlaylistSearchResults,
+            onLoadMore: { Task { @MainActor in await browser.loadMorePlaylistSearchResults() } }
         )
     }
 
@@ -473,12 +473,12 @@ struct SongPickerView: View {
                     Divider().padding(.leading, 72)
                 }
 
-                if isPaginated && viewModel.hasMorePages {
+                if isPaginated && browser.hasMorePages {
                     ProgressView()
                         .padding()
                         .onAppear {
                             Task { @MainActor in
-                                await viewModel.loadMorePages()
+                                await browser.loadMorePages()
                             }
                         }
                 }
@@ -516,7 +516,7 @@ struct SongPickerView: View {
                             Task { @MainActor in
                                 try? await Task.sleep(for: .seconds(2))
                                 withAnimation {
-                                    viewModel.resetAutofillState()
+                                    browser.resetAutofillState()
                                 }
                             }
                         }
@@ -544,9 +544,9 @@ struct SongPickerView: View {
             let requestedCount = sessionDraft.remainingCapacity
             let algorithm = appSettings?.autofillAlgorithm ?? .random
             let source = LibraryAutofillSource(libraryCatalog: libraryCatalog, algorithm: algorithm)
-            await viewModel.autofill(into: sessionDraft, using: source)
+            await browser.autofill(into: sessionDraft, using: source)
 
-            if case .completed(let count) = viewModel.autofillState {
+            if case .completed(let count) = browser.autofillState {
                 showingAutofillCompletion = count > 0
                 editor.noteAutofillCompleted(
                     addedCount: count,
@@ -558,7 +558,7 @@ struct SongPickerView: View {
     }
 
     private var showAutofillBanner: Bool {
-        switch viewModel.autofillState {
+        switch browser.autofillState {
         case .completed(let count):
             return count > 0
         case .error:
@@ -569,18 +569,18 @@ struct SongPickerView: View {
     }
 
     private var autofillMessage: String {
-        if case .completed(let count) = viewModel.autofillState {
+        if case .completed(let count) = browser.autofillState {
             let noun = count == 1 ? "song" : "songs"
             return "Added \(count) \(noun)"
         }
-        if case .error(let message) = viewModel.autofillState {
+        if case .error(let message) = browser.autofillState {
             return message
         }
         return ""
     }
 
     private var autofillMessageIsError: Bool {
-        if case .error = viewModel.autofillState {
+        if case .error = browser.autofillState {
             return true
         }
         return false
