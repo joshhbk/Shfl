@@ -261,6 +261,24 @@ final class LibraryBrowserTests: XCTestCase {
         XCTAssertEqual(browser.autofillState, .completed(count: 1))
     }
 
+    func test_autofillWhileAnotherIsLoadingDoesNothing() async {
+        await mockService.setLibrarySongs((1...30).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        })
+        let alone = SessionDraftStore()
+        await browser.autofill(into: alone)
+        let fetchesForOne = await mockService.libraryFetchCount
+
+        let draft = SessionDraftStore()
+        async let first: Void = browser.autofill(into: draft)
+        async let second: Void = browser.autofill(into: draft)
+        _ = await (first, second)
+
+        let fetchesForTwo = await mockService.libraryFetchCount - fetchesForOne
+        XCTAssertEqual(fetchesForTwo, fetchesForOne)
+        XCTAssertEqual(draft.songCount, 30)
+    }
+
     func test_autofill_whilePlaying_defersTransportAndUpdatesDomainQueue() async throws {
         let allSongs = (1...5).map {
             Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
