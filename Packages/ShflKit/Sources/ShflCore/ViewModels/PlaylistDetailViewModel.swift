@@ -15,7 +15,7 @@ public final class PlaylistDetailViewModel {
     let playlistId: String
     public let playlistName: String
 
-    public init(playlistId: String, playlistName: String, libraryCatalog: LibraryCatalog) {
+    package init(playlistId: String, playlistName: String, libraryCatalog: LibraryCatalog) {
         self.playlistId = playlistId
         self.playlistName = playlistName
         self.lane = LibraryLane<Song>(

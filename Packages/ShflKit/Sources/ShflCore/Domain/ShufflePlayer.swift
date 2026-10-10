@@ -12,10 +12,9 @@ public final class ShufflePlayer {
     @ObservationIgnored private var publishedSessionID: UUID?
     @ObservationIgnored private var hasStartedSong = false
 
-    // PR 4 → package
     /// Each access creates an independent subscription, replaying the current
     /// state before future changes. Buffer all edges, including rapid bursts.
-    public var playbackTransitions: AsyncStream<PlaybackTransition> {
+    package var playbackTransitions: AsyncStream<PlaybackTransition> {
         let id = UUID()
         return AsyncStream { continuation in
             transitionContinuations[id] = continuation
@@ -52,10 +51,9 @@ public final class ShufflePlayer {
             || activeSession.algorithm != draft.algorithm
     }
 
-    // PR 4 → package (previews get a ShflDeterministic fixture)
     /// - Parameter sessionDraft: The songs and algorithm used when a new
     ///   shuffle starts.
-    public init(
+    package init(
         playbackTransport: PlaybackTransport,
         sessionDraft: SessionDraftStore
     ) {

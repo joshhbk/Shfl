@@ -1,5 +1,6 @@
 import XCTest
 @testable import ShflCore
+import ShflTestSupport
 
 @MainActor
 final class SessionDraftStoreTests: XCTestCase {

@@ -1,17 +1,21 @@
+import ShflAppleMusicUI
+import ShflComposition
 import ShflCore
+import ShflDeterministic
 import SwiftUI
 import Vortex
 
 struct PlayerView: View {
     var player: ShufflePlayer
-    let playbackTransport: PlaybackTransport
+    let draft: SessionDraftStore
+    /// Called once, when the player first appears.
+    let makePlaybackClock: () -> PlaybackClock
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
     let onSkipForwardTapped: () -> Void
     let onSkipBackTapped: () -> Void
 
     @Environment(\.appearanceSettings) private var appearanceSettings
-    @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
     @Environment(\.artworkStore) private var artworkStore
     @State private var themeController: ThemeController
@@ -23,7 +27,8 @@ struct PlayerView: View {
 
     init(
         player: ShufflePlayer,
-        playbackTransport: PlaybackTransport,
+        draft: SessionDraftStore,
+        makePlaybackClock: @escaping () -> PlaybackClock,
         initialThemeId: String? = nil,
         onAddTapped: @escaping () -> Void = {},
         onSettingsTapped: @escaping () -> Void = {},
@@ -31,7 +36,8 @@ struct PlayerView: View {
         onSkipBackTapped: @escaping () -> Void = {}
     ) {
         self.player = player
-        self.playbackTransport = playbackTransport
+        self.draft = draft
+        self.makePlaybackClock = makePlaybackClock
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
         self.onSkipForwardTapped = onSkipForwardTapped
@@ -56,7 +62,7 @@ struct PlayerView: View {
 
                 ClassicPlayerLayout(
                     playbackState: player.playbackState,
-                    hasSongs: !sessionDraft.isEmpty,
+                    hasSongs: !draft.isEmpty,
                     playbackClock: playbackClock,
                     onPlayPause: { Task { await sessionHost?.togglePlayback() } },
                     onSkipForward: onSkipForwardTapped,
@@ -85,7 +91,7 @@ struct PlayerView: View {
         .environment(\.shuffleTheme, tintProvider.computedTheme)
         .onAppear {
             if playbackClock == nil {
-                playbackClock = PlaybackClock(playbackTransport: playbackTransport)
+                playbackClock = makePlaybackClock()
             }
             playbackClock?.startUpdating(playbackState: player.playbackState)
 
@@ -93,7 +99,7 @@ struct PlayerView: View {
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
 
             if let song = player.playbackState.currentSong {
-                colorExtractor.updateColor(for: song.id, palette: artworkPalette)
+                colorExtractor.updateColor(for: song.id, lookUpColors: artworkColorLookup)
             }
         }
         .onDisappear {
@@ -123,8 +129,8 @@ struct PlayerView: View {
         }
     }
 
-    private var artworkPalette: ArtworkPalette? {
-        artworkStore.map(ArtworkPalette.init(store:))
+    private var artworkColorLookup: AlbumArtColorExtractor.ColorLookup? {
+        artworkStore.map { ArtworkPalette(store: $0).colors(for:) }
     }
 
     // MARK: - State Handlers
@@ -140,7 +146,7 @@ struct PlayerView: View {
         playbackClock?.handlePlaybackStateChange(newState)
 
         if let song = newState.currentSong {
-            colorExtractor.updateColor(for: song.id, palette: artworkPalette)
+            colorExtractor.updateColor(for: song.id, lookUpColors: artworkColorLookup)
         } else {
             colorExtractor.clear()
         }
@@ -228,9 +234,7 @@ private let previewQueueSongs = [
 ]
 
 private struct PlayerViewPreviewHost: View {
-    private let musicService: DeterministicMusicService
-    private let sessionDraft = SessionDraftStore()
-    private let player: ShufflePlayer
+    @State private var model: AppModel
     private let themeId: String
 
     init(state: PreviewPlayerState, themeId: String) {
@@ -243,36 +247,30 @@ private struct PlayerViewPreviewHost: View {
         case .paused: .paused(previewSong)
         case .error: .error(PreviewPlaybackError(errorDescription: "Preview playback failed."))
         }
-        let musicService = DeterministicMusicService(
-            configuration: .init(
-                librarySongs: previewQueueSongs,
-                playbackDuration: 242,
-                playbackTime: 78,
-                playbackState: initialPlaybackState
+        let draft: [Song] = switch state {
+        case .empty: []
+        case .armed, .loading, .playing, .paused, .error: previewQueueSongs
+        }
+        _model = State(
+            wrappedValue: AppModel.preview(
+                library: DeterministicLibrary(songs: previewQueueSongs),
+                playback: DeterministicPlayback(state: initialPlaybackState, time: 78, duration: 242),
+                draft: draft
             )
         )
-        switch state {
-        case .empty:
-            break
-        case .armed, .loading, .playing, .paused, .error:
-            try? sessionDraft.add(previewQueueSongs)
-        }
-
-        self.musicService = musicService
-        self.player = ShufflePlayer(playbackTransport: musicService, sessionDraft: sessionDraft)
     }
 
     var body: some View {
         PlayerView(
-            player: player,
-            playbackTransport: musicService,
+            player: model.player,
+            draft: model.sessionDraft,
+            makePlaybackClock: model.makePlaybackClock,
             initialThemeId: themeId,
             onAddTapped: {},
             onSettingsTapped: {},
             onSkipForwardTapped: {},
             onSkipBackTapped: {}
         )
-        .environment(\.sessionDraft, sessionDraft)
     }
 }
 

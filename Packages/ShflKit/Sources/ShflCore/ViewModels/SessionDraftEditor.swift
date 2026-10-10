@@ -7,19 +7,23 @@ public enum DraftEdit: Equatable {
     case failed(String)
 }
 
+/// The picker reads the draft through here, so it always shows the draft it edits.
 @Observable
 @MainActor
 public final class SessionDraftEditor {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    public private(set) var actionErrorMessage: String?
     public private(set) var autofillIsExhausted = false
 
-    public init() {}
+    @ObservationIgnored public let draft: SessionDraftStore
+
+    package init(draft: SessionDraftStore) {
+        self.draft = draft
+    }
 
     // MARK: - Editing
 
     @discardableResult
-    public func toggle(_ song: Song, in draft: SessionDraftStore) -> DraftEdit {
+    public func toggle(_ song: Song) -> DraftEdit {
         autofillIsExhausted = false
 
         if draft.contains(song.id) {
@@ -36,28 +40,28 @@ public final class SessionDraftEditor {
         } catch ShufflePlayerError.capacityReached {
             return .rejectedAtCapacity
         } catch {
-            showActionError(error.localizedDescription)
             return .failed(error.localizedDescription)
         }
     }
 
-    public func clearAll(in draft: SessionDraftStore) {
+    public func clearAll() {
         autofillIsExhausted = false
         draft.removeAll()
     }
 
-    public func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
-        autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
+    public func autofill(using browser: LibraryBrowser) async {
+        let requestedCount = draft.remainingCapacity
+        await browser.autofill(into: draft)
+        if case .completed(let count) = browser.autofillState {
+            noteAutofillCompleted(
+                addedCount: count,
+                requestedCount: requestedCount,
+                remainingCapacity: draft.remainingCapacity
+            )
+        }
     }
 
-    func showActionError(_ message: String) {
-        actionErrorMessage = message
-
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
-            if actionErrorMessage == message {
-                actionErrorMessage = nil
-            }
-        }
+    func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
+        autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
     }
 }

@@ -9,6 +9,10 @@
 /* Begin PBXBuildFile section */
 		DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00022F10000000000002 /* Vortex */; };
 		DCAA00042F10000000000004 /* ShflCore in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00032F10000000000003 /* ShflCore */; };
+		DCAA00112F10000000000011 /* ShflDeterministic in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00102F10000000000010 /* ShflDeterministic */; };
+		DCAA00152F10000000000015 /* ShflAppleMusicUI in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00142F10000000000014 /* ShflAppleMusicUI */; };
+		DCAA00172F10000000000017 /* ShflLastFM in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00162F10000000000016 /* ShflLastFM */; };
+		DCAA00192F10000000000019 /* ShflComposition in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00182F10000000000018 /* ShflComposition */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +77,10 @@
 			files = (
 				DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */,
 				DCAA00042F10000000000004 /* ShflCore in Frameworks */,
+				DCAA00192F10000000000019 /* ShflComposition in Frameworks */,
+				DCAA00172F10000000000017 /* ShflLastFM in Frameworks */,
+				DCAA00152F10000000000015 /* ShflAppleMusicUI in Frameworks */,
+				DCAA00112F10000000000011 /* ShflDeterministic in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -144,6 +152,10 @@
 			packageProductDependencies = (
 				DCAA00022F10000000000002 /* Vortex */,
 				DCAA00032F10000000000003 /* ShflCore */,
+				DCAA00182F10000000000018 /* ShflComposition */,
+				DCAA00162F10000000000016 /* ShflLastFM */,
+				DCAA00142F10000000000014 /* ShflAppleMusicUI */,
+				DCAA00102F10000000000010 /* ShflDeterministic */,
 			);
 			productName = Shfl;
 			productReference = DC1306952EFDBDA300200F38 /* Shfl.app */;
@@ -458,7 +470,7 @@
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -506,7 +518,7 @@
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -532,7 +544,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -558,7 +570,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -583,7 +595,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -608,7 +620,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -688,6 +700,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
 			productName = ShflCore;
+		};
+		DCAA00102F10000000000010 /* ShflDeterministic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflDeterministic;
+		};
+		DCAA00142F10000000000014 /* ShflAppleMusicUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflAppleMusicUI;
+		};
+		DCAA00162F10000000000016 /* ShflLastFM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflLastFM;
+		};
+		DCAA00182F10000000000018 /* ShflComposition */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflComposition;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

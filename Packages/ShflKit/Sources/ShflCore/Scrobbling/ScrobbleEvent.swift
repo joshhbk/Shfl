@@ -1,10 +1,9 @@
 import Foundation
 
-// PR 4 → package
-public nonisolated struct ScrobbleEvent: Sendable, Equatable, Codable {
-    public let track: String
-    public let artist: String
-    public let album: String
-    public let timestamp: Date
-    public let durationSeconds: Int
+package nonisolated struct ScrobbleEvent: Sendable, Equatable, Codable {
+    package let track: String
+    package let artist: String
+    package let album: String
+    package let timestamp: Date
+    package let durationSeconds: Int
 }
