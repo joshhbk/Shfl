@@ -168,7 +168,6 @@ actor LastFMTransport: ScrobbleTransport {
 
     // MARK: - Authentication
 
-    /// Where the listener approves Shfl. See `LastFMAuthenticator`.
     nonisolated func signIn() throws -> LastFMSignIn {
         try authenticator.signIn()
     }

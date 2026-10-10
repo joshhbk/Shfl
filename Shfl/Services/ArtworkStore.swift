@@ -1,12 +1,11 @@
 import Foundation
 import MusicKit
 
-/// Hands out MusicKit artwork for library items.
+/// Hands out MusicKit artwork for library items and remembers what it found
+/// for the rest of the launch.
 ///
-/// Callers ask for one subject at a time; the store queues the lookups, asks
-/// the library for them in small batches so artwork-heavy lists don't
-/// overwhelm MusicKit, shares one lookup between everyone waiting on the same
-/// subject, and remembers what it found for the rest of the launch.
+/// Callers waiting on the same subject share one lookup, and lookups go to the
+/// library in small batches so artwork-heavy lists don't overwhelm MusicKit.
 /// Each caller awaits only its own subject, so a list of rows never fans out
 /// through global observation.
 @MainActor
@@ -28,9 +27,7 @@ final class ArtworkStore {
     private var isProcessing = false
     private var waiters: [ArtworkSubject: [UUID: AsyncStream<Artwork?>.Continuation]] = [:]
 
-    /// - Parameters:
-    ///   - load: Looks up a batch. Defaults to the user's Apple Music library.
-    ///   - pauseBetweenBatches: Breathing room for MusicKit between batches.
+    /// - Parameter pauseBetweenBatches: Breathing room for MusicKit between batches.
     init(
         load: @escaping Loader = ArtworkStore.loadFromLibrary,
         pauseBetweenBatches: Duration = .milliseconds(100)
@@ -54,8 +51,6 @@ final class ArtworkStore {
         }
         return nil
     }
-
-    // MARK: - Queue
 
     private func enqueue(_ subject: ArtworkSubject) {
         guard cache[subject] == nil, !pending.contains(subject) else { return }
@@ -91,8 +86,6 @@ final class ArtworkStore {
         }
     }
 
-    // MARK: - Waiters
-
     private func waitForArtwork(for subject: ArtworkSubject) -> AsyncStream<Artwork?> {
         let token = UUID()
         return AsyncStream { continuation in
@@ -123,8 +116,6 @@ final class ArtworkStore {
             waiters[subject] = subjectWaiters
         }
     }
-
-    // MARK: - Apple Music library
 
     static func loadFromLibrary(_ subjects: [ArtworkSubject]) async -> [ArtworkSubject: Artwork] {
         var songIDs: [MusicItemID] = []

@@ -16,7 +16,6 @@ final class AlbumArtColorExtractor {
     /// cycle through colors rather than randomly repeating.
     @ObservationIgnored private var lastUsedIndex: [Int: Int] = [:]
 
-    /// Updates the extracted color for the given song from its artwork's palette.
     /// A nil palette (no artwork store this launch) leaves the theme default.
     func updateColor(for songId: String, palette: ArtworkPalette?) {
         // Skip if already processing this song

@@ -39,10 +39,8 @@ extension LastFMAuthError: LocalizedError {
 /// run `signIn()`, then hand the URL Last.fm redirects to back to
 /// `completeSignIn(callbackURL:)`.
 actor LastFMAuthenticator {
-    /// Fetches a Last.fm API URL's response body.
     typealias Fetch = @Sendable (URL) async throws -> Data
 
-    /// The scheme Last.fm redirects to once the listener approves Shfl.
     private nonisolated static let callbackURLScheme = "shfl"
 
     private let apiKey: String
