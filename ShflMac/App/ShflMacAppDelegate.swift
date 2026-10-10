@@ -1,7 +1,6 @@
 import AppKit
 import ShflComposition
 
-/// Owns the launch's models, so they live exactly as long as the app.
 final class ShflMacAppDelegate: NSObject, NSApplicationDelegate {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
 
@@ -21,10 +20,14 @@ final class ShflMacAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // Unit tests are hosted by the app. Keep that app from taking focus
-        // from whoever is using the Mac while they run.
+        // Tests host the app; keep it from taking focus from the person using the Mac.
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             NSApp.setActivationPolicy(.prohibited)
         }
+    }
+
+    // Quitting from an active window never changes the scene phase.
+    func applicationWillTerminate(_ notification: Notification) {
+        model.sceneDidLeaveForeground()
     }
 }

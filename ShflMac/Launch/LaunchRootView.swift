@@ -4,6 +4,8 @@ import SwiftUI
 struct LaunchRootView: View {
     let model: AppModel
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         content
             .frame(minWidth: 820, minHeight: 520)
@@ -11,6 +13,11 @@ struct LaunchRootView: View {
                 // Reopening the window must not restore the session again.
                 guard model.launchPhase == .loading else { return }
                 await model.launch()
+            }
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                if oldPhase == .active && newPhase != .active {
+                    model.sceneDidLeaveForeground()
+                }
             }
     }
 
