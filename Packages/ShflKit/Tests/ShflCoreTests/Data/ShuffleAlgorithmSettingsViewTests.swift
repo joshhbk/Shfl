@@ -1,6 +1,5 @@
 import XCTest
 import SwiftUI
-@testable import Shfl
 @testable import ShflCore
 
 final class ShuffleAlgorithmSettingsViewTests: XCTestCase {

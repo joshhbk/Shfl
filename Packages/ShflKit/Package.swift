@@ -43,7 +43,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ShflCoreTests",
-            dependencies: ["ShflCore", "ShflTestSupport"],
+            dependencies: ["ShflCore", "ShflDeterministic", "ShflTestSupport"],
             swiftSettings: testSettings
         ),
         /// An in-memory library and transport for tests, previews and

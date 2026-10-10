@@ -1,5 +1,4 @@
 import Testing
-@testable import Shfl
 @testable import ShflCore
 @testable import ShflDeterministic
 

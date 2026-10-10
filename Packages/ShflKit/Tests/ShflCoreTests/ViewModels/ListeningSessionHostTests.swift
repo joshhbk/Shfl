@@ -1,8 +1,8 @@
 import SwiftData
 import XCTest
-@testable import Shfl
 @testable import ShflCore
 @testable import ShflDeterministic
+import ShflTestSupport
 
 @MainActor
 final class ListeningSessionHostTests: XCTestCase {
