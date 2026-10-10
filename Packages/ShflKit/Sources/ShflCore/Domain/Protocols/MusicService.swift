@@ -122,6 +122,10 @@ public nonisolated protocol LibraryCatalog: Sendable {
 // MARK: - PlaybackTransport
 
 /// Playback transport interface. Consumers that queue songs and control playback depend on this.
+///
+/// The synchronous requirements are main-actor because MusicKit's player state
+/// may only be read there. The async ones stay nonisolated so an actor can
+/// adopt the protocol.
 public nonisolated protocol PlaybackTransport: Sendable {
     /// Atomically install one immutable listening session.
     func load(_ request: PlaybackLoadRequest) async throws
@@ -142,21 +146,26 @@ public nonisolated protocol PlaybackTransport: Sendable {
     func restartOrSkipToPrevious() async throws
 
     /// Seek to a specific time in the current song
+    @MainActor
     func seek(to time: TimeInterval)
 
     /// Clear the installed session and stop playback.
     func clear() async
 
     /// Normalized transport events. Session completion is explicit.
+    @MainActor
     var playbackEvents: AsyncStream<PlaybackEvent> { get }
 
     /// Current playback time in seconds
+    @MainActor
     var currentPlaybackTime: TimeInterval { get }
 
     /// Duration of current song in seconds (0 if nothing playing)
+    @MainActor
     var currentSongDuration: TimeInterval { get }
 
     /// ID of the currently playing song (nil if nothing playing)
+    @MainActor
     var currentSongId: String? { get }
 
 }
