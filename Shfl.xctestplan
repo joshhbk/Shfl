@@ -60,6 +60,13 @@
         "identifier" : "ShflCompositionTests",
         "name" : "ShflCompositionTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflDesignTests",
+        "name" : "ShflDesignTests"
+      }
     }
   ],
   "version" : 1
