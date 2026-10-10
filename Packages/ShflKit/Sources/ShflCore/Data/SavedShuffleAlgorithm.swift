@@ -1,5 +1,6 @@
 import Foundation
 
+// PR 4 → package
 /// The shuffle algorithm a listener last chose, kept between launches under
 /// the `shuffleAlgorithm` defaults key. The session draft is the only place
 /// the algorithm is chosen; this only remembers it.

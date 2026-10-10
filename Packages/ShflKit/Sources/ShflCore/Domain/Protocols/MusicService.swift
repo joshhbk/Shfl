@@ -18,36 +18,43 @@ public enum SortOption: String, CaseIterable, Sendable {
     }
 }
 
+// PR 4 → package
 public nonisolated struct LibraryPage: Sendable {
     public let songs: [Song]
     public let hasMore: Bool
 
+    // PR 4 → package
     public init(songs: [Song], hasMore: Bool) {
         self.songs = songs
         self.hasMore = hasMore
     }
 }
 
+// PR 4 → package
 public nonisolated struct ArtistPage: Sendable {
     public let artists: [Artist]
     public let hasMore: Bool
 
+    // PR 4 → package
     public init(artists: [Artist], hasMore: Bool) {
         self.artists = artists
         self.hasMore = hasMore
     }
 }
 
+// PR 4 → package
 public nonisolated struct PlaylistPage: Sendable {
     public let playlists: [Playlist]
     public let hasMore: Bool
 
+    // PR 4 → package
     public init(playlists: [Playlist], hasMore: Bool) {
         self.playlists = playlists
         self.hasMore = hasMore
     }
 }
 
+// PR 4 → package
 public nonisolated struct PlaybackLoadRequest: Sendable, Equatable {
     let sessionID: UUID
     public let queue: [Song]
@@ -56,6 +63,7 @@ public nonisolated struct PlaybackLoadRequest: Sendable, Equatable {
     public let autoplay: Bool
 }
 
+// PR 4 → package
 public nonisolated enum PlaybackLoadError: LocalizedError, Sendable, Equatable {
     case emptyQueue
     case currentSongMissing(String)
@@ -70,6 +78,7 @@ public nonisolated enum PlaybackLoadError: LocalizedError, Sendable, Equatable {
     }
 }
 
+// PR 4 → package
 public nonisolated enum PlaybackEvent: Sendable, Equatable {
     case stateChanged(PlaybackState)
     case sessionEnded
@@ -77,6 +86,7 @@ public nonisolated enum PlaybackEvent: Sendable, Equatable {
 
 // MARK: - MusicAuthorizing
 
+// PR 4 → package
 /// Authorization-only interface. Consumers that only need auth gate depend on this.
 public nonisolated protocol MusicAuthorizing: Sendable {
     /// Request authorization to access Apple Music
@@ -172,5 +182,6 @@ public nonisolated protocol PlaybackTransport: Sendable {
 
 // MARK: - Combined typealias (backward compat)
 
+// PR 4 → package
 /// Combined interface for consumers that need all three capabilities.
 public typealias MusicService = MusicAuthorizing & LibraryCatalog & PlaybackTransport

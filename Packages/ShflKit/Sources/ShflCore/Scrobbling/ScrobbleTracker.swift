@@ -1,5 +1,6 @@
 import Foundation
 
+// PR 4 → package
 @MainActor
 public final class ScrobbleTracker {
     private let scrobbleManager: ScrobbleManager

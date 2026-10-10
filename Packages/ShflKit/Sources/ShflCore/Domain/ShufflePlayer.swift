@@ -12,6 +12,7 @@ public final class ShufflePlayer {
     @ObservationIgnored private var publishedSessionID: UUID?
     @ObservationIgnored private var hasStartedSong = false
 
+    // PR 4 → package
     /// Each access creates an independent subscription, replaying the current
     /// state before future changes. Buffer all edges, including rapid bursts.
     public var playbackTransitions: AsyncStream<PlaybackTransition> {

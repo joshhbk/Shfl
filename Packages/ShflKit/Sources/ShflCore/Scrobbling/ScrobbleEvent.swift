@@ -1,5 +1,6 @@
 import Foundation
 
+// PR 4 → package
 public nonisolated struct ScrobbleEvent: Sendable, Equatable, Codable {
     public let track: String
     public let artist: String

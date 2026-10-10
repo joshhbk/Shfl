@@ -37,6 +37,7 @@ public final class ListeningSessionHost {
     @ObservationIgnored private var songPoolTask: Task<Void, Never>?
     @ObservationIgnored private var algorithmTask: Task<Void, Never>?
 
+    // PR 4 → package
     /// - Parameters:
     ///   - autofillSource: Where autofill finds songs. It is warmed whenever
     ///     the draft is empty, ready for the next press of play.

@@ -1,5 +1,6 @@
 import Foundation
 
+// PR 4 → package
 public actor ScrobbleManager {
     private let transports: [any ScrobbleTransport]
 

@@ -13,6 +13,7 @@ enum SessionArchiveError: Error {
     case encodingFailed
 }
 
+// PR 4 → package
 /// The single persistence module for the song pool and the active listening
 /// session. Hides SwiftData, JSON encoding, and atomic replacement behind one
 /// load/commit interface.
@@ -26,6 +27,7 @@ public final class SessionArchive {
     private let container: ModelContainer
     private let saveHandler: () throws -> Void
 
+    // PR 4 → package
     public init(
         modelContext: ModelContext,
         saveHandler: (() throws -> Void)? = nil
