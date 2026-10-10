@@ -91,6 +91,20 @@
                ReferencedContainer = "container:Packages/ShflKit">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ShflCompositionTests"
+               BuildableName = "ShflCompositionTests"
+               BlueprintName = "ShflCompositionTests"
+               ReferencedContainer = "container:Packages/ShflKit">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

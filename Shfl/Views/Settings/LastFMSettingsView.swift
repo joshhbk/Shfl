@@ -1,4 +1,5 @@
 import AuthenticationServices
+import ShflComposition
 import ShflLastFM
 import SwiftUI
 
@@ -269,4 +270,5 @@ private struct RecentTrackRow: View {
     NavigationStack {
         LastFMSettingsView()
     }
+    .environment(AppModel.preview())
 }

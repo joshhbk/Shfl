@@ -1,4 +1,5 @@
 import ShflAppleMusicUI
+import ShflComposition
 import ShflCore
 import ShflDeterministic
 import SwiftUI
@@ -6,7 +7,6 @@ import Vortex
 
 struct PlayerView: View {
     var player: ShufflePlayer
-    let playbackTransport: PlaybackTransport
     let onAddTapped: () -> Void
     let onSettingsTapped: () -> Void
     let onSkipForwardTapped: () -> Void
@@ -18,14 +18,14 @@ struct PlayerView: View {
     @Environment(\.artworkStore) private var artworkStore
     @State private var themeController: ThemeController
     @State private var tintProvider: TintedThemeProvider
-    @State private var playbackClock: PlaybackClock?
+    @State private var playbackClock: PlaybackClock
     @State private var colorExtractor = AlbumArtColorExtractor()
     @State private var showError = false
     @State private var errorMessage = ""
 
     init(
         player: ShufflePlayer,
-        playbackTransport: PlaybackTransport,
+        playbackClock: PlaybackClock,
         initialThemeId: String? = nil,
         onAddTapped: @escaping () -> Void = {},
         onSettingsTapped: @escaping () -> Void = {},
@@ -33,7 +33,7 @@ struct PlayerView: View {
         onSkipBackTapped: @escaping () -> Void = {}
     ) {
         self.player = player
-        self.playbackTransport = playbackTransport
+        self._playbackClock = State(wrappedValue: playbackClock)
         self.onAddTapped = onAddTapped
         self.onSettingsTapped = onSettingsTapped
         self.onSkipForwardTapped = onSkipForwardTapped
@@ -66,7 +66,7 @@ struct PlayerView: View {
                     onAdd: onAddTapped,
                     onSettings: onSettingsTapped,
                     onSeek: { time in
-                        playbackClock?.handleUserSeek(to: time)
+                        playbackClock.handleUserSeek(to: time)
                         player.seek(to: time)
                     },
                     isShuffling: isStartingSession,
@@ -86,10 +86,7 @@ struct PlayerView: View {
         .simultaneousGesture(themeController.makeSwipeGesture())
         .environment(\.shuffleTheme, tintProvider.computedTheme)
         .onAppear {
-            if playbackClock == nil {
-                playbackClock = PlaybackClock(playbackTransport: playbackTransport)
-            }
-            playbackClock?.startUpdating(playbackState: player.playbackState)
+            playbackClock.startUpdating(playbackState: player.playbackState)
 
             // Initialize tint provider with current theme
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
@@ -99,7 +96,7 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
-            playbackClock?.stopUpdating()
+            playbackClock.stopUpdating()
         }
         .onChange(of: player.playbackState) { _, newState in
             handlePlaybackStateChange(newState)
@@ -139,7 +136,7 @@ struct PlayerView: View {
             }
         }
 
-        playbackClock?.handlePlaybackStateChange(newState)
+        playbackClock.handlePlaybackStateChange(newState)
 
         if let song = newState.currentSong {
             colorExtractor.updateColor(for: song.id, lookUpColors: artworkColorLookup)
@@ -230,9 +227,7 @@ private let previewQueueSongs = [
 ]
 
 private struct PlayerViewPreviewHost: View {
-    private let musicService: DeterministicMusicService
-    private let sessionDraft = SessionDraftStore()
-    private let player: ShufflePlayer
+    @State private var model: AppModel
     private let themeId: String
 
     init(state: PreviewPlayerState, themeId: String) {
@@ -245,36 +240,30 @@ private struct PlayerViewPreviewHost: View {
         case .paused: .paused(previewSong)
         case .error: .error(PreviewPlaybackError(errorDescription: "Preview playback failed."))
         }
-        let musicService = DeterministicMusicService(
-            configuration: .init(
-                librarySongs: previewQueueSongs,
-                playbackDuration: 242,
-                playbackTime: 78,
-                playbackState: initialPlaybackState
+        let draft: [Song] = switch state {
+        case .empty: []
+        case .armed, .loading, .playing, .paused, .error: previewQueueSongs
+        }
+        _model = State(
+            wrappedValue: AppModel.preview(
+                library: DeterministicLibrary(songs: previewQueueSongs),
+                playback: DeterministicPlayback(state: initialPlaybackState, time: 78, duration: 242),
+                draft: draft
             )
         )
-        switch state {
-        case .empty:
-            break
-        case .armed, .loading, .playing, .paused, .error:
-            try? sessionDraft.add(previewQueueSongs)
-        }
-
-        self.musicService = musicService
-        self.player = ShufflePlayer(playbackTransport: musicService, sessionDraft: sessionDraft)
     }
 
     var body: some View {
         PlayerView(
-            player: player,
-            playbackTransport: musicService,
+            player: model.player,
+            playbackClock: model.makePlaybackClock(),
             initialThemeId: themeId,
             onAddTapped: {},
             onSettingsTapped: {},
             onSkipForwardTapped: {},
             onSkipBackTapped: {}
         )
-        .environment(\.sessionDraft, sessionDraft)
+        .environment(\.sessionDraft, model.sessionDraft)
     }
 }
 

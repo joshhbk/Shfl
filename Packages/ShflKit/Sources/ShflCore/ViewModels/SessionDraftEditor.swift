@@ -4,22 +4,29 @@ public enum DraftEdit: Equatable {
     case added(songCount: Int, reachedMilestone: Bool)
     case removed
     case rejectedAtCapacity
+    /// The pool is unchanged. The message says why, for the listener; this is
+    /// the only place it is reported.
     case failed(String)
 }
 
+/// The song picker's edits to one session draft, and whether autofill has run
+/// out of songs.
 @Observable
 @MainActor
 public final class SessionDraftEditor {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    public private(set) var actionErrorMessage: String?
     public private(set) var autofillIsExhausted = false
 
-    public init() {}
+    @ObservationIgnored private let draft: SessionDraftStore
+
+    package init(draft: SessionDraftStore) {
+        self.draft = draft
+    }
 
     // MARK: - Editing
 
     @discardableResult
-    public func toggle(_ song: Song, in draft: SessionDraftStore) -> DraftEdit {
+    public func toggle(_ song: Song) -> DraftEdit {
         autofillIsExhausted = false
 
         if draft.contains(song.id) {
@@ -36,28 +43,16 @@ public final class SessionDraftEditor {
         } catch ShufflePlayerError.capacityReached {
             return .rejectedAtCapacity
         } catch {
-            showActionError(error.localizedDescription)
             return .failed(error.localizedDescription)
         }
     }
 
-    public func clearAll(in draft: SessionDraftStore) {
+    public func clearAll() {
         autofillIsExhausted = false
         draft.removeAll()
     }
 
     public func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
         autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
-    }
-
-    func showActionError(_ message: String) {
-        actionErrorMessage = message
-
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
-            if actionErrorMessage == message {
-                actionErrorMessage = nil
-            }
-        }
     }
 }

@@ -1,9 +1,9 @@
+import ShflComposition
 import ShflCore
 import SwiftUI
 
 struct MainView: View {
     let model: AppModel
-    let libraryPreferences: LibraryPreferences
     let appearanceSettings: AppearanceSettings
 
     @Environment(\.scenePhase) private var scenePhase
@@ -18,12 +18,10 @@ struct MainView: View {
 
     init(
         model: AppModel,
-        libraryPreferences: LibraryPreferences,
         appearanceSettings: AppearanceSettings,
         showsStartupSplash: Bool = true
     ) {
         self.model = model
-        self.libraryPreferences = libraryPreferences
         self.appearanceSettings = appearanceSettings
         _hasCompletedSplashTimeline = State(initialValue: !showsStartupSplash)
         _hasDismissedStartupSplash = State(initialValue: !showsStartupSplash)
@@ -63,7 +61,7 @@ struct MainView: View {
             }
         }
         .tint(deviceAccentColor)
-        .environment(\.libraryPreferences, libraryPreferences)
+        .environment(\.libraryPreferences, model.libraryPreferences)
         .environment(\.appearanceSettings, appearanceSettings)
         .task {
             await startInitialLoadIfNeeded()
@@ -82,7 +80,7 @@ struct MainView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .tint(deviceAccentColor)
-                .environment(\.libraryPreferences, libraryPreferences)
+                .environment(\.libraryPreferences, model.libraryPreferences)
                 .environment(\.appearanceSettings, appearanceSettings)
                 .environment(\.shufflePlayer, model.player)
         }
@@ -105,13 +103,13 @@ struct MainView: View {
     @ViewBuilder
     private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
         SongPickerView(
-            libraryCatalog: model.library,
-            libraryPreferences: libraryPreferences,
+            browser: model.makeLibraryBrowser(),
+            editor: model.makeDraftEditor(),
             onDismiss: onDismiss
         )
         .tint(deviceAccentColor)
         .environment(\.shuffleTheme, currentTheme)
-        .environment(\.libraryPreferences, libraryPreferences)
+        .environment(\.libraryPreferences, model.libraryPreferences)
         .environment(\.appearanceSettings, appearanceSettings)
     }
 
@@ -133,7 +131,7 @@ struct MainView: View {
         case .ready:
             PlayerView(
                 player: model.player,
-                playbackTransport: model.playbackTransport,
+                playbackClock: model.makePlaybackClock(),
                 initialThemeId: appearanceSettings.currentThemeId,
                 onAddTapped: { showingPicker = true },
                 onSettingsTapped: { showingSettings = true },
@@ -155,7 +153,7 @@ struct MainView: View {
         hasStartedInitialLoad = true
 
         await Task.yield()
-        await model.onAppear()
+        await model.launch()
         hasCompletedInitialLoad = true
         VolumeController.initialize()
         dismissSplashIfReady()

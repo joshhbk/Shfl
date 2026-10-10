@@ -31,6 +31,7 @@ let package = Package(
         .library(name: "ShflCore", targets: ["ShflCore"]),
         .library(name: "ShflAppleMusic", targets: ["ShflAppleMusic"]),
         .library(name: "ShflAppleMusicUI", targets: ["ShflAppleMusicUI"]),
+        .library(name: "ShflComposition", targets: ["ShflComposition"]),
         .library(name: "ShflDeterministic", targets: ["ShflDeterministic"]),
         .library(name: "ShflLastFM", targets: ["ShflLastFM"]),
     ],
@@ -90,6 +91,17 @@ let package = Package(
         .testTarget(
             name: "ShflLastFMTests",
             dependencies: ["ShflLastFM"],
+            swiftSettings: testSettings
+        ),
+        /// Chooses each launch's adapters and hands shells one AppModel.
+        .target(
+            name: "ShflComposition",
+            dependencies: ["ShflCore", "ShflAppleMusic", "ShflLastFM", "ShflDeterministic"],
+            swiftSettings: librarySettings
+        ),
+        .testTarget(
+            name: "ShflCompositionTests",
+            dependencies: ["ShflComposition", "ShflTestSupport"],
             swiftSettings: testSettings
         ),
         /// Helpers shared by the test targets. No product, so nothing ships it.

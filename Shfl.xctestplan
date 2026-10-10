@@ -53,6 +53,13 @@
         "identifier" : "ShflLastFMTests",
         "name" : "ShflLastFMTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflCompositionTests",
+        "name" : "ShflCompositionTests"
+      }
     }
   ],
   "version" : 1

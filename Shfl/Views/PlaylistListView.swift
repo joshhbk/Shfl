@@ -1,12 +1,14 @@
+import ShflComposition
 import ShflCore
 import SwiftUI
 
 struct PlaylistListView: View {
     @Bindable var browser: LibraryBrowser
-    let libraryCatalog: LibraryCatalog
     let selectedSongIds: Set<String>
     let isAtCapacity: Bool
     let onToggleSong: (Song) -> Void
+
+    @Environment(AppModel.self) private var model
 
     // Optional search results — when provided, show these instead of browse data
     var searchResults: [Playlist]? = nil
@@ -62,9 +64,7 @@ struct PlaylistListView: View {
         .scrollDismissesKeyboard(.immediately)
         .navigationDestination(for: Playlist.self) { playlist in
             PlaylistDetailView(
-                playlistId: playlist.id,
-                playlistName: playlist.name,
-                libraryCatalog: libraryCatalog,
+                songs: model.makeSongs(in: playlist),
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: isAtCapacity,
                 onToggleSong: onToggleSong

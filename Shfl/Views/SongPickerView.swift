@@ -1,3 +1,4 @@
+import ShflComposition
 import ShflCore
 import ShflDeterministic
 import SwiftUI
@@ -37,11 +38,12 @@ enum BrowseMode: String, CaseIterable {
 }
 
 struct SongPickerView: View {
-    let libraryCatalog: LibraryCatalog
     let onDismiss: () -> Void
 
     @State private var browser: LibraryBrowser
-    @State private var editor = SessionDraftEditor()
+    @State private var editor: SessionDraftEditor
+    /// Why the last edit failed, shown for three seconds.
+    @State private var draftEditFailure: String?
     @State private var navigationPath = NavigationPath()
     @State private var showingAutofillCompletion = false
     @State private var autofillTapCount = 0
@@ -52,19 +54,16 @@ struct SongPickerView: View {
     @Environment(\.listeningSessionHost) private var sessionHost
     @Environment(\.shuffleTheme) private var shuffleTheme
 
+    /// - Parameter editor: Edits the draft the environment's `sessionDraft`
+    ///   shows.
     init(
-        libraryCatalog: LibraryCatalog,
-        libraryPreferences: LibraryPreferences,
+        browser: LibraryBrowser,
+        editor: SessionDraftEditor,
         onDismiss: @escaping () -> Void
     ) {
-        self.libraryCatalog = libraryCatalog
         self.onDismiss = onDismiss
-        self._browser = State(
-            wrappedValue: LibraryBrowser(
-                libraryCatalog: libraryCatalog,
-                preferences: libraryPreferences
-            )
-        )
+        self._browser = State(wrappedValue: browser)
+        self._editor = State(wrappedValue: editor)
     }
 
     private var browseMode: BrowseMode {
@@ -108,7 +107,7 @@ struct SongPickerView: View {
                     modernCompletionBar
                 }
             }
-            .animation(.default, value: editor.actionErrorMessage)
+            .animation(.default, value: draftEditFailure)
             .accessibilityElement(children: .contain)
             .accessibilitySortPriority(-1)
         }
@@ -248,7 +247,7 @@ struct SongPickerView: View {
                 if !selectedSongIds.isEmpty {
                     Button(role: .destructive) {
                         showingAutofillCompletion = false
-                        editor.clearAll(in: sessionDraft)
+                        editor.clearAll()
                     } label: {
                         Image(systemName: "trash")
                             .font(.body.weight(.semibold))
@@ -305,7 +304,6 @@ struct SongPickerView: View {
         case .artists:
             ArtistListView(
                 browser: browser,
-                libraryCatalog: libraryCatalog,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
                 onToggleSong: toggle
@@ -313,7 +311,6 @@ struct SongPickerView: View {
         case .playlists:
             PlaylistListView(
                 browser: browser,
-                libraryCatalog: libraryCatalog,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
                 onToggleSong: toggle
@@ -440,7 +437,6 @@ struct SongPickerView: View {
     private var artistSearchResultsList: some View {
         ArtistListView(
             browser: browser,
-            libraryCatalog: libraryCatalog,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
             onToggleSong: toggle,
@@ -464,7 +460,6 @@ struct SongPickerView: View {
     private var playlistSearchResultsList: some View {
         PlaylistListView(
             browser: browser,
-            libraryCatalog: libraryCatalog,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
             onToggleSong: toggle,
@@ -514,8 +509,8 @@ struct SongPickerView: View {
     private var overlayPills: some View {
         if hasOverlayMessage {
             VStack(spacing: 8) {
-                if let actionErrorMessage = editor.actionErrorMessage {
-                    Text(actionErrorMessage)
+                if let draftEditFailure {
+                    Text(draftEditFailure)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(.white)
@@ -523,6 +518,10 @@ struct SongPickerView: View {
                         .padding(.vertical, 10)
                         .background(Color.red.opacity(0.9), in: Capsule())
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .task(id: draftEditFailure) {
+                            guard (try? await Task.sleep(for: .seconds(3))) != nil else { return }
+                            self.draftEditFailure = nil
+                        }
                 }
 
                 if showAutofillBanner {
@@ -554,17 +553,20 @@ struct SongPickerView: View {
     }
 
     private var hasOverlayMessage: Bool {
-        editor.actionErrorMessage != nil || showAutofillBanner
+        draftEditFailure != nil || showAutofillBanner
     }
 
     // MARK: - Helpers
 
     private func toggle(_ song: Song) {
-        switch editor.toggle(song, in: sessionDraft) {
+        switch editor.toggle(song) {
         case .added(_, reachedMilestone: true):
             HapticFeedback.milestone.trigger()
-        case .added, .removed, .rejectedAtCapacity, .failed:
-            // SongRow plays its own feedback; failures show the error pill.
+        case .failed(let message):
+            draftEditFailure = message
+        case .added, .removed, .rejectedAtCapacity:
+            // SongRow plays its own feedback, including the nope animation
+            // at capacity.
             break
         }
     }
@@ -619,30 +621,32 @@ struct SongPickerView: View {
 
 // MARK: - Previews
 
+private struct SongPickerPreview: View {
+    @State private var model: AppModel
+
+    init(library: DeterministicLibrary, draft: [Song] = []) {
+        _model = State(wrappedValue: AppModel.preview(library: library, draft: draft))
+    }
+
+    var body: some View {
+        SongPickerView(
+            browser: model.makeLibraryBrowser(),
+            editor: model.makeDraftEditor(),
+            onDismiss: {}
+        )
+        .environment(\.sessionDraft, model.sessionDraft)
+        .environment(model)
+    }
+}
+
 #Preview("Songs Tab") {
-    SongPickerView(
-        libraryCatalog: DeterministicMusicService(library: .sample),
-        libraryPreferences: LibraryPreferences(),
-        onDismiss: {}
-    )
+    SongPickerPreview(library: .sample)
 }
 
 #Preview("With Selected Songs") {
-    let draft = SessionDraftStore()
-    try? draft.add(Array(DeterministicLibrary.sample.songs.prefix(5)))
-
-    return SongPickerView(
-        libraryCatalog: DeterministicMusicService(library: .sample),
-        libraryPreferences: LibraryPreferences(),
-        onDismiss: {}
-    )
-    .environment(\.sessionDraft, draft)
+    SongPickerPreview(library: .sample, draft: Array(DeterministicLibrary.sample.songs.prefix(5)))
 }
 
 #Preview("Empty Library") {
-    SongPickerView(
-        libraryCatalog: DeterministicMusicService(),
-        libraryPreferences: LibraryPreferences(),
-        onDismiss: {}
-    )
+    SongPickerPreview(library: .empty)
 }

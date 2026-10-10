@@ -2,24 +2,25 @@ import Foundation
 import ShflAppleMusic
 import ShflCore
 import ShflDeterministic
+import ShflLastFM
 import SwiftData
 
 /// The single place where Shfl chooses concrete adapters and storage.
 @MainActor
-struct AppComposition {
-    enum Mode: Equatable {
+public struct AppComposition {
+    public enum Mode: Equatable {
         case live
         case deterministic
     }
 
     static let deterministicLaunchArgument = "--deterministic"
 
-    let modelContainer: ModelContainer
-    let libraryPreferences: LibraryPreferences
-    let appearanceSettings: AppearanceSettings
-    let appModel: AppModel
-    let artworkStore: ArtworkStore?
-    let showsStartupSplash: Bool
+    public let mode: Mode
+    public let appModel: AppModel
+    /// Where this launch keeps settings, the shell's included: standard
+    /// defaults for live launches, and a fresh suite for deterministic ones
+    /// so they always start from the same settings.
+    public let userDefaults: UserDefaults
 
     static func selectedMode(
         arguments: [String] = ProcessInfo.processInfo.arguments,
@@ -32,70 +33,68 @@ struct AppComposition {
         return .live
     }
 
-    static func make() throws -> AppComposition {
+    /// Deterministic when launched with `--deterministic` or under XCTest,
+    /// live otherwise.
+    public static func make() throws -> AppComposition {
         try make(mode: selectedMode())
     }
 
     static func make(mode: Mode) throws -> AppComposition {
-        let schema = Schema([
-            PersistedSession.self
-        ])
-
         switch mode {
         case .live:
-            let modelContainer = try ModelContainer(
-                for: schema,
-                configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)]
-            )
-            let libraryPreferences = LibraryPreferences()
+            let defaults = UserDefaults.standard
+            let modelContainer = try makeModelContainer(storedInMemoryOnly: false)
             return AppComposition(
-                modelContainer: modelContainer,
-                libraryPreferences: libraryPreferences,
-                appearanceSettings: AppearanceSettings(),
+                mode: mode,
                 appModel: AppModel(
                     library: AppleMusicService(),
                     playbackTransport: MusicKitTransport(),
-                    modelContext: modelContainer.mainContext,
-                    libraryPreferences: libraryPreferences,
-                    savedAlgorithm: SavedShuffleAlgorithm()
+                    modelContainer: modelContainer,
+                    libraryPreferences: LibraryPreferences(defaults: defaults),
+                    savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
+                    lastFMTransport: LastFMTransport(
+                        apiKey: LastFMConfig.apiKey,
+                        sharedSecret: LastFMConfig.sharedSecret
+                    ),
+                    artworkStore: ArtworkStore()
                 ),
-                artworkStore: ArtworkStore(),
-                showsStartupSplash: true
+                userDefaults: defaults
             )
 
         case .deterministic:
-            let modelContainer = try ModelContainer(
-                for: schema,
-                configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
-            )
             let defaults = isolatedDefaults()
             let libraryPreferences = LibraryPreferences(defaults: defaults)
             libraryPreferences.autofillAlgorithm = .random
-            let appearanceSettings = AppearanceSettings(defaults: defaults)
-            appearanceSettings.currentThemeId = "silver"
             let savedAlgorithm = SavedShuffleAlgorithm(defaults: defaults)
             savedAlgorithm.save(.weightedByPlayCount)
 
             let musicService = DeterministicMusicService(library: .launch)
             return AppComposition(
-                modelContainer: modelContainer,
-                libraryPreferences: libraryPreferences,
-                appearanceSettings: appearanceSettings,
+                mode: mode,
                 appModel: AppModel(
                     library: musicService,
                     playbackTransport: musicService,
-                    modelContext: modelContainer.mainContext,
+                    modelContainer: try makeModelContainer(storedInMemoryOnly: true),
                     libraryPreferences: libraryPreferences,
                     savedAlgorithm: savedAlgorithm,
-                    scrobblingEnabled: false
+                    lastFMTransport: nil,
+                    artworkStore: nil
                 ),
-                artworkStore: nil,
-                showsStartupSplash: false
+                userDefaults: defaults
             )
         }
     }
 
-    private static func isolatedDefaults() -> UserDefaults {
+    static func makeModelContainer(storedInMemoryOnly: Bool) throws -> ModelContainer {
+        let schema = Schema([PersistedSession.self])
+        return try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: storedInMemoryOnly)]
+        )
+    }
+
+    /// An emptied suite unique to this process.
+    static func isolatedDefaults() -> UserDefaults {
         let suiteName = "com.joshuahughes.shuffled.deterministic.\(ProcessInfo.processInfo.processIdentifier)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)

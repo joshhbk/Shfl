@@ -1,9 +1,9 @@
-import SwiftData
 import SwiftUI
 import XCTest
 @testable import Shfl
-@testable import ShflCore
-@testable import ShflDeterministic
+import ShflComposition
+import ShflCore
+import ShflDeterministic
 
 /// Builds real screens in a window and lets SwiftUI tear them down, the way
 /// closing a sheet or popping a screen does. Under Xcode 27, a main-actor class
@@ -12,54 +12,35 @@ import XCTest
 @MainActor
 final class ViewTeardownTests: XCTestCase {
     func test_closingTheSongPickerReleasesItsStateWithoutCrashing() async throws {
-        let suiteName = "ViewTeardownTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let draft = SessionDraftStore()
+        let model = AppModel.preview(library: .empty)
         try await showThenTearDown(
             SongPickerView(
-                libraryCatalog: DeterministicMusicService(),
-                libraryPreferences: LibraryPreferences(defaults: defaults),
+                browser: model.makeLibraryBrowser(),
+                editor: model.makeDraftEditor(),
                 onDismiss: {}
             )
-            .environment(\.sessionDraft, draft)
+            .environment(\.sessionDraft, model.sessionDraft)
+            .environment(model)
         )
     }
 
     func test_leavingThePlayerReleasesItsStateWithoutCrashing() async throws {
-        let service = DeterministicMusicService()
-        let draft = SessionDraftStore()
+        let model = AppModel.preview(library: .empty)
         try await showThenTearDown(
             PlayerView(
-                player: ShufflePlayer(playbackTransport: service, sessionDraft: draft),
-                playbackTransport: service
+                player: model.player,
+                playbackClock: model.makePlaybackClock()
             )
-            .environment(\.sessionDraft, draft)
+            .environment(\.sessionDraft, model.sessionDraft)
         )
     }
 
     func test_leavingLastFMSettingsReleasesItsStateWithoutCrashing() async throws {
-        let container = try ModelContainer(
-            for: PersistedSession.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        let suiteName = "ViewTeardownTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let service = DeterministicMusicService()
-        let model = AppModel(
-            library: service,
-            playbackTransport: service,
-            modelContext: container.mainContext,
-            libraryPreferences: LibraryPreferences(defaults: defaults),
-            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
-            scrobblingEnabled: false
-        )
         try await showThenTearDown(
             NavigationStack {
                 LastFMSettingsView()
             }
-            .environment(model)
+            .environment(AppModel.preview(library: .empty))
         )
     }
 

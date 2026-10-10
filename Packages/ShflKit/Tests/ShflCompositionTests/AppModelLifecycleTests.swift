@@ -1,8 +1,9 @@
 import SwiftData
 import XCTest
-@testable import Shfl
+@testable import ShflComposition
 @testable import ShflCore
 @testable import ShflDeterministic
+import ShflTestSupport
 
 @MainActor
 final class AppModelLifecycleTests: XCTestCase {
@@ -39,9 +40,11 @@ final class AppModelLifecycleTests: XCTestCase {
         let model = AppModel(
             library: mockService,
             playbackTransport: mockService,
-            modelContext: modelContext,
+            modelContainer: container,
             libraryPreferences: libraryPreferences,
-            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults)
+            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
+            lastFMTransport: nil,
+            artworkStore: nil
         )
 
         let song = Song(
@@ -71,9 +74,11 @@ final class AppModelLifecycleTests: XCTestCase {
         let model = AppModel(
             library: mockService,
             playbackTransport: mockService,
-            modelContext: modelContext,
+            modelContainer: container,
             libraryPreferences: libraryPreferences,
             savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
+            lastFMTransport: nil,
+            artworkStore: nil,
             lifecyclePersistenceHook: { persistCallCount += 1 }
         )
 
@@ -86,7 +91,7 @@ final class AppModelLifecycleTests: XCTestCase {
         let model = makeModel(service: DeterministicMusicService())
         XCTAssertEqual(model.launchPhase, .loading)
 
-        await model.onAppear()
+        await model.launch()
 
         XCTAssertEqual(model.launchPhase, .ready)
     }
@@ -94,7 +99,7 @@ final class AppModelLifecycleTests: XCTestCase {
     func testLaunchWithoutAccessAsksAndReportsADenial() async {
         let model = makeModel(service: DeterministicMusicService(configuration: .init(isAuthorized: false)))
 
-        await model.onAppear()
+        await model.launch()
         XCTAssertEqual(model.launchPhase, .needsAuthorization)
 
         await model.requestAuthorization()
@@ -116,9 +121,11 @@ final class AppModelLifecycleTests: XCTestCase {
         AppModel(
             library: service,
             playbackTransport: service,
-            modelContext: modelContext,
+            modelContainer: container,
             libraryPreferences: libraryPreferences,
-            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults)
+            savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
+            lastFMTransport: nil,
+            artworkStore: nil
         )
     }
 }

@@ -1,5 +1,5 @@
 import XCTest
-@testable import Shfl
+@testable import ShflComposition
 @testable import ShflCore
 @testable import ShflDeterministic
 
@@ -30,9 +30,9 @@ final class AppCompositionTests: XCTestCase {
             model.playbackTransport as? DeterministicMusicService
         )
 
-        XCTAssertFalse(composition.showsStartupSplash)
+        XCTAssertEqual(composition.mode, .deterministic)
 
-        await model.onAppear()
+        await model.launch()
         XCTAssertEqual(model.launchPhase, .ready)
 
         // Play on an empty draft autofills it from the library first.
