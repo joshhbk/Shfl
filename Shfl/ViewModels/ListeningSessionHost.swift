@@ -49,7 +49,7 @@ final class ListeningSessionHost {
         playbackTransport: PlaybackTransport,
         archive: SessionArchive,
         autofillSource: WarmableAutofillSource,
-        initialAlgorithm: ShuffleAlgorithm = .noRepeat,
+        initialAlgorithm: ShuffleAlgorithm = SessionDraft.defaultAlgorithm,
         saveAlgorithm: @escaping (ShuffleAlgorithm) -> Void = { _ in },
         makeSeed: @escaping () -> UInt64 = { UInt64.random(in: UInt64.min ... UInt64.max) },
         now: @escaping () -> Date = Date.init,

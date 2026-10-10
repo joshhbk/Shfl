@@ -2,6 +2,8 @@ import Foundation
 
 nonisolated struct SessionDraft: Equatable, Sendable {
     static let maxSongs = 120
+    /// The algorithm a draft uses until the listener picks another.
+    static let defaultAlgorithm: ShuffleAlgorithm = .noRepeat
     /// Song counts worth celebrating as the draft fills up.
     static let milestones: Set<Int> = [1, 50, 100, 120]
 
@@ -10,7 +12,7 @@ nonisolated struct SessionDraft: Equatable, Sendable {
 
     init(
         songs: [Song] = [],
-        algorithm: ShuffleAlgorithm = .noRepeat
+        algorithm: ShuffleAlgorithm = SessionDraft.defaultAlgorithm
     ) {
         let uniqueSongs = Self.unique(songs)
         precondition(

@@ -12,9 +12,9 @@ struct SavedShuffleAlgorithm {
         self.defaults = defaults
     }
 
-    /// The saved algorithm, or `.noRepeat` when none was saved.
+    /// The saved algorithm, or the draft's default when none was saved.
     func load() -> ShuffleAlgorithm {
-        defaults.string(forKey: Self.defaultsKey).flatMap(ShuffleAlgorithm.init(rawValue:)) ?? .noRepeat
+        defaults.string(forKey: Self.defaultsKey).flatMap(ShuffleAlgorithm.init(rawValue:)) ?? SessionDraft.defaultAlgorithm
     }
 
     func save(_ algorithm: ShuffleAlgorithm) {
