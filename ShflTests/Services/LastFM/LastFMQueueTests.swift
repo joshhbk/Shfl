@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import Shfl
+@testable import ShflCore
 
 @Suite("LastFMQueue Tests")
 struct LastFMQueueTests {

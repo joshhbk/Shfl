@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 
 /// The classic iPod Shuffle player layout, composing PlayerTopBar, SongInfoDisplay, and PlayerControlsPanel

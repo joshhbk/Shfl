@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import ShflCore
 
 nonisolated struct LastFMRecentTrack: Identifiable, Equatable, Sendable {
     let id: String

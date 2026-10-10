@@ -1,5 +1,6 @@
 import XCTest
 @testable import Shfl
+@testable import ShflCore
 
 /// The MusicKit transport adapter against a fake player that reproduces
 /// MusicKit's quirks. Timing of the end-of-session confirmation is controlled

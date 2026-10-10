@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 
 /// Picks a tint colour for the playing song from its album artwork's palette,

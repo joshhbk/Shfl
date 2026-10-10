@@ -1,5 +1,6 @@
 import Foundation
 import MusicKit
+import ShflCore
 
 /// MusicKit authorization and library catalog. Playback lives in
 /// `MusicKitTransport`.
@@ -136,7 +137,7 @@ final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
             return LibraryPage(songs: [], hasMore: false)
         }
 
-        let allSongs = tracks.compactMap { track -> Song? in
+        let allSongs = tracks.compactMap { track -> ShflCore.Song? in
             guard case .song(let musicKitSong) = track else { return nil }
             return Song(
                 id: musicKitSong.id.rawValue,

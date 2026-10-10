@@ -1,4 +1,5 @@
 import MusicKit
+import ShflCore
 import SwiftUI
 
 /// Draws a library item's artwork at `size` points square, showing

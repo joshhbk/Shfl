@@ -1,4 +1,5 @@
 import Foundation
+import ShflCore
 import SwiftData
 
 /// The single place where Shfl chooses concrete adapters and storage.

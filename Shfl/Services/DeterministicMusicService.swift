@@ -1,4 +1,5 @@
 import Foundation
+import ShflCore
 import Synchronization
 
 /// Deterministic adapter for playback scenarios, previews, and UI tests.
@@ -6,7 +7,7 @@ import Synchronization
 /// It uses the same music seam as MusicKit. Catalog results are supplied at
 /// construction time, and playback time advances only when `advance(by:)` is
 /// called. No Apple Music account, network, or wall clock is involved.
-actor DeterministicMusicService: MusicService {
+actor DeterministicMusicService {
     nonisolated struct Configuration: Sendable {
         var isAuthorized = true
         var librarySongs: [Song] = []
@@ -362,3 +363,7 @@ actor DeterministicMusicService: MusicService {
         return (start..<end, end < count)
     }
 }
+
+// Declared in an extension: listing nonisolated protocols on the actor itself
+// infers `nonisolated` onto its members, which Xcode 27 can reject on clean builds.
+extension DeterministicMusicService: MusicService {}

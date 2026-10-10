@@ -2,6 +2,7 @@ import Foundation
 import MusicKit
 import Testing
 @testable import Shfl
+@testable import ShflCore
 
 @Suite("ArtworkStore Tests")
 @MainActor

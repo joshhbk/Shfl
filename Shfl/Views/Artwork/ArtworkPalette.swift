@@ -1,4 +1,5 @@
 import MusicKit
+import ShflCore
 import SwiftUI
 
 /// The colours Apple Music picked for a library item's artwork.

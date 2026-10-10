@@ -5,6 +5,7 @@
 //  Created by Joshua Hughes on 2025-12-25.
 //
 
+import ShflCore
 import SwiftUI
 import SwiftData
 

@@ -1,5 +1,6 @@
 import Foundation
 import MusicKit
+import ShflCore
 
 /// Hands out MusicKit artwork for library items and remembers what it found
 /// for the rest of the launch.

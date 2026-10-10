@@ -1,4 +1,5 @@
 import Foundation
+import ShflCore
 import SwiftData
 
 @Observable

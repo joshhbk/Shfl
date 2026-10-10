@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 
 /// A 44pt rounded artwork tile for list rows, with an icon for the kind of

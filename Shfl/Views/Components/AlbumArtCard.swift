@@ -1,3 +1,4 @@
+import ShflCore
 import SwiftUI
 
 /// Floating album art card with layered shadows and subtle border
