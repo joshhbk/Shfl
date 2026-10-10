@@ -12,6 +12,7 @@ struct PlayerView: View {
     @Environment(\.appearanceSettings) private var appearanceSettings
     @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
+    @Environment(\.artworkStore) private var artworkStore
     @State private var themeController: ThemeController
     @State private var tintProvider: TintedThemeProvider
     @State private var playbackClock: PlaybackClock?
@@ -91,7 +92,7 @@ struct PlayerView: View {
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
 
             if let song = player.playbackState.currentSong {
-                colorExtractor.updateColor(for: song.id)
+                colorExtractor.updateColor(for: song.id, palette: artworkPalette)
             }
         }
         .onDisappear {
@@ -122,6 +123,10 @@ struct PlayerView: View {
         }
     }
 
+    private var artworkPalette: ArtworkPalette? {
+        artworkStore.map(ArtworkPalette.init(store:))
+    }
+
     // MARK: - State Handlers
 
     private func handlePlaybackStateChange(_ newState: PlaybackState) {
@@ -135,7 +140,7 @@ struct PlayerView: View {
         playbackClock?.handlePlaybackStateChange(newState)
 
         if let song = newState.currentSong {
-            colorExtractor.updateColor(for: song.id)
+            colorExtractor.updateColor(for: song.id, palette: artworkPalette)
         } else {
             colorExtractor.clear()
         }
