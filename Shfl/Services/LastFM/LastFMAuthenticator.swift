@@ -6,11 +6,18 @@ nonisolated struct LastFMSession: Codable, Equatable, Sendable {
     let username: String
 }
 
+/// Where the listener approves Shfl, and the URL scheme Last.fm redirects to
+/// afterwards. Run it in a web authentication session that watches for
+/// `callbackURLScheme`.
+nonisolated struct LastFMSignIn: Equatable, Sendable {
+    let url: URL
+    let callbackURLScheme: String
+}
+
 enum LastFMAuthError: Error {
     case keychainError(OSStatus)
     case authenticationFailed(String)
     case tokenExchangeFailed
-    case cancelled
 }
 
 extension LastFMAuthError: LocalizedError {
@@ -22,8 +29,6 @@ extension LastFMAuthError: LocalizedError {
             return message
         case .tokenExchangeFailed:
             return "Unable to complete Last.fm sign-in."
-        case .cancelled:
-            return nil
         }
     }
 }
@@ -31,14 +36,14 @@ extension LastFMAuthError: LocalizedError {
 /// Signs the listener in to Last.fm and keeps their session in the keychain.
 ///
 /// Sign-in is two steps around a web authentication session the shell runs:
-/// open `signInURL()` watching for `callbackURLScheme`, then hand the URL
-/// Last.fm redirects to back to `completeSignIn(callbackURL:)`.
+/// run `signIn()`, then hand the URL Last.fm redirects to back to
+/// `completeSignIn(callbackURL:)`.
 actor LastFMAuthenticator {
     /// Fetches a Last.fm API URL's response body.
     typealias Fetch = @Sendable (URL) async throws -> Data
 
     /// The scheme Last.fm redirects to once the listener approves Shfl.
-    nonisolated static let callbackURLScheme = "shfl"
+    private nonisolated static let callbackURLScheme = "shfl"
 
     private let apiKey: String
     private let sharedSecret: String
@@ -128,14 +133,14 @@ actor LastFMAuthenticator {
 
     // MARK: - Sign-in
 
-    /// The Last.fm page where the listener approves Shfl. It redirects to
-    /// `callbackURLScheme` with a token.
-    nonisolated func signInURL() throws -> URL {
+    /// The Last.fm page where the listener approves Shfl, which redirects to
+    /// the callback scheme with a token.
+    nonisolated func signIn() throws -> LastFMSignIn {
         let authURLString = "https://www.last.fm/api/auth/?api_key=\(apiKey)&cb=\(Self.callbackURLScheme)://lastfm"
         guard let authURL = URL(string: authURLString) else {
             throw LastFMAuthError.authenticationFailed("Invalid auth URL")
         }
-        return authURL
+        return LastFMSignIn(url: authURL, callbackURLScheme: Self.callbackURLScheme)
     }
 
     /// Finishes sign-in with the URL Last.fm redirected to: trades its token

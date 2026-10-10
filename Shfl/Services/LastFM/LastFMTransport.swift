@@ -168,9 +168,9 @@ actor LastFMTransport: ScrobbleTransport {
 
     // MARK: - Authentication
 
-    /// The Last.fm page where the listener approves Shfl. See `LastFMAuthenticator`.
-    nonisolated func signInURL() throws -> URL {
-        try authenticator.signInURL()
+    /// Where the listener approves Shfl. See `LastFMAuthenticator`.
+    nonisolated func signIn() throws -> LastFMSignIn {
+        try authenticator.signIn()
     }
 
     /// Finishes sign-in with the URL Last.fm redirected to, then sends any

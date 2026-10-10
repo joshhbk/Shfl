@@ -78,7 +78,7 @@ struct LastFMSettingsView: View {
                 .disabled(true)
             case .disconnected:
                 Button {
-                    Task { await account.connect(using: signIn) }
+                    Task { await account.connect(using: runWebSignIn) }
                 } label: {
                     Label("Connect to Last.fm", systemImage: "link.badge.plus")
                 }
@@ -91,15 +91,16 @@ struct LastFMSettingsView: View {
         }
     }
 
-    private func signIn(at url: URL, callbackURLScheme: String) async throws -> URL {
+    /// Returns nil when the listener cancels.
+    private func runWebSignIn(_ signIn: LastFMSignIn) async throws -> URL? {
         do {
             return try await webAuthenticationSession.authenticate(
-                using: url,
-                callbackURLScheme: callbackURLScheme,
+                using: signIn.url,
+                callbackURLScheme: signIn.callbackURLScheme,
                 preferredBrowserSession: .shared
             )
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
-            throw LastFMAuthError.cancelled
+            return nil
         }
     }
 

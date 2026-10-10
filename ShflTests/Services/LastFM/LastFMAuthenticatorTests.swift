@@ -91,18 +91,19 @@ struct LastFMAuthenticatorTests {
         #expect(retrieved == nil)
     }
 
-    @Test("Sign-in URL asks Last.fm to redirect to Shfl's callback scheme")
-    func signInURL() throws {
+    @Test("Sign-in asks Last.fm to redirect to Shfl's callback scheme")
+    func signIn() throws {
         let authenticator = LastFMAuthenticator(apiKey: "testkey", sharedSecret: "testsecret")
 
-        let url = try authenticator.signInURL()
+        let signIn = try authenticator.signIn()
 
-        #expect(url.absoluteString == "https://www.last.fm/api/auth/?api_key=testkey&cb=shfl://lastfm")
+        #expect(signIn.url.absoluteString == "https://www.last.fm/api/auth/?api_key=testkey&cb=shfl://lastfm")
+        #expect(signIn.callbackURLScheme == "shfl")
         let callback = try #require(
-            URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            URLComponents(url: signIn.url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "cb" })?.value
         )
-        #expect(URL(string: callback)?.scheme == LastFMAuthenticator.callbackURLScheme)
+        #expect(URL(string: callback)?.scheme == signIn.callbackURLScheme)
     }
 
     @Test("Completing sign-in trades the callback token for a signed-in session")
