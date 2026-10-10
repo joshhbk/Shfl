@@ -1,4 +1,3 @@
-import MusicKit
 import SwiftUI
 
 struct SongDisplay: View {
@@ -6,7 +5,7 @@ struct SongDisplay: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SongArtwork(songId: song.id)
+            EntityArtwork(subject: .song(id: song.id))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
@@ -20,38 +19,6 @@ struct SongDisplay: View {
                     .lineLimit(1)
             }
         }
-    }
-}
-
-struct SongArtwork: View {
-    let songId: String
-
-    @State private var artwork: Artwork?
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(Color.gray.opacity(0.2))
-            .frame(width: 44, height: 44)
-            .overlay {
-                if let artwork {
-                    ArtworkImage(artwork, width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                } else {
-                    Image(systemName: "music.note")
-                        .foregroundStyle(.gray)
-                }
-            }
-            .task(id: songId) {
-                artwork = ArtworkCache.shared.artwork(for: songId)
-                guard artwork == nil else { return }
-
-                ArtworkCache.shared.requestArtwork(for: songId)
-
-                for await loadedArtwork in ArtworkCache.shared.artworkUpdates(for: songId) {
-                    artwork = loadedArtwork
-                    break
-                }
-            }
     }
 }
 

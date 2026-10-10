@@ -1,7 +1,7 @@
-import MusicKit
 import SwiftUI
 
-/// Extracts colors from album artwork using MusicKit's library data
+/// Picks a tint colour for the playing song from its album artwork's palette,
+/// rotating through the palette so songs from one album don't repeat a colour.
 @Observable
 @MainActor
 final class AlbumArtColorExtractor {
@@ -16,8 +16,8 @@ final class AlbumArtColorExtractor {
     /// cycle through colors rather than randomly repeating.
     @ObservationIgnored private var lastUsedIndex: [Int: Int] = [:]
 
-    /// Updates the extracted color for the given song by fetching from user's library
-    func updateColor(for songId: String) {
+    /// A nil palette (no artwork store this launch) leaves the theme default.
+    func updateColor(for songId: String, palette: ArtworkPalette?) {
         // Skip if already processing this song
         guard songId != currentSongId else { return }
         currentSongId = songId
@@ -40,61 +40,42 @@ final class AlbumArtColorExtractor {
         // Cancel any existing task
         currentTask?.cancel()
 
+        guard let palette else {
+            extractedColor = nil
+            return
+        }
+
         #if DEBUG
-        print("[ColorExtractor] Fetching library data for songId: \(songId)")
+        print("[ColorExtractor] Fetching artwork palette for songId: \(songId)")
         #endif
         currentTask = Task {
-            do {
-                // Fetch from library using library ID
-                var request = MusicLibraryRequest<MusicKit.Song>()
-                request.filter(matching: \.id, equalTo: MusicItemID(songId))
-                let response = try await request.response()
+            let candidates = await palette.colors(for: .song(id: songId))
 
-                guard !Task.isCancelled, currentSongId == songId else { return }
+            guard !Task.isCancelled, currentSongId == songId else { return }
 
-                guard let song = response.items.first else {
-                    #if DEBUG
-                    print("[ColorExtractor] No song found in library for songId: \(songId)")
-                    #endif
-                    candidateCache[songId] = []
-                    extractedColor = nil
-                    return
-                }
-
+            guard let candidates else {
                 #if DEBUG
-                print("[ColorExtractor] Artwork object: \(String(describing: song.artwork))")
+                print("[ColorExtractor] No artwork available for songId: \(songId)")
                 #endif
-
-                guard let artwork = song.artwork else {
-                    #if DEBUG
-                    print("[ColorExtractor] No artwork available for songId: \(songId)")
-                    #endif
-                    candidateCache[songId] = []
-                    extractedColor = nil
-                    return
-                }
-
-                let candidates = Self.artworkColors(from: artwork)
-                candidateCache[songId] = candidates
-
-                let selected = pickNext(from: candidates)
-
-                #if DEBUG
-                if let selected {
-                    let hsb = ColorBlending.extractHSB(from: selected)
-                    print("[ColorExtractor] Randomly selected from \(candidates.count) candidate(s) for songId: \(songId) — hue: \(String(format: "%.2f", hsb.hue)) sat: \(String(format: "%.2f", hsb.saturation)) bright: \(String(format: "%.2f", hsb.brightness))")
-                } else {
-                    print("[ColorExtractor] No candidates for songId: \(songId), using theme default")
-                }
-                #endif
-
-                extractedColor = selected
-            } catch {
-                #if DEBUG
-                print("[ColorExtractor] Failed to fetch library data: \(error)")
-                #endif
+                candidateCache[songId] = []
                 extractedColor = nil
+                return
             }
+
+            candidateCache[songId] = candidates
+
+            let selected = pickNext(from: candidates)
+
+            #if DEBUG
+            if let selected {
+                let hsb = ColorBlending.extractHSB(from: selected)
+                print("[ColorExtractor] Randomly selected from \(candidates.count) candidate(s) for songId: \(songId) — hue: \(String(format: "%.2f", hsb.hue)) sat: \(String(format: "%.2f", hsb.saturation)) bright: \(String(format: "%.2f", hsb.brightness))")
+            } else {
+                print("[ColorExtractor] No candidates for songId: \(songId), using theme default")
+            }
+            #endif
+
+            extractedColor = selected
         }
     }
 
@@ -136,20 +117,5 @@ final class AlbumArtColorExtractor {
             hasher.combine(Int(hsb.brightness * 1000))
         }
         return hasher.finalize()
-    }
-
-    /// Collects all available artwork colors from MusicKit.
-    /// MusicKit provides backgroundColor, primaryTextColor, secondaryTextColor,
-    /// tertiaryTextColor, and quaternaryTextColor — any of them can be randomly selected.
-    private static func artworkColors(from artwork: MusicKit.Artwork) -> [Color] {
-        var colors: [Color] = []
-
-        if let c = artwork.backgroundColor { colors.append(Color(cgColor: c)) }
-        if let c = artwork.primaryTextColor { colors.append(Color(cgColor: c)) }
-        if let c = artwork.secondaryTextColor { colors.append(Color(cgColor: c)) }
-        if let c = artwork.tertiaryTextColor { colors.append(Color(cgColor: c)) }
-        if let c = artwork.quaternaryTextColor { colors.append(Color(cgColor: c)) }
-
-        return colors
     }
 }

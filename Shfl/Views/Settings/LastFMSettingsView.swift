@@ -1,8 +1,10 @@
+import AuthenticationServices
 import SwiftUI
 
 struct LastFMSettingsView: View {
     @Environment(\.lastFMTransport) private var transport
-    @State private var viewModel = LastFMSettingsViewModel()
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+    @State private var account = LastFMAccount()
 
     var body: some View {
         List {
@@ -13,39 +15,39 @@ struct LastFMSettingsView: View {
         }
         .navigationTitle("Last.fm")
         .refreshable {
-            await viewModel.refreshActivity(showLoading: !viewModel.recentTracksState.hasLoadedTracks)
+            await account.refreshActivity(showLoading: !account.recentTracksState.hasLoadedTracks)
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await viewModel.refreshActivity(showLoading: !viewModel.recentTracksState.hasLoadedTracks) }
+                    Task { await account.refreshActivity(showLoading: !account.recentTracksState.hasLoadedTracks) }
                 } label: {
-                    if viewModel.isRefreshing {
+                    if account.isRefreshing {
                         ProgressView()
                     } else {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
-                .disabled(!viewModel.connectionState.isConnected || viewModel.connectionState.isConnecting || viewModel.isRefreshing)
+                .disabled(!account.connectionState.isConnected || account.connectionState.isConnecting || account.isRefreshing)
                 .accessibilityLabel("Refresh Last.fm activity")
             }
         }
         .task {
-            viewModel.transport = transport
-            await viewModel.syncConnectionStatusOnly()
-            await viewModel.refreshActivity(showLoading: true)
+            account.transport = transport
+            await account.syncConnectionStatusOnly()
+            await account.refreshActivity(showLoading: true)
         }
     }
 
     private var statusSection: some View {
         Section("Status") {
             HStack(spacing: 12) {
-                Image(systemName: viewModel.connectionState.isConnected ? "checkmark.circle.fill" : "xmark.circle")
-                    .foregroundStyle(viewModel.connectionState.isConnected ? .green : .secondary)
+                Image(systemName: account.connectionState.isConnected ? "checkmark.circle.fill" : "xmark.circle")
+                    .foregroundStyle(account.connectionState.isConnected ? .green : .secondary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(viewModel.connectionState.isConnected ? "Connected" : "Not connected")
+                    Text(account.connectionState.isConnected ? "Connected" : "Not connected")
                         .font(.body.weight(.semibold))
-                    Text(viewModel.connectionState.username ?? "Connect Last.fm to enable scrobbling")
+                    Text(account.connectionState.username ?? "Connect Last.fm to enable scrobbling")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -57,14 +59,14 @@ struct LastFMSettingsView: View {
 
     private var actionsSection: some View {
         Section("Actions") {
-            switch viewModel.connectionState {
+            switch account.connectionState {
             case .connected:
                 Button(role: .destructive) {
-                    Task { await viewModel.disconnect() }
+                    Task { await account.disconnect() }
                 } label: {
                     Label("Disconnect", systemImage: "link.badge.minus")
                 }
-                .disabled(viewModel.isRefreshing)
+                .disabled(account.isRefreshing)
             case .connecting:
                 Button {} label: {
                     HStack {
@@ -76,29 +78,42 @@ struct LastFMSettingsView: View {
                 .disabled(true)
             case .disconnected:
                 Button {
-                    Task { await viewModel.connect() }
+                    Task { await account.connect(using: runWebSignIn) }
                 } label: {
                     Label("Connect to Last.fm", systemImage: "link.badge.plus")
                 }
             }
 
-            if let errorMessage = viewModel.errorMessage {
+            if let errorMessage = account.errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
             }
         }
     }
 
+    /// Returns nil when the listener cancels.
+    private func runWebSignIn(_ signIn: LastFMSignIn) async throws -> URL? {
+        do {
+            return try await webAuthenticationSession.authenticate(
+                using: signIn.url,
+                callbackURLScheme: signIn.callbackURLScheme,
+                preferredBrowserSession: .shared
+            )
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            return nil
+        }
+    }
+
     @ViewBuilder
     private var recentTracksSection: some View {
         Section("Recent Tracks") {
-            if !viewModel.connectionState.isConnected {
+            if !account.connectionState.isConnected {
                 emptyHintRow(
                     title: "Connect Last.fm to see recent tracks",
                     subtitle: "You can verify real-time scrobbling activity here after connecting."
                 )
             } else {
-                switch viewModel.recentTracksState {
+                switch account.recentTracksState {
                 case .idle, .loading:
                     HStack(spacing: 12) {
                         ProgressView()
@@ -111,7 +126,7 @@ struct LastFMSettingsView: View {
                         subtitle: "Play music for at least half the track duration to scrobble."
                     )
                     Button("Retry") {
-                        Task { await viewModel.refreshActivity(showLoading: true) }
+                        Task { await account.refreshActivity(showLoading: true) }
                     }
                 case .error:
                     emptyHintRow(
@@ -119,7 +134,7 @@ struct LastFMSettingsView: View {
                         subtitle: "Check your connection and try again."
                     )
                     Button("Retry") {
-                        Task { await viewModel.refreshActivity(showLoading: true) }
+                        Task { await account.refreshActivity(showLoading: true) }
                     }
                 case .loaded(let tracks):
                     ForEach(tracks) { track in
