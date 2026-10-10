@@ -44,7 +44,6 @@ struct SongPickerView: View {
 
     @State private var browser: LibraryBrowser
     @State private var editor: SessionDraftEditor
-    /// Why the last edit failed, shown for three seconds.
     @State private var draftEditFailure: DraftEditFailure?
     @State private var navigationPath = NavigationPath()
     @State private var showingAutofillCompletion = false
@@ -69,7 +68,6 @@ struct SongPickerView: View {
         self._editor = State(wrappedValue: editor)
     }
 
-    /// The draft the editor edits; the picker reads no other.
     private var sessionDraft: SessionDraftStore { editor.draft }
 
     private var browseMode: BrowseMode {
@@ -575,8 +573,7 @@ struct SongPickerView: View {
         case .failed(let message):
             draftEditFailure = DraftEditFailure(message: message)
         case .added, .removed, .rejectedAtCapacity:
-            // SongRow plays its own feedback, including the nope animation
-            // at capacity.
+            // SongRow plays its own feedback.
             break
         }
     }
@@ -622,8 +619,7 @@ struct SongPickerView: View {
     }
 }
 
-/// One failed edit. Each gets its own identity, so failing the same way twice
-/// shows the pill for another full three seconds.
+/// A fresh identity per failure, so a repeat restarts the three-second pill.
 private struct DraftEditFailure: Equatable {
     let id = UUID()
     let message: String

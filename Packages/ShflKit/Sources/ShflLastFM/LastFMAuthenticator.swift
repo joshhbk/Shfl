@@ -6,9 +6,6 @@ package nonisolated struct LastFMSession: Codable, Equatable, Sendable {
     let username: String
 }
 
-/// Where the listener approves Shfl, and the URL scheme Last.fm redirects to
-/// afterwards. Run it in a web authentication session that watches for
-/// `callbackURLScheme`.
 public nonisolated struct LastFMSignIn: Equatable, Sendable {
     public let url: URL
     public let callbackURLScheme: String

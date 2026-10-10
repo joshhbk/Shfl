@@ -4,14 +4,10 @@ public enum DraftEdit: Equatable {
     case added(songCount: Int, reachedMilestone: Bool)
     case removed
     case rejectedAtCapacity
-    /// The pool is unchanged. The message says why, for the listener; this is
-    /// the only place it is reported.
     case failed(String)
 }
 
-/// The song picker's edits to one session draft, and whether autofill has run
-/// out of songs. The picker reads the draft here too, so it always shows the
-/// draft it edits.
+/// The picker reads the draft through here, so it always shows the draft it edits.
 @Observable
 @MainActor
 public final class SessionDraftEditor {
@@ -53,8 +49,6 @@ public final class SessionDraftEditor {
         draft.removeAll()
     }
 
-    /// Fills the draft from `browser`'s library, which reports progress and
-    /// the outcome in its `autofillState`.
     public func autofill(using browser: LibraryBrowser) async {
         let requestedCount = draft.remainingCapacity
         await browser.autofill(into: draft)
@@ -67,8 +61,6 @@ public final class SessionDraftEditor {
         }
     }
 
-    /// Autofill is exhausted when it came back short while there was still
-    /// room, so the library has no more songs to offer.
     func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
         autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
     }

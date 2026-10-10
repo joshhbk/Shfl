@@ -2,11 +2,7 @@ import Foundation
 import MusicKit
 import ShflCore
 
-/// MusicKit authorization and library catalog. Playback lives in
-/// `MusicKitTransport`.
-///
-/// Nonisolated: it holds no state, and MusicKit's library requests don't need
-/// the main actor.
+/// Nonisolated: stateless, and MusicKit's library requests don't need the main actor.
 package nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
     package init() {}
 

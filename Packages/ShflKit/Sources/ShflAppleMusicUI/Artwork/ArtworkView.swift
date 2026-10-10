@@ -3,8 +3,6 @@ import ShflAppleMusic
 import ShflCore
 import SwiftUI
 
-/// Draws a library item's artwork at `size` points square, showing
-/// `placeholder` until (or unless) the artwork store finds some.
 public struct ArtworkView<Placeholder: View>: View {
     let subject: ArtworkSubject
     let size: CGFloat

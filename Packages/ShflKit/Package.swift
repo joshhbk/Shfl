@@ -45,8 +45,6 @@ let package = Package(
             dependencies: ["ShflCore", "ShflDeterministic", "ShflTestSupport"],
             swiftSettings: testSettings
         ),
-        /// An in-memory library and transport for tests, previews and
-        /// `--deterministic` launches.
         .target(
             name: "ShflDeterministic",
             dependencies: ["ShflCore"],
@@ -57,8 +55,6 @@ let package = Package(
             dependencies: ["ShflDeterministic"],
             swiftSettings: testSettings
         ),
-        /// The MusicKit adapters: library catalog, playback transport and
-        /// artwork lookup.
         .target(
             name: "ShflAppleMusic",
             dependencies: ["ShflCore"],
@@ -69,8 +65,6 @@ let package = Package(
             dependencies: ["ShflAppleMusic", "ShflDeterministic", "ShflTestSupport"],
             swiftSettings: testSettings
         ),
-        /// SwiftUI views that draw Apple Music artwork. The only views in the
-        /// package; every shell draws artwork through them.
         .target(
             name: "ShflAppleMusicUI",
             dependencies: ["ShflCore", "ShflAppleMusic"],
@@ -81,7 +75,6 @@ let package = Package(
             dependencies: ["ShflAppleMusicUI", "ShflAppleMusic", "ShflCore"],
             swiftSettings: testSettings
         ),
-        /// Scrobbling to Last.fm and the listener's Last.fm account.
         .target(
             name: "ShflLastFM",
             dependencies: ["ShflCore"],
@@ -92,7 +85,6 @@ let package = Package(
             dependencies: ["ShflLastFM"],
             swiftSettings: testSettings
         ),
-        /// Chooses each launch's adapters and hands shells one AppModel.
         .target(
             name: "ShflComposition",
             dependencies: ["ShflCore", "ShflAppleMusic", "ShflLastFM", "ShflDeterministic"],
@@ -103,7 +95,6 @@ let package = Package(
             dependencies: ["ShflComposition", "ShflCore", "ShflDeterministic", "ShflLastFM", "ShflTestSupport"],
             swiftSettings: testSettings
         ),
-        /// Helpers shared by the test targets. No product, so nothing ships it.
         .target(
             name: "ShflTestSupport",
             swiftSettings: testSettings

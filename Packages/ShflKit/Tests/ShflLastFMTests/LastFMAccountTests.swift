@@ -89,8 +89,6 @@ struct LastFMAccountTests {
     }
 }
 
-/// Signs in as "listener" whatever the callback, and has `tracks` as their
-/// recent scrobbles.
 private actor SignedInConnection {
     private let tracks: [LastFMRecentTrack]
     private var session: LastFMSession?
@@ -120,6 +118,5 @@ private actor SignedInConnection {
     }
 }
 
-// Declared in an extension: Xcode 27 infers `nonisolated` onto an actor that
-// lists a nonisolated protocol on its primary declaration, then rejects it.
+// In an extension: on the actor itself Xcode 27 infers nonisolated and rejects it.
 extension SignedInConnection: LastFMConnection {}

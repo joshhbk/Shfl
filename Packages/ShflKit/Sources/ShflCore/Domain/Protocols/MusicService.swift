@@ -121,11 +121,7 @@ package nonisolated protocol LibraryCatalog: Sendable {
 
 // MARK: - PlaybackTransport
 
-/// Playback transport interface. Consumers that queue songs and control playback depend on this.
-///
-/// The synchronous requirements are main-actor because MusicKit's player state
-/// may only be read there. The async ones stay nonisolated so an actor can
-/// adopt the protocol.
+/// Synchronous requirements are main-actor: MusicKit's player state may only be read there.
 package nonisolated protocol PlaybackTransport: Sendable {
     /// Atomically install one immutable listening session.
     func load(_ request: PlaybackLoadRequest) async throws

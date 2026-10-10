@@ -173,8 +173,7 @@ package actor LastFMTransport {
         try authenticator.signIn()
     }
 
-    /// Finishes sign-in with the URL Last.fm redirected to, then sends any
-    /// scrobbles queued while signed out.
+    /// Also sends scrobbles queued while signed out.
     package func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
         let session = try await authenticator.completeSignIn(callbackURL: callbackURL)
         await client.setSessionKey(session.sessionKey)
@@ -315,8 +314,7 @@ package actor LastFMTransport {
     }
 }
 
-// Declared in extensions: Xcode 27 infers `nonisolated` onto an actor that
-// lists a nonisolated protocol on its primary declaration, then rejects it.
+// In extensions: on the actor itself Xcode 27 infers nonisolated and rejects it.
 extension LastFMTransport: ScrobbleTransport {}
 extension LastFMTransport: LastFMConnection {}
 

@@ -30,14 +30,6 @@ public final class ListeningSessionHost {
     @ObservationIgnored private var songPoolTask: Task<Void, Never>?
     @ObservationIgnored private var algorithmTask: Task<Void, Never>?
 
-    /// - Parameters:
-    ///   - autofillSource: Where autofill finds songs. It is warmed whenever
-    ///     the draft is empty, ready for the next press of play.
-    ///   - initialAlgorithm: The algorithm the session draft starts with,
-    ///     usually the one last saved.
-    ///   - saveAlgorithm: Keeps each algorithm staged on the draft for the
-    ///     next launch.
-    ///   - makeSeed: The seed for each fresh shuffle.
     package init(
         playbackTransport: PlaybackTransport,
         archive: SessionArchive,
@@ -160,7 +152,6 @@ public final class ListeningSessionHost {
         }
     }
 
-    /// Saves the live playback position on the active session.
     package func sceneDidLeaveForeground() {
         print("📱 Scene left the foreground - checkpointing session...")
         checkpoint(position: playbackTransport.currentPlaybackTime)

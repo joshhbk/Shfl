@@ -1,19 +1,13 @@
 #!/bin/bash
-# Fails when a ShflKit target imports a module outside its allowed list, or
-# when the iOS app reaches past AppModel to MusicKit or an adapter.
-#
-# The package can't enforce this on its own: Apple's system frameworks
-# (SwiftUI, UIKit, AppKit, MusicKit, MediaPlayer…) are importable from any
-# target whatever it declares. Run from anywhere in the repo:
-#   scripts/check-core-imports.sh
+# Fails when a ShflKit target or the iOS app imports a module outside its allowed list.
+# Packages can import Apple frameworks without declaring them, so the compiler can't catch this.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 sources=Packages/ShflKit/Sources
 
-# Each target's allowed imports. Keep in step with Package.swift's
-# dependencies; a target missing here fails the check.
+# Keep in step with Package.swift; a target missing here fails the check.
 allowed_for() {
     case "$1" in
         ShflCore) echo 'Foundation|Observation|SwiftData' ;;
@@ -32,7 +26,6 @@ import_line='^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+((typealia
 
 violations=0
 
-# Prints each import in the files under $1 whose module doesn't match $2.
 check_imports() {
     local dir=$1 allowed=$2 file match line module
     while IFS= read -r -d '' file; do
@@ -58,8 +51,6 @@ for dir in "$sources"/*/; do
     check_imports "$dir" "$allowed"
 done
 
-# The app reaches MusicKit only through ShflAppleMusicUI's views, and the
-# adapters only through AppModel.
 check_imports Shfl 'Foundation|Observation|SwiftUI|UIKit|MediaPlayer|AuthenticationServices|Vortex|ShflCore|ShflAppleMusicUI|ShflLastFM|ShflDeterministic|ShflComposition'
 while IFS= read -r match; do
     [[ -z "$match" ]] && continue

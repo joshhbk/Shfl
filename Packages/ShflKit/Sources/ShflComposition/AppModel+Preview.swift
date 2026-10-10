@@ -3,14 +3,7 @@ import ShflCore
 import ShflDeterministic
 
 extension AppModel {
-    /// A model for previews and view tests. It browses and plays `library`
-    /// without Apple Music, starts with `draft` in the session draft, and has
-    /// no saved session, Last.fm or artwork. Its settings live in a preview
-    /// suite that is emptied each time a preview model is made, so nothing
-    /// leaks into the app's settings or piles up between runs.
-    ///
-    /// Lives here rather than in ShflDeterministic, which composition
-    /// depends on, so it can build an `AppModel`.
+    /// Its settings suite is emptied on each call, so previews never leak into the app's settings.
     public static func preview(
         library: DeterministicLibrary = .sample,
         playback: DeterministicPlayback = DeterministicPlayback(),

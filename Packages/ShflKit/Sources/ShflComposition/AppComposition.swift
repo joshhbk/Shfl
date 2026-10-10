@@ -17,9 +17,7 @@ public struct AppComposition {
 
     public let mode: Mode
     public let appModel: AppModel
-    /// Where this launch keeps settings, the shell's included: standard
-    /// defaults for live launches, and a fresh suite for deterministic ones
-    /// so they always start from the same settings.
+    /// Deterministic launches get a fresh suite, so they always start from the same settings.
     public let userDefaults: UserDefaults
 
     static func selectedMode(
@@ -33,8 +31,6 @@ public struct AppComposition {
         return .live
     }
 
-    /// Deterministic when launched with `--deterministic` or under XCTest,
-    /// live otherwise.
     public static func make() throws -> AppComposition {
         try make(mode: selectedMode())
     }
@@ -93,7 +89,6 @@ public struct AppComposition {
         )
     }
 
-    /// An emptied suite unique to this process.
     static func isolatedDefaults() -> UserDefaults {
         let suiteName = "com.joshuahughes.shuffled.deterministic.\(ProcessInfo.processInfo.processIdentifier)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard

@@ -126,8 +126,6 @@ public final class LibraryBrowser {
 
     // MARK: - Init
 
-    /// - Parameter preferences: Supplies the song sort order and the autofill
-    ///   algorithm, and saves a newly chosen sort order.
     package init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
         self.libraryCatalog = libraryCatalog
         self.preferences = preferences
@@ -292,7 +290,6 @@ public final class LibraryBrowser {
 
     // MARK: - Autofill
 
-    /// Fills the draft from the library with the saved autofill algorithm.
     package func autofill(into draft: SessionDraftStore) async {
         let source = LibraryAutofillSource(
             libraryCatalog: libraryCatalog,

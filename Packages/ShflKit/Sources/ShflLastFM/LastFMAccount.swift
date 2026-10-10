@@ -1,26 +1,18 @@
 import Foundation
 import Observation
 
-/// What `LastFMAccount` needs from Last.fm. `LastFMTransport` is the live
-/// one; tests supply their own.
 package nonisolated protocol LastFMConnection: Sendable {
-    /// The signed-in session, or nil when signed out.
     func storedSession() async -> LastFMSession?
     func fetchRecentTracks(limit: Int) async throws -> [LastFMRecentTrack]
-    /// Where to send the listener to approve Shfl.
     func signIn() throws -> LastFMSignIn
-    /// Finishes sign-in with the URL Last.fm redirected to.
     func completeSignIn(callbackURL: URL) async throws -> LastFMSession
     func disconnect() async throws
 }
 
-/// The listener's Last.fm connection as the settings screen shows it: whether
-/// they're signed in, their recent scrobbles, and connecting or disconnecting.
 @Observable
 @MainActor
 public final class LastFMAccount {
-    /// Runs Last.fm's sign-in page in a web authentication session and returns
-    /// the URL it redirects to, or nil when the listener backs out.
+    /// nil means the listener backed out.
     public typealias WebSignIn = (_ signIn: LastFMSignIn) async throws -> URL?
 
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
@@ -31,13 +23,10 @@ public final class LastFMAccount {
 
     @ObservationIgnored private let connection: (any LastFMConnection)?
 
-    /// - Parameter connection: Nil for launches that don't talk to Last.fm;
-    ///   the account then stays signed out and every action does nothing.
     package init(connection: (any LastFMConnection)?) {
         self.connection = connection
     }
 
-    /// Signed out for good, for previews and view tests.
     public static func preview() -> LastFMAccount {
         LastFMAccount(connection: nil)
     }
@@ -52,7 +41,6 @@ public final class LastFMAccount {
         }
     }
 
-    /// Clears any earlier error, including one from a failed connect.
     public func refreshActivity(showLoading: Bool) async {
         guard connection != nil, !isRefreshing else { return }
 
@@ -81,7 +69,6 @@ public final class LastFMAccount {
         isRefreshing = false
     }
 
-    /// Signs in through `webSignIn`, then loads recent tracks.
     public func connect(using webSignIn: WebSignIn) async {
         guard let connection else { return }
         connectionState = .connecting

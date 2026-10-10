@@ -1,12 +1,9 @@
 import Foundation
 import ShflCore
 
-/// A made-up Apple Music library for previews and deterministic launches.
 public nonisolated struct DeterministicLibrary: Sendable {
     public var songs: [Song]
     public var playlists: [Playlist]
-    /// Each playlist's songs, keyed by playlist id. A playlist missing here
-    /// is empty.
     public var playlistSongs: [String: [Song]]
 
     public init(
@@ -21,8 +18,7 @@ public nonisolated struct DeterministicLibrary: Sendable {
 
     public static let empty = DeterministicLibrary()
 
-    /// What `--deterministic` launches browse and shuffle. Playback
-    /// scenarios depend on these songs and their play counts.
+    /// Playback scenarios depend on these songs and their play counts.
     public static let launch: DeterministicLibrary = {
         let songs = [
             Song(
@@ -57,7 +53,6 @@ public nonisolated struct DeterministicLibrary: Sendable {
         )
     }()
 
-    /// Ten well-known songs in three playlists, enough to fill a picker.
     public static let sample: DeterministicLibrary = {
         let songs = [
             Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil, playCount: 142),
@@ -87,8 +82,7 @@ public nonisolated struct DeterministicLibrary: Sendable {
     }()
 }
 
-/// Where deterministic playback starts. Time moves only when a test
-/// advances it, so a preview stays exactly where this puts it.
+/// Time moves only when a test advances it.
 public nonisolated struct DeterministicPlayback: Sendable {
     public var state: PlaybackState
     public var time: TimeInterval

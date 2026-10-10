@@ -16,10 +16,8 @@ final class AlbumArtColorExtractor {
     /// cycle through colors rather than randomly repeating.
     @ObservationIgnored private var lastUsedIndex: [Int: Int] = [:]
 
-    /// The colours of a library item's artwork, or nil when it has none.
     typealias ColorLookup = (ArtworkSubject) async -> [Color]?
 
-    /// A nil lookup (no artwork store this launch) leaves the theme default.
     func updateColor(for songId: String, lookUpColors: ColorLookup?) {
         // Skip if already processing this song
         guard songId != currentSongId else { return }
