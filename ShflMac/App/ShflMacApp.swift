@@ -11,5 +11,13 @@ struct ShflMacApp: App {
                 .shellEnvironment(appDelegate.shell)
         }
         .defaultSize(width: 1100, height: 700)
+        .commands {
+            PlaybackCommands(
+                sessionHost: appDelegate.model.sessionHost,
+                player: appDelegate.model.player
+            )
+            SongsCommands(drafting: appDelegate.shell.drafting)
+        }
+
     }
 }
