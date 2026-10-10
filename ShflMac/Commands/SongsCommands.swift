@@ -18,7 +18,7 @@ struct SongsCommands: Commands {
                 Task { await drafting.autofill() }
             }
             .keyboardShortcut("a", modifiers: [.command, .shift])
-            .disabled(drafting.draft.isAtCapacity)
+            .disabled(!drafting.canAutofill)
 
             Button("Clear Selected") {
                 drafting.clearAll()

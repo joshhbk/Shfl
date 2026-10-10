@@ -10,9 +10,11 @@ struct LibraryToolbar: ToolbarContent {
 }
 
 private struct SortMenu: View {
+    @Environment(LibraryBrowser.self) private var browser
+
     var body: some View {
         Menu {
-            SongSortPicker()
+            SongSortPicker(selection: browser.sortSelection)
                 .pickerStyle(.inline)
         } label: {
             Label("Sort", systemImage: "arrow.up.arrow.down")
@@ -24,14 +26,13 @@ private struct SortMenu: View {
 
 private struct AutofillButton: View {
     @Environment(DraftEditing.self) private var drafting
-    @Environment(LibraryBrowser.self) private var browser
 
     var body: some View {
         Button("Autofill", systemImage: "wand.and.stars") {
             Task { await drafting.autofill() }
         }
         .help("Fill Selected with songs from your library")
-        .disabled(drafting.draft.isAtCapacity || browser.autofillState == .loading)
+        .disabled(!drafting.canAutofill)
         .accessibilityIdentifier("mac.toolbar.autofill")
     }
 }
