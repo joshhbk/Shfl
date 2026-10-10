@@ -15,12 +15,12 @@ struct LastFMSettingsView: View {
         }
         .navigationTitle("Last.fm")
         .refreshable {
-            await account.refreshActivity(showLoading: !account.recentTracksState.hasLoadedTracks)
+            await account.refreshActivity()
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await account.refreshActivity(showLoading: !account.recentTracksState.hasLoadedTracks) }
+                    Task { await account.refreshActivity() }
                 } label: {
                     if account.isRefreshing {
                         ProgressView()
@@ -34,7 +34,7 @@ struct LastFMSettingsView: View {
         }
         .task {
             await account.syncConnectionStatusOnly()
-            await account.refreshActivity(showLoading: !account.recentTracksState.hasLoadedTracks)
+            await account.refreshActivity()
         }
     }
 

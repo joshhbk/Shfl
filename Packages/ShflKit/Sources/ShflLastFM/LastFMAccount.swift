@@ -41,12 +41,13 @@ public final class LastFMAccount {
         }
     }
 
-    public func refreshActivity(showLoading: Bool) async {
+    /// By default the loading state shows only when no tracks have loaded yet.
+    public func refreshActivity(showLoading: Bool? = nil) async {
         guard connection != nil, !isRefreshing else { return }
 
         isRefreshing = true
         errorMessage = nil
-        if showLoading {
+        if showLoading ?? !recentTracksState.hasLoadedTracks {
             recentTracksState = .loading
         }
 
