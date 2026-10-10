@@ -33,7 +33,7 @@ public final class PlaybackClock {
         timerInterval
     }
 
-    public init(
+    package init(
         playbackTransport: PlaybackTransport,
         boostedUpdateInterval: TimeInterval = 0.12,
         steadyUpdateInterval: TimeInterval = 0.45,

@@ -1,0 +1,194 @@
+import XCTest
+@testable import ShflCore
+@testable import ShflDeterministic
+
+@MainActor
+final class PlaybackTransitionTests: XCTestCase {
+    func test_subscribersReceiveEveryEdgeInOrderWithoutDuplicateLoadReports() async throws {
+        let transport = DeterministicMusicService()
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        let song = makeSong("one")
+        try draft.add([song])
+        let first = player.playbackTransitions
+        let second = player.playbackTransitions
+
+        try await player.startFreshShuffle(seed: 1)
+        await player.pause()
+        try await player.play()
+        await player.pause()
+
+        for stream in [first, second] {
+            let transitions = await collect(stream, count: 5)
+            XCTAssertEqual(transitions.map(\.state), [.empty, .playing(song), .paused(song), .playing(song), .paused(song)])
+            XCTAssertEqual(transitions.map(\.songTransition), [nil, .selectedAndStarted(song), nil, nil, nil])
+        }
+    }
+
+    func test_restoreThenPlayStartsSongOnceAndFreshSessionStartsItAgain() async throws {
+        let transport = DeterministicMusicService()
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        let song = makeSong("one")
+        try draft.add([song])
+        let stream = player.playbackTransitions
+        let session = ListeningSession(songOrder: [song], algorithm: .noRepeat, seed: 1)
+        let restored = await player.restore(
+            session,
+            currentSongID: song.id,
+            playbackPosition: 42
+        )
+        XCTAssertTrue(restored)
+        // Wait for the restored state through the real seam before resuming.
+        let restoredEvents = await collect(stream, count: 2)
+        XCTAssertEqual(restoredEvents.last?.state, .paused(song))
+        XCTAssertEqual(restoredEvents.last?.playbackTime, 42)
+        XCTAssertEqual(restoredEvents.last?.songTransition, .selected(song))
+
+        let resumed = player.playbackTransitions
+        try await player.play()
+        let resumedEvents = await collect(resumed, count: 2)
+        XCTAssertEqual(resumedEvents.last?.songTransition, .started(song))
+        let oldSession = player.activeSession?.id
+
+        let fresh = player.playbackTransitions
+        try await player.startFreshShuffle(seed: 2)
+        let freshEvents = await collect(fresh, count: 2)
+        XCTAssertEqual(freshEvents.last?.songTransition, .selectedAndStarted(song))
+        XCTAssertNotEqual(freshEvents.last?.session?.id, oldSession)
+    }
+
+    func test_loadingNewSongThenPlayingDetectsStartAfterSongChange() async throws {
+        let transport = DeterministicMusicService()
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        let song = makeSong("one")
+        try draft.add([song])
+        try await player.startFreshShuffle(seed: 1)
+        let stream = player.playbackTransitions
+        let next = makeSong("two")
+        await transport.simulatePlaybackState(.loading(next))
+        await transport.simulatePlaybackState(.playing(next))
+        await transport.simulatePlaybackState(.playing(next))
+        await transport.simulatePlaybackState(.paused(next))
+        let events = await collect(stream, count: 4)
+        XCTAssertEqual(events.map(\.state), [.playing(song), .loading(next), .playing(next), .paused(next)])
+        XCTAssertEqual(events.map(\.songTransition), [.selectedAndStarted(song), .selected(next), .started(next), nil])
+    }
+
+    func test_transientEmptyIsSuppressedAndClearPublishesEmpty() async throws {
+        let transport = DeterministicMusicService()
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        let song = makeSong("one")
+        try draft.add([song])
+        try await player.startFreshShuffle(seed: 1)
+        let stream = player.playbackTransitions
+        await transport.simulatePlaybackState(.empty)
+        await transport.simulatePlaybackState(.paused(song))
+        let events = await collect(stream, count: 2)
+        XCTAssertEqual(events.map(\.state), [.playing(song), .paused(song)])
+
+        let cleared = player.playbackTransitions
+        draft.removeAll()
+        await player.clearSession()
+        let clearEvents = await collect(cleared, count: 2)
+        XCTAssertEqual(clearEvents.last?.state, .empty)
+        XCTAssertNil(clearEvents.last?.session)
+        XCTAssertEqual(clearEvents.last?.songTransition, .cleared)
+    }
+
+    func test_sessionExhaustionPublishesAStopMarkedAsSessionEnd() async throws {
+        let transport = DeterministicMusicService()
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        let song = makeSong("one")
+        try draft.add([song])
+        try await player.startFreshShuffle(seed: 1)
+        let oldSession = player.activeSession?.id
+        let stream = player.playbackTransitions
+        await transport.simulateSessionEnded()
+        let events = await collect(stream, count: 2)
+        XCTAssertEqual(events.map(\.state), [.playing(song), .stopped])
+        XCTAssertEqual(events.first?.session?.id, oldSession)
+        XCTAssertNil(events.last?.session)
+        XCTAssertEqual(events.last?.songTransition, .sessionEnded)
+        let loads = await transport.loadCallCount
+        XCTAssertEqual(loads, 1)
+    }
+
+    func test_failedLoadPublishesFailureWithoutACommittedSession() async throws {
+        let transport = DeterministicMusicService()
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        try draft.add([makeSong("one")])
+        let stream = player.playbackTransitions
+        await transport.failNextLoad(with: NSError(domain: "load", code: 1))
+        do {
+            try await player.startFreshShuffle(seed: 1)
+            XCTFail("Expected failure")
+        } catch {}
+        let events = await collect(stream, count: 2)
+        guard case .error = events.last?.state else {
+            return XCTFail("Expected an error transition")
+        }
+        XCTAssertNil(events.last?.session)
+        XCTAssertEqual(events.map(\.songTransition), [nil, nil])
+    }
+
+    func test_cancellingOneSubscriberDoesNotStopAnother() async throws {
+        let transport = DeterministicMusicService()
+        let draft = SessionDraftStore()
+        let player = ShufflePlayer(playbackTransport: transport, sessionDraft: draft)
+        let song = makeSong("one")
+        try draft.add([song])
+        let cancelledStream = player.playbackTransitions
+        let task = Task { for await _ in cancelledStream {} }
+        await Task.yield()
+        task.cancel()
+        await task.value
+        let remaining = player.playbackTransitions
+        try await player.startFreshShuffle(seed: 1)
+        let events = await collect(remaining, count: 2)
+        XCTAssertEqual(events.map(\.state), [.empty, .playing(song)])
+    }
+
+    func test_streamFinishesWhenPlayerIsReleased() async {
+        let transport = DeterministicMusicService()
+        var player: ShufflePlayer? = ShufflePlayer(playbackTransport: transport, sessionDraft: SessionDraftStore())
+        weak var weakPlayer = player
+        let stream = player!.playbackTransitions
+        // Let the transport observation task reach its suspension point.
+        await Task.yield()
+        player = nil
+        XCTAssertNil(weakPlayer)
+        let finished = expectation(description: "Stream finished")
+        let task = Task {
+            for await _ in stream {}
+            finished.fulfill()
+        }
+        await fulfillment(of: [finished], timeout: 2)
+        task.cancel()
+    }
+
+    private func collect(_ stream: AsyncStream<PlaybackTransition>, count: Int) async -> [PlaybackTransition] {
+        let received = expectation(description: "Received \(count) transitions")
+        var result: [PlaybackTransition] = []
+        let task = Task {
+            for await transition in stream {
+                result.append(transition)
+                if result.count == count {
+                    received.fulfill()
+                    return
+                }
+            }
+        }
+        await fulfillment(of: [received], timeout: 2)
+        task.cancel()
+        return result
+    }
+
+    private func makeSong(_ id: String) -> Song {
+        Song(id: id, title: id, artist: "Artist", albumTitle: "Album", artworkURL: nil)
+    }
+}

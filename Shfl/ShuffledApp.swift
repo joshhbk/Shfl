@@ -5,40 +5,45 @@
 //  Created by Joshua Hughes on 2025-12-25.
 //
 
-import ShflCore
+import ShflAppleMusicUI
+import ShflComposition
 import SwiftUI
-import SwiftData
 
 @main
 struct ShuffledApp: App {
-    @State private var libraryPreferences: LibraryPreferences
-    @State private var appearanceSettings: AppearanceSettings
     @State private var appModel: AppModel
-
-    private let composition: AppComposition
+    @State private var appearanceSettings: AppearanceSettings
+    private let showsStartupSplash: Bool
 
     init() {
+        let composition: AppComposition
         do {
-            let composition = try AppComposition.make()
-            self.composition = composition
-            _libraryPreferences = State(wrappedValue: composition.libraryPreferences)
-            _appearanceSettings = State(wrappedValue: composition.appearanceSettings)
-            _appModel = State(wrappedValue: composition.appModel)
+            composition = try AppComposition.make()
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
+        _appModel = State(wrappedValue: composition.appModel)
+
+        let appearanceSettings = AppearanceSettings(defaults: composition.userDefaults)
+        switch composition.mode {
+        case .live:
+            showsStartupSplash = true
+        case .deterministic:
+            // Scenarios start straight away on a fixed theme.
+            appearanceSettings.currentThemeId = "silver"
+            showsStartupSplash = false
+        }
+        _appearanceSettings = State(wrappedValue: appearanceSettings)
     }
 
     var body: some Scene {
         WindowGroup {
             MainView(
                 model: appModel,
-                libraryPreferences: libraryPreferences,
                 appearanceSettings: appearanceSettings,
-                showsStartupSplash: composition.showsStartupSplash
+                showsStartupSplash: showsStartupSplash
             )
-            .environment(\.artworkStore, composition.artworkStore)
+            .environment(\.artworkStore, appModel.artworkStore)
         }
-        .modelContainer(composition.modelContainer)
     }
 }

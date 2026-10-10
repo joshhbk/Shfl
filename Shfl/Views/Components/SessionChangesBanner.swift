@@ -5,14 +5,16 @@ import SwiftUI
 /// next shuffle, and offers to start that shuffle now. Shows only while the
 /// draft differs from the playing session.
 struct SessionChangesBanner: View {
+    let draft: SessionDraftStore
+
     @Environment(\.listeningSessionHost) private var sessionHost
-    @Environment(\.sessionDraft) private var sessionDraft
+    @Environment(\.shufflePlayer) private var player
     @Environment(\.shuffleTheme) private var shuffleTheme
 
     var body: some View {
-        if let sessionHost,
-           sessionHost.player.activeSession != nil,
-           sessionHost.player.hasPendingSessionChanges {
+        if let sessionHost, let player,
+           player.activeSession != nil,
+           player.hasPendingSessionChanges {
             HStack(spacing: 12) {
                 Text(message)
                     .font(.footnote)
@@ -48,12 +50,12 @@ struct SessionChangesBanner: View {
     }
 
     private var message: String {
-        sessionDraft.isEmpty
+        draft.isEmpty
             ? "Nothing picked. Playback stops after this shuffle."
             : "Your picks apply to the next shuffle."
     }
 
     private var buttonTitle: String {
-        sessionDraft.isEmpty ? "Autofill" : "Shuffle Now"
+        draft.isEmpty ? "Autofill" : "Shuffle Now"
     }
 }

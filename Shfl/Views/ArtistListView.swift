@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ArtistListView: View {
     @Bindable var browser: LibraryBrowser
-    let libraryCatalog: LibraryCatalog
+    let makeArtistSongs: (Artist) -> ArtistDetailViewModel
     let selectedSongIds: Set<String>
     let isAtCapacity: Bool
     let onToggleSong: (Song) -> Void
@@ -62,8 +62,7 @@ struct ArtistListView: View {
         .scrollDismissesKeyboard(.immediately)
         .navigationDestination(for: Artist.self) { artist in
             ArtistDetailView(
-                artistName: artist.name,
-                libraryCatalog: libraryCatalog,
+                songs: makeArtistSongs(artist),
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: isAtCapacity,
                 onToggleSong: onToggleSong

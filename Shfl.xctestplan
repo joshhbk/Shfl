@@ -25,6 +25,41 @@
         "identifier" : "ShflCoreTests",
         "name" : "ShflCoreTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflDeterministicTests",
+        "name" : "ShflDeterministicTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflAppleMusicTests",
+        "name" : "ShflAppleMusicTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflAppleMusicUITests",
+        "name" : "ShflAppleMusicUITests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflLastFMTests",
+        "name" : "ShflLastFMTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Packages\/ShflKit",
+        "identifier" : "ShflCompositionTests",
+        "name" : "ShflCompositionTests"
+      }
     }
   ],
   "version" : 1
