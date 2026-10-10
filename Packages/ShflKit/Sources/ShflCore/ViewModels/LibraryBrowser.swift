@@ -291,6 +291,7 @@ public final class LibraryBrowser {
     // MARK: - Autofill
 
     package func autofill(into draft: SessionDraftStore) async {
+        guard autofillState != .loading else { return }
         let source = LibraryAutofillSource(
             libraryCatalog: libraryCatalog,
             algorithm: preferences.autofillAlgorithm

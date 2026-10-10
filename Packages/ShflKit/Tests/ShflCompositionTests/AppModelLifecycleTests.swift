@@ -117,6 +117,24 @@ final class AppModelLifecycleTests: XCTestCase {
         XCTAssertEqual(SavedShuffleAlgorithm(defaults: defaults).load(), .weightedByRecency)
     }
 
+    func testConcurrentLaunchesRestoreOnce() async throws {
+        let first = makeModel(service: mockService)
+        try first.sessionDraft.add(Song(id: "1", title: "One", artist: "Artist", albumTitle: "Album", artworkURL: nil))
+        await first.sessionHost.startFreshShuffle()
+        first.sceneDidLeaveForeground()
+
+        let service = DeterministicMusicService()
+        let model = makeModel(service: service)
+        async let launchA: Void = model.launch()
+        async let launchB: Void = model.launch()
+        _ = await (launchA, launchB)
+        await model.launch()
+
+        let restoreLoads = await service.loadCallCount
+        XCTAssertEqual(restoreLoads, 1)
+        XCTAssertEqual(model.launchPhase, .ready)
+    }
+
     private func makeModel(service: DeterministicMusicService) -> AppModel {
         AppModel(
             library: service,

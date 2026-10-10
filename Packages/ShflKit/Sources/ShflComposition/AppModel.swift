@@ -32,6 +32,7 @@ public final class AppModel {
     /// Held only so the store lives as long as the model.
     @ObservationIgnored private let modelContainer: ModelContainer
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
+    @ObservationIgnored private var launchTask: Task<Void, Never>?
 
     package init(
         library: MusicAuthorizing & LibraryCatalog,
@@ -66,7 +67,14 @@ public final class AppModel {
         scrobbleTracker.start(consuming: player.playbackTransitions)
     }
 
+    /// Runs once; later and concurrent calls wait for that run.
     public func launch() async {
+        let task = launchTask ?? Task { await restoreAndCheckAccess() }
+        launchTask = task
+        await task.value
+    }
+
+    private func restoreAndCheckAccess() async {
         async let authStatus = library.isAuthorized
         await sessionHost.restoreSavedSession()
         launchPhase = await authStatus ? .ready : .needsAuthorization
