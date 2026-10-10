@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-public nonisolated struct LastFMSession: Codable, Equatable, Sendable {
+package nonisolated struct LastFMSession: Codable, Equatable, Sendable {
     let sessionKey: String
     let username: String
 }

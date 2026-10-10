@@ -29,14 +29,14 @@ public final class ArtworkStore {
     }
 
     /// Looks artwork up in the Apple Music library.
-    public convenience init() {
+    package convenience init() {
         self.init(load: ArtworkStore.loadFromLibrary)
     }
 
     /// The subject's artwork, looking it up if this launch hasn't yet.
     /// Returns nil when the subject has no artwork, the lookup fails, or the
     /// calling task is cancelled while waiting.
-    public func artwork(for subject: ArtworkSubject) async -> Artwork? {
+    package func artwork(for subject: ArtworkSubject) async -> Artwork? {
         if let cached = cache[subject] {
             return cached
         }

@@ -1,6 +1,5 @@
 import Foundation
 
-// PR 4 → package
 /// Autofills from the user's library, fetching a full draft's worth of songs
 /// ahead of time so pressing play on an empty draft needn't wait for the
 /// library.
@@ -8,7 +7,7 @@ import Foundation
 /// A warmed batch serves one autofill, and only while the autofill algorithm
 /// it was fetched with is still the chosen one. Otherwise the fetch is live.
 @MainActor
-public final class WarmedLibraryAutofillSource: WarmableAutofillSource {
+package final class WarmedLibraryAutofillSource: WarmableAutofillSource {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
 
     private struct Batch {
@@ -23,7 +22,7 @@ public final class WarmedLibraryAutofillSource: WarmableAutofillSource {
 
     /// - Parameter algorithm: The chosen autofill algorithm, read at each warm
     ///   and fetch so a settings change takes effect.
-    public convenience init(
+    package convenience init(
         libraryCatalog: LibraryCatalog,
         algorithm: @escaping () -> AutofillAlgorithm
     ) {
@@ -40,7 +39,7 @@ public final class WarmedLibraryAutofillSource: WarmableAutofillSource {
         self.batchSize = batchSize
     }
 
-    public func warm() {
+    package func warm() {
         let algorithm = currentAlgorithm()
         guard batch?.algorithm != algorithm else { return }
         batch?.songs.cancel()
@@ -53,7 +52,7 @@ public final class WarmedLibraryAutofillSource: WarmableAutofillSource {
         )
     }
 
-    public func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
+    package func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
         let algorithm = currentAlgorithm()
         if let batch {
             self.batch = nil

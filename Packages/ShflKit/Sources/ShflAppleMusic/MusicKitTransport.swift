@@ -61,7 +61,7 @@ enum PlayerStatus: Equatable {
 /// - While a session is loaded, the brief empty and stopped reports MusicKit
 ///   makes between entries are not published. Completion is published once, as
 ///   `.sessionEnded`, after the player stays stopped on the final song.
-public final class MusicKitTransport {
+package final class MusicKitTransport {
     private let player: MusicPlayerSurface
     private let confirmationDelay: () async -> Void
     private let playbackEventBroadcaster = PlaybackEventBroadcaster()
@@ -88,7 +88,7 @@ public final class MusicKitTransport {
         self.confirmationDelay = confirmationDelay
     }
 
-    public convenience init() {
+    package convenience init() {
         self.init(player: ApplicationPlayerSurface())
     }
 
@@ -98,7 +98,7 @@ public final class MusicKitTransport {
         playbackEventBroadcaster.finishAll()
     }
 
-    public var playbackEvents: AsyncStream<PlaybackEvent> {
+    package var playbackEvents: AsyncStream<PlaybackEvent> {
         let stream = playbackEventBroadcaster.stream(
             replaying: .stateChanged(mapPlaybackState())
         )
@@ -106,19 +106,19 @@ public final class MusicKitTransport {
         return stream
     }
 
-    public var currentPlaybackTime: TimeInterval {
+    package var currentPlaybackTime: TimeInterval {
         player.playbackTime
     }
 
-    public var currentSongDuration: TimeInterval {
+    package var currentSongDuration: TimeInterval {
         player.currentEntry?.duration ?? 0
     }
 
-    public var currentSongId: String? {
+    package var currentSongId: String? {
         player.currentEntry.flatMap(song(for:))?.id
     }
 
-    public func load(_ request: PlaybackLoadRequest) async throws {
+    package func load(_ request: PlaybackLoadRequest) async throws {
         guard !request.queue.isEmpty else {
             throw PlaybackLoadError.emptyQueue
         }
@@ -153,7 +153,7 @@ public final class MusicKitTransport {
         emitCurrentState()
     }
 
-    public func clear() async {
+    package func clear() async {
         sessionSongOrder = []
         loadedFinalSongID = nil
         lastObservedSongID = nil
@@ -165,23 +165,23 @@ public final class MusicKitTransport {
         emitCurrentState()
     }
 
-    public func play() async throws {
+    package func play() async throws {
         try await player.play()
     }
 
-    public func pause() async {
+    package func pause() async {
         player.pause()
     }
 
-    public func skipToNext() async throws {
+    package func skipToNext() async throws {
         try await player.skipToNextEntry()
     }
 
-    public func skipToPrevious() async throws {
+    package func skipToPrevious() async throws {
         try await player.skipToPreviousEntry()
     }
 
-    public func restartOrSkipToPrevious() async throws {
+    package func restartOrSkipToPrevious() async throws {
         if player.playbackTime <= 3 {
             try await skipToPrevious()
         } else {
@@ -189,7 +189,7 @@ public final class MusicKitTransport {
         }
     }
 
-    public func seek(to time: TimeInterval) {
+    package func seek(to time: TimeInterval) {
         player.playbackTime = max(0, time)
     }
 

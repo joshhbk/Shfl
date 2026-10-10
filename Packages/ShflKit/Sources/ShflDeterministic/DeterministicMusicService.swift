@@ -7,17 +7,17 @@ import Synchronization
 /// It uses the same music seam as MusicKit. Catalog results are supplied at
 /// construction time, and playback time advances only when `advance(by:)` is
 /// called. No Apple Music account, network, or wall clock is involved.
-public actor DeterministicMusicService {
-    public nonisolated struct Configuration: Sendable {
-        public var isAuthorized = true
-        public var librarySongs: [Song] = []
-        public var libraryPlaylists: [Playlist] = []
-        public var playlistSongs: [String: [Song]] = [:]
-        public var playbackDuration: TimeInterval = 180
-        public var playbackTime: TimeInterval = 0
-        public var playbackState: PlaybackState = .empty
+package actor DeterministicMusicService {
+    package nonisolated struct Configuration: Sendable {
+        package var isAuthorized = true
+        package var librarySongs: [Song] = []
+        package var libraryPlaylists: [Playlist] = []
+        package var playlistSongs: [String: [Song]] = [:]
+        package var playbackDuration: TimeInterval = 180
+        package var playbackTime: TimeInterval = 0
+        package var playbackState: PlaybackState = .empty
 
-        public init(
+        package init(
             isAuthorized: Bool = true,
             librarySongs: [Song] = [],
             libraryPlaylists: [Playlist] = [],
@@ -59,7 +59,7 @@ public actor DeterministicMusicService {
     private var sessionHasEnded = false
     private nonisolated let playbackSnapshot: Mutex<PlaybackSnapshot>
 
-    public init(configuration: Configuration = Configuration()) {
+    package init(configuration: Configuration = Configuration()) {
         authorizationResult = configuration.isAuthorized
         librarySongs = configuration.librarySongs
         libraryPlaylists = configuration.libraryPlaylists
@@ -74,7 +74,7 @@ public actor DeterministicMusicService {
         )
     }
 
-    public nonisolated var playbackEvents: AsyncStream<PlaybackEvent> {
+    package nonisolated var playbackEvents: AsyncStream<PlaybackEvent> {
         AsyncStream { continuation in
             let id = UUID()
             Task { await self.addContinuation(continuation, id: id) }
@@ -84,25 +84,25 @@ public actor DeterministicMusicService {
         }
     }
 
-    public nonisolated var currentPlaybackTime: TimeInterval {
+    package nonisolated var currentPlaybackTime: TimeInterval {
         playbackSnapshot.withLock { $0.time }
     }
 
-    public nonisolated var currentSongDuration: TimeInterval {
+    package nonisolated var currentSongDuration: TimeInterval {
         playbackSnapshot.withLock { $0.duration }
     }
 
-    public nonisolated var currentSongId: String? {
+    package nonisolated var currentSongId: String? {
         playbackSnapshot.withLock { $0.currentSongID }
     }
 
-    public var isAuthorized: Bool { authorizationResult }
+    package var isAuthorized: Bool { authorizationResult }
 
-    public func requestAuthorization() async -> Bool {
+    package func requestAuthorization() async -> Bool {
         authorizationResult
     }
 
-    public func fetchLibrarySongs(
+    package func fetchLibrarySongs(
         sortedBy sortOption: SortOption,
         limit: Int,
         offset: Int
@@ -111,7 +111,7 @@ public actor DeterministicMusicService {
         return page(sorted(librarySongs, by: sortOption), limit: limit, offset: offset)
     }
 
-    public func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    package func searchLibrarySongs(query: String, limit: Int, offset: Int) async throws -> LibraryPage {
         let matches = librarySongs.filter {
             $0.title.localizedCaseInsensitiveContains(query)
                 || $0.artist.localizedCaseInsensitiveContains(query)
@@ -119,39 +119,39 @@ public actor DeterministicMusicService {
         return page(matches, limit: limit, offset: offset)
     }
 
-    public func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
+    package func searchLibraryArtists(query: String, limit: Int, offset: Int) async throws -> ArtistPage {
         let matches = artists.filter { $0.name.localizedCaseInsensitiveContains(query) }
         let bounds = pageBounds(count: matches.count, limit: limit, offset: offset)
         return ArtistPage(artists: Array(matches[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    public func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
+    package func searchLibraryPlaylists(query: String, limit: Int, offset: Int) async throws -> PlaylistPage {
         let matches = libraryPlaylists.filter { $0.name.localizedCaseInsensitiveContains(query) }
         let bounds = pageBounds(count: matches.count, limit: limit, offset: offset)
         return PlaylistPage(playlists: Array(matches[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    public func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
+    package func fetchLibraryArtists(limit: Int, offset: Int) async throws -> ArtistPage {
         let artists = self.artists
         let bounds = pageBounds(count: artists.count, limit: limit, offset: offset)
         return ArtistPage(artists: Array(artists[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    public func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
+    package func fetchLibraryPlaylists(limit: Int, offset: Int) async throws -> PlaylistPage {
         let bounds = pageBounds(count: libraryPlaylists.count, limit: limit, offset: offset)
         return PlaylistPage(playlists: Array(libraryPlaylists[bounds.range]), hasMore: bounds.hasMore)
     }
 
-    public func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    package func fetchSongs(byArtist artistName: String, limit: Int, offset: Int) async throws -> LibraryPage {
         let songs = librarySongs.filter { $0.artist == artistName }
         return page(songs, limit: limit, offset: offset)
     }
 
-    public func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
+    package func fetchSongs(byPlaylistId playlistId: String, limit: Int, offset: Int) async throws -> LibraryPage {
         page(playlistSongs[playlistId] ?? [], limit: limit, offset: offset)
     }
 
-    public func load(_ request: PlaybackLoadRequest) async throws {
+    package func load(_ request: PlaybackLoadRequest) async throws {
         if let nextLoadError {
             self.nextLoadError = nil
             throw nextLoadError
@@ -177,17 +177,17 @@ public actor DeterministicMusicService {
         )
     }
 
-    public func play() async throws {
+    package func play() async throws {
         guard queuedSongs.indices.contains(currentIndex) else { return }
         publish(.stateChanged(.playing(queuedSongs[currentIndex])))
     }
 
-    public func pause() async {
+    package func pause() async {
         guard let song = currentState.currentSong else { return }
         publish(.stateChanged(.paused(song)))
     }
 
-    public func skipToNext() async throws {
+    package func skipToNext() async throws {
         guard !queuedSongs.isEmpty else { return }
         guard currentIndex + 1 < queuedSongs.count else {
             finishSession()
@@ -199,7 +199,7 @@ public actor DeterministicMusicService {
         publish(.stateChanged(.playing(queuedSongs[currentIndex])))
     }
 
-    public func skipToPrevious() async throws {
+    package func skipToPrevious() async throws {
         guard !queuedSongs.isEmpty else { return }
         currentIndex = max(0, currentIndex - 1)
         updateSnapshot(time: 0)
@@ -207,7 +207,7 @@ public actor DeterministicMusicService {
         publish(.stateChanged(.playing(queuedSongs[currentIndex])))
     }
 
-    public func restartOrSkipToPrevious() async throws {
+    package func restartOrSkipToPrevious() async throws {
         if currentPlaybackTime > 3 {
             seek(to: 0)
         } else {
@@ -215,11 +215,11 @@ public actor DeterministicMusicService {
         }
     }
 
-    public nonisolated func seek(to time: TimeInterval) {
+    package nonisolated func seek(to time: TimeInterval) {
         playbackSnapshot.withLock { $0.time = max(0, time) }
     }
 
-    public func clear() async {
+    package func clear() async {
         queuedSongs = []
         currentIndex = 0
         sessionHasEnded = false

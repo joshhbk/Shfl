@@ -102,7 +102,7 @@ public nonisolated struct DeterministicPlayback: Sendable {
 }
 
 extension DeterministicMusicService {
-    public init(library: DeterministicLibrary, playback: DeterministicPlayback = DeterministicPlayback()) {
+    package init(library: DeterministicLibrary, playback: DeterministicPlayback = DeterministicPlayback()) {
         self.init(
             configuration: Configuration(
                 librarySongs: library.songs,

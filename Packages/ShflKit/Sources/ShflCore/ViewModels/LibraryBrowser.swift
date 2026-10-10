@@ -126,7 +126,9 @@ public final class LibraryBrowser {
 
     // MARK: - Init
 
-    public init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
+    /// - Parameter preferences: Supplies the song sort order and the autofill
+    ///   algorithm, and saves a newly chosen sort order.
+    package init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
         self.libraryCatalog = libraryCatalog
         self.preferences = preferences
 

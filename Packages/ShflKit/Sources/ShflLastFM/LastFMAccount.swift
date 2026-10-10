@@ -42,7 +42,7 @@ public enum RecentTracksState: Equatable {
 
 /// What `LastFMAccount` needs from Last.fm. `LastFMTransport` is the live
 /// one; tests supply their own.
-public nonisolated protocol LastFMConnection: Sendable {
+package nonisolated protocol LastFMConnection: Sendable {
     /// The signed-in session, or nil when signed out.
     func storedSession() async -> LastFMSession?
     func fetchRecentTracks(limit: Int) async throws -> [LastFMRecentTrack]
@@ -72,7 +72,7 @@ public final class LastFMAccount {
 
     /// - Parameter connection: Nil for launches that don't talk to Last.fm;
     ///   the account then stays signed out and every action does nothing.
-    public init(connection: (any LastFMConnection)?) {
+    package init(connection: (any LastFMConnection)?) {
         self.connection = connection
     }
 

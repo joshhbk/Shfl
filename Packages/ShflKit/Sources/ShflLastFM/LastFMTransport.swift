@@ -39,7 +39,7 @@ nonisolated enum LastFMNowPlayingState: Equatable, Sendable {
     case failed(ScrobbleEvent, updatedAt: Date)
 }
 
-public actor LastFMTransport {
+package actor LastFMTransport {
     private let apiKey: String
     private let client: LastFMClient
     private let authenticator: LastFMAuthenticator
@@ -52,7 +52,7 @@ public actor LastFMTransport {
     private let flushRetryDelayNanoseconds: UInt64 = 5_000_000_000
     private var nowPlayingState: LastFMNowPlayingState = .idle
 
-    public init(
+    package init(
         apiKey: String,
         sharedSecret: String,
         keychainService: String = "com.shfl.lastfm.session",
@@ -73,13 +73,13 @@ public actor LastFMTransport {
         }
     }
 
-    public var isAuthenticated: Bool {
+    package var isAuthenticated: Bool {
         get async {
             await authenticator.isAuthenticated
         }
     }
 
-    public func scrobble(_ event: ScrobbleEvent) async {
+    package func scrobble(_ event: ScrobbleEvent) async {
         guard await isAuthenticated else {
             await queue.enqueue(event)
             return
@@ -96,7 +96,7 @@ public actor LastFMTransport {
         }
     }
 
-    public func sendNowPlaying(_ event: ScrobbleEvent) async {
+    package func sendNowPlaying(_ event: ScrobbleEvent) async {
         guard await isAuthenticated else {
             nowPlayingState = .queued(event, reason: .disconnected, updatedAt: Date())
             return
@@ -123,7 +123,7 @@ public actor LastFMTransport {
         nowPlayingState
     }
 
-    public func fetchRecentTracks(limit: Int = 20) async throws -> [LastFMRecentTrack] {
+    package func fetchRecentTracks(limit: Int = 20) async throws -> [LastFMRecentTrack] {
         guard let session = await authenticator.storedSession() else { return [] }
 
         var components = URLComponents(string: "https://ws.audioscrobbler.com/2.0/")
@@ -169,24 +169,24 @@ public actor LastFMTransport {
 
     // MARK: - Authentication
 
-    public nonisolated func signIn() throws -> LastFMSignIn {
+    package nonisolated func signIn() throws -> LastFMSignIn {
         try authenticator.signIn()
     }
 
     /// Finishes sign-in with the URL Last.fm redirected to, then sends any
     /// scrobbles queued while signed out.
-    public func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
+    package func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
         let session = try await authenticator.completeSignIn(callbackURL: callbackURL)
         await client.setSessionKey(session.sessionKey)
         await flushQueue()
         return session
     }
 
-    public func storedSession() async -> LastFMSession? {
+    package func storedSession() async -> LastFMSession? {
         await authenticator.storedSession()
     }
 
-    public func disconnect() async throws {
+    package func disconnect() async throws {
         try await authenticator.clearSession()
         nowPlayingState = .idle
     }

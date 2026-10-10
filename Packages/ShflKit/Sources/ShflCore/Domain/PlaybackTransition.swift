@@ -1,9 +1,8 @@
 import Foundation
 
-// PR 4 → package
 /// One committed playback change. Every subscriber receives the same ordered
 /// values; session and position belong to this change, not a later player state.
-public nonisolated struct PlaybackTransition: Sendable {
+package nonisolated struct PlaybackTransition: Sendable {
     let observedAt = Date()
     let state: PlaybackState
     let session: ListeningSession?
