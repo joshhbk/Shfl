@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DCAC00212F20000000000021 /* ShflComposition in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00112F20000000000011 /* ShflComposition */; };
+		DCAC00222F20000000000022 /* ShflCore in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00122F20000000000012 /* ShflCore */; };
+		DCAC00232F20000000000023 /* ShflAppleMusicUI in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00132F20000000000013 /* ShflAppleMusicUI */; };
+		DCAC00242F20000000000024 /* ShflLastFM in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00142F20000000000014 /* ShflLastFM */; };
 		DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00022F10000000000002 /* Vortex */; };
 		DCAA00042F10000000000004 /* ShflCore in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00032F10000000000003 /* ShflCore */; };
 		DCAA00112F10000000000011 /* ShflDeterministic in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00102F10000000000010 /* ShflDeterministic */; };
@@ -16,6 +20,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		DCAC00312F20000000000031 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DC13068D2EFDBDA300200F38 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DCAC00012F20000000000001;
+			remoteInfo = ShflMac;
+		};
 		DC1306A52EFDBDA400200F38 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = DC13068D2EFDBDA300200F38 /* Project object */;
@@ -33,6 +44,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		DCAC00032F20000000000003 /* Shuffled.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shuffled.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCAC00042F20000000000004 /* ShflMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306952EFDBDA300200F38 /* Shfl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shfl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306A42EFDBDA400200F38 /* ShflTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShflUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -50,6 +63,16 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		DCAC00052F20000000000005 /* ShflMac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShflMac;
+			sourceTree = "<group>";
+		};
+		DCAC00062F20000000000006 /* ShflMacTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShflMacTests;
+			sourceTree = "<group>";
+		};
 		DC1306972EFDBDA300200F38 /* Shfl */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -71,6 +94,24 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		DCAC00412F20000000000041 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCAC00212F20000000000021 /* ShflComposition in Frameworks */,
+				DCAC00222F20000000000022 /* ShflCore in Frameworks */,
+				DCAC00232F20000000000023 /* ShflAppleMusicUI in Frameworks */,
+				DCAC00242F20000000000024 /* ShflLastFM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCAC00442F20000000000044 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DC1306922EFDBDA300200F38 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -109,6 +150,8 @@
 				DC1306972EFDBDA300200F38 /* Shfl */,
 				DC1306A72EFDBDA400200F38 /* ShflTests */,
 				DC1306B12EFDBDA400200F38 /* ShflUITests */,
+				DCAC00052F20000000000005 /* ShflMac */,
+				DCAC00062F20000000000006 /* ShflMacTests */,
 				DC1306962EFDBDA300200F38 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -119,6 +162,8 @@
 				DC1306952EFDBDA300200F38 /* Shfl.app */,
 				DC1306A42EFDBDA400200F38 /* ShflTests.xctest */,
 				DC1306AE2EFDBDA400200F38 /* ShflUITests.xctest */,
+				DCAC00032F20000000000003 /* Shuffled.app */,
+				DCAC00042F20000000000004 /* ShflMacTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -133,6 +178,55 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		DCAC00012F20000000000001 /* ShflMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCAC00612F20000000000061 /* Build configuration list for PBXNativeTarget "ShflMac" */;
+			buildPhases = (
+				DCAC00402F20000000000040 /* Sources */,
+				DCAC00412F20000000000041 /* Frameworks */,
+				DCAC00422F20000000000042 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DCAC00052F20000000000005 /* ShflMac */,
+			);
+			name = ShflMac;
+			packageProductDependencies = (
+				DCAC00112F20000000000011 /* ShflComposition */,
+				DCAC00122F20000000000012 /* ShflCore */,
+				DCAC00132F20000000000013 /* ShflAppleMusicUI */,
+				DCAC00142F20000000000014 /* ShflLastFM */,
+			);
+			productName = ShflMac;
+			productReference = DCAC00032F20000000000003 /* Shuffled.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DCAC00022F20000000000002 /* ShflMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCAC00622F20000000000062 /* Build configuration list for PBXNativeTarget "ShflMacTests" */;
+			buildPhases = (
+				DCAC00432F20000000000043 /* Sources */,
+				DCAC00442F20000000000044 /* Frameworks */,
+				DCAC00452F20000000000045 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DCAC00322F20000000000032 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				DCAC00062F20000000000006 /* ShflMacTests */,
+			);
+			name = ShflMacTests;
+			packageProductDependencies = (
+			);
+			productName = ShflMacTests;
+			productReference = DCAC00042F20000000000004 /* ShflMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		DC1306942EFDBDA300200F38 /* Shfl */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = DC1306B82EFDBDA400200F38 /* Build configuration list for PBXNativeTarget "Shfl" */;
@@ -217,6 +311,13 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					DCAC00012F20000000000001 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					DCAC00022F20000000000002 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = DCAC00012F20000000000001;
+					};
 					DC1306942EFDBDA300200F38 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -251,11 +352,27 @@
 				DC1306942EFDBDA300200F38 /* Shfl */,
 				DC1306A32EFDBDA400200F38 /* ShflTests */,
 				DC1306AD2EFDBDA400200F38 /* ShflUITests */,
+				DCAC00012F20000000000001 /* ShflMac */,
+				DCAC00022F20000000000002 /* ShflMacTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		DCAC00422F20000000000042 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCAC00452F20000000000045 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DC1306932EFDBDA300200F38 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -280,6 +397,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		DCAC00402F20000000000040 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCAC00432F20000000000043 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DC1306912EFDBDA300200F38 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -304,6 +435,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		DCAC00322F20000000000032 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DCAC00012F20000000000001 /* ShflMac */;
+			targetProxy = DCAC00312F20000000000031 /* PBXContainerItemProxy */;
+		};
 		DC1306A62EFDBDA400200F38 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = DC1306942EFDBDA300200F38 /* Shfl */;
@@ -317,6 +453,120 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		DCAC00512F20000000000051 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShflMac/ShflMac.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = X5XSK7UQ3N;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Shuffled;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Shuffled needs access to Apple Music to search your library and play songs.";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.shuffled;
+				PRODUCT_MODULE_NAME = ShflMac;
+				PRODUCT_NAME = Shuffled;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		DCAC00522F20000000000052 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShflMac/ShflMac.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = X5XSK7UQ3N;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Shuffled;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Shuffled needs access to Apple Music to search your library and play songs.";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.shuffled;
+				PRODUCT_MODULE_NAME = ShflMac;
+				PRODUCT_NAME = Shuffled;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		DCAC00532F20000000000053 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = X5XSK7UQ3N;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.ShflMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shuffled.app/Contents/MacOS/Shuffled";
+			};
+			name = Debug;
+		};
+		DCAC00542F20000000000054 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = X5XSK7UQ3N;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuahughes.ShflMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shuffled.app/Contents/MacOS/Shuffled";
+			};
+			name = Release;
+		};
 		DC1306B62EFDBDA400200F38 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -634,6 +884,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		DCAC00612F20000000000061 /* Build configuration list for PBXNativeTarget "ShflMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCAC00512F20000000000051 /* Debug */,
+				DCAC00522F20000000000052 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCAC00622F20000000000062 /* Build configuration list for PBXNativeTarget "ShflMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCAC00532F20000000000053 /* Debug */,
+				DCAC00542F20000000000054 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		DC1306902EFDBDA300200F38 /* Build configuration list for PBXProject "Shfl" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -691,6 +959,26 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		DCAC00112F20000000000011 /* ShflComposition */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflComposition;
+		};
+		DCAC00122F20000000000012 /* ShflCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflCore;
+		};
+		DCAC00132F20000000000013 /* ShflAppleMusicUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflAppleMusicUI;
+		};
+		DCAC00142F20000000000014 /* ShflLastFM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflLastFM;
+		};
 		DCAA00022F10000000000002 /* Vortex */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DCAA00012F10000000000001 /* XCRemoteSwiftPackageReference "Vortex" */;
