@@ -1,4 +1,3 @@
-import MusicKit
 import SwiftUI
 
 /// Floating album art card with layered shadows and subtle border
@@ -6,8 +5,6 @@ struct AlbumArtCard: View {
     let artworkURL: URL?
     let songId: String?
     var size: CGFloat = 280
-
-    @State private var artwork: Artwork?
 
     init(artworkURL: URL?, songId: String? = nil, size: CGFloat = 280) {
         self.artworkURL = artworkURL
@@ -17,25 +14,12 @@ struct AlbumArtCard: View {
 
     var body: some View {
         Group {
-            if let artwork {
-                ArtworkImage(artwork, width: size, height: size)
-            } else if let artworkURL, artworkURL.scheme == "https" || artworkURL.scheme == "http" {
-                AsyncImage(url: artworkURL) { phase in
-                    switch phase {
-                    case .empty:
-                        placeholderView
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .failure:
-                        placeholderView
-                    @unknown default:
-                        placeholderView
-                    }
+            if let songId {
+                ArtworkView(subject: .song(id: songId), size: size) {
+                    fallbackView
                 }
             } else {
-                placeholderView
+                fallbackView
             }
         }
         .frame(width: size, height: size)
@@ -49,21 +33,29 @@ struct AlbumArtCard: View {
         .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
         .shadow(color: .black.opacity(0.20), radius: 8, x: 0, y: 4)
         .shadow(color: .black.opacity(0.10), radius: 20, x: 0, y: 10)
-        .task(id: songId) {
-            artwork = nil
-            guard let songId else { return }
+    }
 
-            if let cachedArtwork = ArtworkCache.shared.artwork(for: songId) {
-                artwork = cachedArtwork
-                return
+    /// Shown until library artwork loads, or when there is none. Draws the web
+    /// artwork URL that songs from the system player's queue (and previews) carry.
+    @ViewBuilder
+    private var fallbackView: some View {
+        if let artworkURL, artworkURL.scheme == "https" || artworkURL.scheme == "http" {
+            AsyncImage(url: artworkURL) { phase in
+                switch phase {
+                case .empty:
+                    placeholderView
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                case .failure:
+                    placeholderView
+                @unknown default:
+                    placeholderView
+                }
             }
-
-            ArtworkCache.shared.requestArtwork(for: songId)
-
-            for await loadedArtwork in ArtworkCache.shared.artworkUpdates(for: songId) {
-                artwork = loadedArtwork
-                break
-            }
+        } else {
+            placeholderView
         }
     }
 
