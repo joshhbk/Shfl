@@ -3,7 +3,9 @@ import ShflAppleMusic
 import ShflCore
 import SwiftUI
 
-struct ArtworkView<Placeholder: View>: View {
+/// Draws a library item's artwork at `size` points square, showing
+/// `placeholder` until (or unless) the artwork store finds some.
+public struct ArtworkView<Placeholder: View>: View {
     let subject: ArtworkSubject
     let size: CGFloat
     let placeholder: Placeholder
@@ -11,13 +13,13 @@ struct ArtworkView<Placeholder: View>: View {
     @Environment(\.artworkStore) private var store
     @State private var artwork: Artwork?
 
-    init(subject: ArtworkSubject, size: CGFloat, @ViewBuilder placeholder: () -> Placeholder) {
+    public init(subject: ArtworkSubject, size: CGFloat, @ViewBuilder placeholder: () -> Placeholder) {
         self.subject = subject
         self.size = size
         self.placeholder = placeholder()
     }
 
-    var body: some View {
+    public var body: some View {
         Group {
             if let artwork {
                 ArtworkImage(artwork, width: size, height: size)

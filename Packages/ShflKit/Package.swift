@@ -30,6 +30,7 @@ let package = Package(
     products: [
         .library(name: "ShflCore", targets: ["ShflCore"]),
         .library(name: "ShflAppleMusic", targets: ["ShflAppleMusic"]),
+        .library(name: "ShflAppleMusicUI", targets: ["ShflAppleMusicUI"]),
         .library(name: "ShflDeterministic", targets: ["ShflDeterministic"]),
     ],
     targets: [
@@ -65,6 +66,18 @@ let package = Package(
         .testTarget(
             name: "ShflAppleMusicTests",
             dependencies: ["ShflAppleMusic", "ShflDeterministic", "ShflTestSupport"],
+            swiftSettings: testSettings
+        ),
+        /// SwiftUI views that draw Apple Music artwork. The only views in the
+        /// package; every shell draws artwork through them.
+        .target(
+            name: "ShflAppleMusicUI",
+            dependencies: ["ShflCore", "ShflAppleMusic"],
+            swiftSettings: librarySettings
+        ),
+        .testTarget(
+            name: "ShflAppleMusicUITests",
+            dependencies: ["ShflAppleMusicUI"],
             swiftSettings: testSettings
         ),
         /// Helpers shared by the test targets. No product, so nothing ships it.

@@ -16,7 +16,11 @@ final class AlbumArtColorExtractor {
     /// cycle through colors rather than randomly repeating.
     @ObservationIgnored private var lastUsedIndex: [Int: Int] = [:]
 
-    func updateColor(for songId: String, palette: ArtworkPalette?) {
+    /// The colours of a library item's artwork, or nil when it has none.
+    typealias ColorLookup = (ArtworkSubject) async -> [Color]?
+
+    /// A nil lookup (no artwork store this launch) leaves the theme default.
+    func updateColor(for songId: String, lookUpColors: ColorLookup?) {
         // Skip if already processing this song
         guard songId != currentSongId else { return }
         currentSongId = songId
@@ -39,7 +43,7 @@ final class AlbumArtColorExtractor {
         // Cancel any existing task
         currentTask?.cancel()
 
-        guard let palette else {
+        guard let lookUpColors else {
             extractedColor = nil
             return
         }
@@ -48,7 +52,7 @@ final class AlbumArtColorExtractor {
         print("[ColorExtractor] Fetching artwork palette for songId: \(songId)")
         #endif
         currentTask = Task {
-            let candidates = await palette.colors(for: .song(id: songId))
+            let candidates = await lookUpColors(.song(id: songId))
 
             guard !Task.isCancelled, currentSongId == songId else { return }
 

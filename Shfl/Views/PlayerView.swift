@@ -1,3 +1,4 @@
+import ShflAppleMusicUI
 import ShflCore
 import ShflDeterministic
 import SwiftUI
@@ -94,7 +95,7 @@ struct PlayerView: View {
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: themeController.currentTheme)
 
             if let song = player.playbackState.currentSong {
-                colorExtractor.updateColor(for: song.id, palette: artworkPalette)
+                colorExtractor.updateColor(for: song.id, lookUpColors: artworkColorLookup)
             }
         }
         .onDisappear {
@@ -124,8 +125,8 @@ struct PlayerView: View {
         }
     }
 
-    private var artworkPalette: ArtworkPalette? {
-        artworkStore.map(ArtworkPalette.init(store:))
+    private var artworkColorLookup: AlbumArtColorExtractor.ColorLookup? {
+        artworkStore.map { ArtworkPalette(store: $0).colors(for:) }
     }
 
     // MARK: - State Handlers
@@ -141,7 +142,7 @@ struct PlayerView: View {
         playbackClock?.handlePlaybackStateChange(newState)
 
         if let song = newState.currentSong {
-            colorExtractor.updateColor(for: song.id, palette: artworkPalette)
+            colorExtractor.updateColor(for: song.id, lookUpColors: artworkColorLookup)
         } else {
             colorExtractor.clear()
         }
