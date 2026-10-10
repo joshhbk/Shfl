@@ -76,6 +76,18 @@ public final class ListeningSessionHost {
         await startSession(autofillingEmptyDraft: true)
     }
 
+    /// False while there is no session to move through, or one is loading.
+    public var canSkip: Bool { player.activeSession != nil && !isStartingSession }
+
+    public func skipToNext() async {
+        try? await player.skipToNext()
+    }
+
+    /// Restarts the current song, or goes back when it has only just begun.
+    public func skipToPrevious() async {
+        try? await player.restartOrSkipToPrevious()
+    }
+
     /// Replaces any active listening session with a fresh shuffle of the draft.
     /// - Parameter autofillingEmptyDraft: Fill an empty draft first, for an
     ///   explicit request to shuffle after the draft was cleared.

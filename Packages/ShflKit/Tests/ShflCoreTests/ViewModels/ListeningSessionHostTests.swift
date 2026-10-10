@@ -434,6 +434,41 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertNil(releasedHost)
     }
 
+    func testCanSkipOnlyWithAnActiveSession() async throws {
+        let host = makeHost()
+        XCTAssertFalse(host.canSkip)
+
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.togglePlayback()
+
+        XCTAssertTrue(host.canSkip)
+    }
+
+    func testSkipToNextPlaysTheNextSongInTheSession() async throws {
+        let host = makeHost()
+        try host.sessionDraft.add(makeSongs("one", "two", "three"))
+        await host.togglePlayback()
+        let order = try XCTUnwrap(host.player.activeSession?.songIDs)
+
+        await host.skipToNext()
+
+        await waitUntil { host.player.playbackState.currentSongId == order[1] }
+        XCTAssertEqual(host.player.playbackState.currentSongId, order[1])
+    }
+
+    func testSkipToPreviousRestartsASongThatHasPlayedAWhile() async throws {
+        let host = makeHost()
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.togglePlayback()
+        let current = host.player.playbackState.currentSongId
+        await mockService.setPlaybackTime(30)
+
+        await host.skipToPrevious()
+
+        XCTAssertEqual(mockService.currentPlaybackTime, 0)
+        XCTAssertEqual(host.player.playbackState.currentSongId, current)
+    }
+
     private func makeHost(
         autofillSource: StubAutofillSource? = nil,
         makeSeed: @escaping () -> UInt64 = { 1 },
