@@ -19,5 +19,9 @@ struct ShflMacApp: App {
             SongsCommands(drafting: appDelegate.shell.drafting)
         }
 
+        Settings {
+            ShflSettingsView()
+                .shellEnvironment(appDelegate.shell)
+        }
     }
 }
