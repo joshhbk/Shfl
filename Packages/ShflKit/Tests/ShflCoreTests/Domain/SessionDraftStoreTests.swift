@@ -130,6 +130,19 @@ final class SessionDraftStoreTests: XCTestCase {
 
         XCTAssertEqual(staged, [.artistSpacing, .weightedByPlayCount])
     }
+
+    func test_songsMatchingAQuerySearchTitleArtistAndAlbum() throws {
+        let store = SessionDraftStore()
+        try store.add([
+            Song(id: "1", title: "Harbour", artist: "Low Tide", albumTitle: "Waves", artworkURL: nil),
+            Song(id: "2", title: "Static", artist: "Northern", albumTitle: "Harbour Lights", artworkURL: nil),
+            Song(id: "3", title: "Afterglow", artist: "Paper", albumTitle: "Satellites", artworkURL: nil),
+        ])
+
+        XCTAssertEqual(store.songs(matching: "harbour").map(\.id), ["1", "2"])
+        XCTAssertEqual(store.songs(matching: "paper").map(\.id), ["3"])
+        XCTAssertEqual(store.songs(matching: "").map(\.id), ["1", "2", "3"])
+    }
 }
 
 @MainActor
