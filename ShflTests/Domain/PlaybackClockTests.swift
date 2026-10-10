@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Shfl
+@testable import ShflCore
 
 @Suite("PlaybackClock Tests")
 @MainActor

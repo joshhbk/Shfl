@@ -1,5 +1,6 @@
 import Testing
 @testable import Shfl
+@testable import ShflCore
 
 @Suite("ScrobbleTracker Tests")
 struct ScrobbleTrackerTests {

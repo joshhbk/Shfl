@@ -1,13 +1,14 @@
 import Combine
 import Foundation
 import MusicKit
+import ShflCore
 
 /// The real `MusicPlayerSurface`: MusicKit's shared application player.
 final class ApplicationPlayerSurface: MusicPlayerSurface {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private let player = ApplicationMusicPlayer.shared
 
-    func installQueue(_ songs: [Song], startingAt currentSongID: String) async throws -> [Song] {
+    func installQueue(_ songs: [ShflCore.Song], startingAt currentSongID: String) async throws -> [ShflCore.Song] {
         let ids = songs.map { MusicItemID($0.id) }
         var request = MusicLibraryRequest<MusicKit.Song>()
         request.limit = ids.count

@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import ShflCore
 
 actor LastFMClient {
     private let apiKey: String

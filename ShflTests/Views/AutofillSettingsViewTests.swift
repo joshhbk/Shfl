@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Testing
 @testable import Shfl
+@testable import ShflCore
 
 @Suite("AutofillSettingsView Tests")
 struct AutofillSettingsViewTests {
