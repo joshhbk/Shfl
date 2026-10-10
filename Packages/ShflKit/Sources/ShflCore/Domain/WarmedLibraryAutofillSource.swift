@@ -7,7 +7,7 @@ import Foundation
 /// A warmed batch serves one autofill, and only while the autofill algorithm
 /// it was fetched with is still the chosen one. Otherwise the fetch is live.
 @MainActor
-final class WarmedLibraryAutofillSource: WarmableAutofillSource {
+public final class WarmedLibraryAutofillSource: WarmableAutofillSource {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
 
     private struct Batch {
@@ -22,7 +22,7 @@ final class WarmedLibraryAutofillSource: WarmableAutofillSource {
 
     /// - Parameter algorithm: The chosen autofill algorithm, read at each warm
     ///   and fetch so a settings change takes effect.
-    init(
+    public init(
         libraryCatalog: LibraryCatalog,
         algorithm: @escaping () -> AutofillAlgorithm,
         batchSize: Int = SessionDraft.maxSongs
@@ -32,7 +32,7 @@ final class WarmedLibraryAutofillSource: WarmableAutofillSource {
         self.batchSize = batchSize
     }
 
-    func warm() {
+    public func warm() {
         let algorithm = currentAlgorithm()
         guard batch?.algorithm != algorithm else { return }
         batch?.songs.cancel()
@@ -45,7 +45,7 @@ final class WarmedLibraryAutofillSource: WarmableAutofillSource {
         )
     }
 
-    func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
+    public func fetchSongs(excluding: Set<String>, limit: Int) async throws -> [Song] {
         let algorithm = currentAlgorithm()
         if let batch {
             self.batch = nil

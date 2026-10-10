@@ -1,8 +1,9 @@
 import Foundation
 
+@usableFromInline
 nonisolated struct SessionDraft: Equatable, Sendable {
-    static let maxSongs = 120
-    static let defaultAlgorithm: ShuffleAlgorithm = .noRepeat
+    @usableFromInline static let maxSongs = 120
+    @usableFromInline static let defaultAlgorithm: ShuffleAlgorithm = .noRepeat
     /// Song counts worth celebrating as the draft fills up.
     static let milestones: Set<Int> = [1, 50, 100, 120]
 
@@ -68,11 +69,11 @@ nonisolated struct SessionDraft: Equatable, Sendable {
     }
 }
 
-nonisolated struct ListeningSession: Equatable, Sendable {
-    let id: UUID
-    let songOrder: [Song]
-    let algorithm: ShuffleAlgorithm
-    let seed: UInt64
+public nonisolated struct ListeningSession: Equatable, Sendable {
+    public let id: UUID
+    public let songOrder: [Song]
+    public let algorithm: ShuffleAlgorithm
+    public let seed: UInt64
     let createdAt: Date
 
     init(
@@ -89,7 +90,7 @@ nonisolated struct ListeningSession: Equatable, Sendable {
         self.createdAt = createdAt
     }
 
-    var songIDs: [String] {
+    public var songIDs: [String] {
         songOrder.map(\.id)
     }
 
@@ -98,11 +99,11 @@ nonisolated struct ListeningSession: Equatable, Sendable {
     }
 }
 
-nonisolated struct PlaybackTraceEntry: Equatable, Sendable, Identifiable {
-    let id = UUID()
-    let timestamp = Date()
-    let event: String
-    let detail: String?
+public nonisolated struct PlaybackTraceEntry: Equatable, Sendable, Identifiable {
+    public let id = UUID()
+    public let timestamp = Date()
+    public let event: String
+    public let detail: String?
 }
 
 nonisolated enum SessionComposerError: LocalizedError, Equatable {

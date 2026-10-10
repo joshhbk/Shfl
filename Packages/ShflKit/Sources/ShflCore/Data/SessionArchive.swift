@@ -20,13 +20,13 @@ enum SessionArchiveError: Error {
 /// Only `ListeningSessionHost` writes here; it keeps the last written session
 /// record in memory, so any other writer would desynchronise it.
 @MainActor
-final class SessionArchive {
+public final class SessionArchive {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private let modelContext: ModelContext
     private let container: ModelContainer
     private let saveHandler: () throws -> Void
 
-    init(
+    public init(
         modelContext: ModelContext,
         saveHandler: (() throws -> Void)? = nil
     ) {

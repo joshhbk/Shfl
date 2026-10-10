@@ -1,15 +1,15 @@
 import Foundation
 
-nonisolated struct Song: Codable, Equatable, Identifiable, Sendable {
-    let id: String
-    let title: String
-    let artist: String
-    let albumTitle: String
-    let artworkURL: URL?
-    let playCount: Int
-    let lastPlayedDate: Date?
+public nonisolated struct Song: Codable, Equatable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let artist: String
+    public let albumTitle: String
+    public let artworkURL: URL?
+    public let playCount: Int
+    public let lastPlayedDate: Date?
 
-    init(
+    public init(
         id: String,
         title: String,
         artist: String,

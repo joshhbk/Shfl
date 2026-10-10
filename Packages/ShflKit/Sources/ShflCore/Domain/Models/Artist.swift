@@ -1,6 +1,11 @@
 import Foundation
 
-struct Artist: Equatable, Hashable, Identifiable, Sendable {
-    let id: String
-    let name: String
+public nonisolated struct Artist: Equatable, Hashable, Identifiable, Sendable {
+    public let id: String
+    public let name: String
+
+    public init(id: String, name: String) {
+        self.id = id
+        self.name = name
+    }
 }

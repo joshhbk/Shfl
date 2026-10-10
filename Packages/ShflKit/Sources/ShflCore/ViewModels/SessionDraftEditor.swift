@@ -1,7 +1,7 @@
 import Foundation
 
 /// What toggling a song did to the session draft.
-enum DraftEdit: Equatable {
+public enum DraftEdit: Equatable {
     /// The song joined the pool, which now holds `songCount` songs.
     case added(songCount: Int, reachedMilestone: Bool)
     case removed
@@ -15,15 +15,17 @@ enum DraftEdit: Equatable {
 /// `SessionDraftStore` passed in.
 @Observable
 @MainActor
-final class SessionDraftEditor {
+public final class SessionDraftEditor {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    private(set) var actionErrorMessage: String?
-    private(set) var autofillIsExhausted = false
+    public private(set) var actionErrorMessage: String?
+    public private(set) var autofillIsExhausted = false
+
+    public init() {}
 
     // MARK: - Editing
 
     @discardableResult
-    func toggle(_ song: Song, in draft: SessionDraftStore) -> DraftEdit {
+    public func toggle(_ song: Song, in draft: SessionDraftStore) -> DraftEdit {
         autofillIsExhausted = false
 
         if draft.contains(song.id) {
@@ -45,14 +47,14 @@ final class SessionDraftEditor {
         }
     }
 
-    func clearAll(in draft: SessionDraftStore) {
+    public func clearAll(in draft: SessionDraftStore) {
         autofillIsExhausted = false
         draft.removeAll()
     }
 
     /// Autofill is exhausted when it came back short while there was still
     /// room, so the library has no more songs to offer.
-    func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
+    public func noteAutofillCompleted(addedCount: Int, requestedCount: Int, remainingCapacity: Int) {
         autofillIsExhausted = addedCount < requestedCount && remainingCapacity > 0
     }
 

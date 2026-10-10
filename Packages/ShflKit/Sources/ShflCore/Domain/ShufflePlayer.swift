@@ -2,7 +2,7 @@ import Foundation
 
 @Observable
 @MainActor
-final class ShufflePlayer {
+public final class ShufflePlayer {
     @ObservationIgnored private let playbackTransport: PlaybackTransport
     @ObservationIgnored private let sessionDraft: SessionDraftStore
     @ObservationIgnored private let composer = SessionComposer()
@@ -14,7 +14,7 @@ final class ShufflePlayer {
 
     /// Each access creates an independent subscription, replaying the current
     /// state before future changes. Buffer all edges, including rapid bursts.
-    var playbackTransitions: AsyncStream<PlaybackTransition> {
+    public var playbackTransitions: AsyncStream<PlaybackTransition> {
         let id = UUID()
         return AsyncStream { continuation in
             transitionContinuations[id] = continuation
@@ -34,16 +34,16 @@ final class ShufflePlayer {
         }
     }
 
-    private(set) var activeSession: ListeningSession?
-    private(set) var playbackState: PlaybackState = .empty
-    private(set) var operationNotice: String?
-    private(set) var isLoadingSession = false
+    public private(set) var activeSession: ListeningSession?
+    public private(set) var playbackState: PlaybackState = .empty
+    public private(set) var operationNotice: String?
+    public private(set) var isLoadingSession = false
     private(set) var sessionEndCount = 0
-    private(set) var recentPlaybackTrace: [PlaybackTraceEntry] = []
+    public private(set) var recentPlaybackTrace: [PlaybackTraceEntry] = []
 
     var lastShuffledQueue: [Song] { activeSession?.songOrder ?? [] }
-    var transportCurrentSongId: String? { playbackTransport.currentSongId }
-    var hasPendingSessionChanges: Bool {
+    public var transportCurrentSongId: String? { playbackTransport.currentSongId }
+    public var hasPendingSessionChanges: Bool {
         let draft = sessionDraft.draft
         guard let activeSession else { return !draft.songs.isEmpty }
         return activeSession.songIDs.count != draft.songs.count
@@ -53,7 +53,7 @@ final class ShufflePlayer {
 
     /// - Parameter sessionDraft: The songs and algorithm used when a new
     ///   shuffle starts.
-    init(
+    public init(
         playbackTransport: PlaybackTransport,
         sessionDraft: SessionDraftStore
     ) {
@@ -70,7 +70,7 @@ final class ShufflePlayer {
         }
     }
 
-    func clearOperationNotice() {
+    public func clearOperationNotice() {
         operationNotice = nil
     }
 
@@ -117,7 +117,7 @@ final class ShufflePlayer {
         record("pause")
     }
 
-    func skipToNext() async throws {
+    public func skipToNext() async throws {
         do {
             try await playbackTransport.skipToNext()
             record("skip-next")
@@ -135,7 +135,7 @@ final class ShufflePlayer {
         }
     }
 
-    func restartOrSkipToPrevious() async throws {
+    public func restartOrSkipToPrevious() async throws {
         do {
             try await playbackTransport.restartOrSkipToPrevious()
             record("restart-or-previous")
@@ -144,7 +144,7 @@ final class ShufflePlayer {
         }
     }
 
-    func seek(to time: TimeInterval) {
+    public func seek(to time: TimeInterval) {
         playbackTransport.seek(to: time)
         record("seek", detail: String(format: "%.1f", time))
     }
@@ -182,7 +182,7 @@ final class ShufflePlayer {
         }
     }
 
-    func hardResetQueueForDebug() async {
+    public func hardResetQueueForDebug() async {
         await clearSession()
         recentPlaybackTrace = []
         record("debug-reset")

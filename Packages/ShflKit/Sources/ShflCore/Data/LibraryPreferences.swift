@@ -5,7 +5,7 @@ import Foundation
 /// UserDefaults straight away.
 @Observable
 @MainActor
-final class LibraryPreferences {
+public final class LibraryPreferences {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -16,14 +16,14 @@ final class LibraryPreferences {
         }
     }
 
-    var autofillAlgorithm: AutofillAlgorithm {
+    public var autofillAlgorithm: AutofillAlgorithm {
         didSet {
             guard autofillAlgorithm != oldValue else { return }
             defaults.set(autofillAlgorithm.rawValue, forKey: "autofillAlgorithm")
         }
     }
 
-    init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
         let sortRaw = defaults.string(forKey: "librarySortOption") ?? SortOption.mostPlayed.rawValue

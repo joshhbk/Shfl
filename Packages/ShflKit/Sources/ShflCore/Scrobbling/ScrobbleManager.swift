@@ -1,9 +1,9 @@
 import Foundation
 
-actor ScrobbleManager {
+public actor ScrobbleManager {
     private let transports: [any ScrobbleTransport]
 
-    init(transports: [any ScrobbleTransport]) {
+    public init(transports: [any ScrobbleTransport]) {
         self.transports = transports
     }
 

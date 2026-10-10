@@ -2,19 +2,19 @@ import Foundation
 
 @Observable
 @MainActor
-final class ArtistDetailViewModel {
+public final class ArtistDetailViewModel {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     let lane: LibraryLane<Song>
 
     // Facade properties for view compatibility
-    var songs: [Song] { lane.items }
-    var isLoading: Bool { lane.isLoading }
-    var hasMorePages: Bool { lane.hasMorePages }
+    public var songs: [Song] { lane.items }
+    public var isLoading: Bool { lane.isLoading }
+    public var hasMorePages: Bool { lane.hasMorePages }
     var errorMessage: String? { lane.errorMessage }
 
-    let artistName: String
+    public let artistName: String
 
-    init(artistName: String, libraryCatalog: LibraryCatalog) {
+    public init(artistName: String, libraryCatalog: LibraryCatalog) {
         self.artistName = artistName
         self.lane = LibraryLane<Song>(
             fetchPage: { offset, limit in
@@ -32,11 +32,11 @@ final class ArtistDetailViewModel {
         )
     }
 
-    func loadInitialPage() async {
+    public func loadInitialPage() async {
         await lane.loadInitial(force: false)
     }
 
-    func loadMorePages() async {
+    public func loadMorePages() async {
         await lane.loadMore()
     }
 }

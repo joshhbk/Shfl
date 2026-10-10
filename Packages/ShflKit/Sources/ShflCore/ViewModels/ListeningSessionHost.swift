@@ -10,13 +10,13 @@ import Foundation
 /// always match. A newly staged shuffle algorithm is handed to `saveAlgorithm`.
 @Observable
 @MainActor
-final class ListeningSessionHost {
-    @ObservationIgnored let sessionDraft: SessionDraftStore
-    @ObservationIgnored let player: ShufflePlayer
+public final class ListeningSessionHost {
+    @ObservationIgnored public let sessionDraft: SessionDraftStore
+    @ObservationIgnored public let player: ShufflePlayer
 
     /// True from the moment a listening session is asked for until it has
     /// loaded, including any autofill beforehand.
-    var isStartingSession: Bool { isPreparingSession || player.isLoadingSession }
+    public var isStartingSession: Bool { isPreparingSession || player.isLoadingSession }
 
     private var isPreparingSession = false
 
@@ -45,7 +45,7 @@ final class ListeningSessionHost {
     ///   - saveAlgorithm: Keeps each algorithm staged on the draft for the
     ///     next launch.
     ///   - makeSeed: The seed for each fresh shuffle.
-    init(
+    public init(
         playbackTransport: PlaybackTransport,
         archive: SessionArchive,
         autofillSource: WarmableAutofillSource,
@@ -83,7 +83,7 @@ final class ListeningSessionHost {
     /// Plays or pauses the active listening session, whatever the session
     /// draft holds. With no active session, starts a fresh shuffle, autofilling
     /// the draft first when it is empty.
-    func togglePlayback() async {
+    public func togglePlayback() async {
         guard player.activeSession == nil else {
             try? await player.togglePlayback()
             return
@@ -94,7 +94,7 @@ final class ListeningSessionHost {
     /// Replaces any active listening session with a fresh shuffle of the draft.
     /// - Parameter autofillingEmptyDraft: Fill an empty draft first, for an
     ///   explicit request to shuffle after the draft was cleared.
-    func startFreshShuffle(autofillingEmptyDraft: Bool = false) async {
+    public func startFreshShuffle(autofillingEmptyDraft: Bool = false) async {
         await startSession(autofillingEmptyDraft: autofillingEmptyDraft)
     }
 
@@ -126,7 +126,7 @@ final class ListeningSessionHost {
     /// Reinstates the saved song pool and, when still valid, the saved session.
     /// Returns whether a saved session was loaded into the player.
     @discardableResult
-    func restoreSavedSession() async -> Bool {
+    public func restoreSavedSession() async -> Bool {
         let archived = (try? await archive.loadAsync()) ?? .empty
         committedSession = archived.session
 
@@ -168,7 +168,7 @@ final class ListeningSessionHost {
     }
 
     /// Saves the live playback position on the active session.
-    func sceneDidLeaveForeground() {
+    public func sceneDidLeaveForeground() {
         print("📱 Scene left the foreground - checkpointing session...")
         checkpoint(position: playbackTransport.currentPlaybackTime)
         lifecyclePersistenceHook?()

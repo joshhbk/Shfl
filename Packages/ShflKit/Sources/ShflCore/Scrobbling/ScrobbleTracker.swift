@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class ScrobbleTracker {
+public final class ScrobbleTracker {
     private let scrobbleManager: ScrobbleManager
     private let playbackTransport: PlaybackTransport
 
@@ -13,7 +13,7 @@ final class ScrobbleTracker {
     private var timerTask: Task<Void, Never>?
     private var subscriptionTask: Task<Void, Never>?
 
-    init(scrobbleManager: ScrobbleManager, playbackTransport: PlaybackTransport) {
+    public init(scrobbleManager: ScrobbleManager, playbackTransport: PlaybackTransport) {
         self.scrobbleManager = scrobbleManager
         self.playbackTransport = playbackTransport
     }
@@ -24,7 +24,7 @@ final class ScrobbleTracker {
     }
 
     /// Subscribes to the shared playback seam as an independent consumer.
-    func start(consuming transitions: AsyncStream<PlaybackTransition>) {
+    public func start(consuming transitions: AsyncStream<PlaybackTransition>) {
         subscriptionTask?.cancel()
         subscriptionTask = Task { @MainActor [weak self] in
             for await transition in transitions {

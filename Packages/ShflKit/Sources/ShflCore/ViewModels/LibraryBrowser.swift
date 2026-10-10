@@ -1,7 +1,7 @@
 import Foundation
 
 /// The library catalog lanes a listener can browse and search.
-enum LibraryLaneKind: Equatable, CaseIterable {
+public enum LibraryLaneKind: Equatable, CaseIterable {
     case songs
     case artists
     case playlists
@@ -9,14 +9,14 @@ enum LibraryLaneKind: Equatable, CaseIterable {
 
 @Observable
 @MainActor
-final class LibraryBrowser {
+public final class LibraryBrowser {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     enum Mode: Equatable {
         case browse
         case search
     }
 
-    enum AutofillState: Equatable {
+    public enum AutofillState: Equatable {
         case idle
         case loading
         case completed(count: Int)
@@ -31,18 +31,18 @@ final class LibraryBrowser {
 
     // MARK: - Autofill state
 
-    private(set) var autofillState: AutofillState = .idle
+    public private(set) var autofillState: AutofillState = .idle
 
     // MARK: - Song sort
 
-    var sortOption: SortOption { preferences.sortOption }
+    public var sortOption: SortOption { preferences.sortOption }
 
     // MARK: - Active lane
 
     /// The lane being browsed and searched, or nil while the listener looks
     /// at something other than the catalog, such as their picks. Switching
     /// lanes loads the new lane's first page, or runs the current search on it.
-    var activeLane: LibraryLaneKind? = .songs {
+    public var activeLane: LibraryLaneKind? = .songs {
         didSet {
             guard activeLane != oldValue else { return }
             if searchText.isEmpty {
@@ -55,7 +55,7 @@ final class LibraryBrowser {
 
     // MARK: - Search text (single source of truth)
 
-    var searchText = "" {
+    public var searchText = "" {
         didSet {
             guard searchText != oldValue else { return }
             handleSearchTextChanged()
@@ -65,7 +65,7 @@ final class LibraryBrowser {
         }
     }
 
-    var errorMessage: String? {
+    public var errorMessage: String? {
         songsLane.errorMessage ?? artistsLane.errorMessage ?? playlistsLane.errorMessage
     }
 
@@ -85,42 +85,42 @@ final class LibraryBrowser {
 
     // MARK: - Song browse facade
 
-    var browseSongs: [Song] { songsLane.items }
-    var browseLoading: Bool { songsLane.isLoading }
-    var hasMorePages: Bool { songsLane.hasMorePages }
+    public var browseSongs: [Song] { songsLane.items }
+    public var browseLoading: Bool { songsLane.isLoading }
+    public var hasMorePages: Bool { songsLane.hasMorePages }
 
     // MARK: - Song search facade
 
-    var searchResults: [Song] { songsLane.searchResults }
-    var searchLoading: Bool { songsLane.isSearching }
-    var hasSearchedOnce: Bool { songsLane.hasSearchedOnce }
-    var hasMoreSearchResults: Bool { songsLane.hasMoreSearchResults }
+    public var searchResults: [Song] { songsLane.searchResults }
+    public var searchLoading: Bool { songsLane.isSearching }
+    public var hasSearchedOnce: Bool { songsLane.hasSearchedOnce }
+    public var hasMoreSearchResults: Bool { songsLane.hasMoreSearchResults }
 
     // MARK: - Artist browse facade
 
-    var artists: [Artist] { artistsLane.items }
-    var artistsLoading: Bool { artistsLane.isLoading }
-    var hasMoreArtists: Bool { artistsLane.hasMorePages }
+    public var artists: [Artist] { artistsLane.items }
+    public var artistsLoading: Bool { artistsLane.isLoading }
+    public var hasMoreArtists: Bool { artistsLane.hasMorePages }
 
     // MARK: - Artist search facade
 
-    var artistSearchResults: [Artist] { artistsLane.searchResults }
-    var artistSearchLoading: Bool { artistsLane.isSearching }
-    var hasArtistSearchedOnce: Bool { artistsLane.hasSearchedOnce }
-    var hasMoreArtistSearchResults: Bool { artistsLane.hasMoreSearchResults }
+    public var artistSearchResults: [Artist] { artistsLane.searchResults }
+    public var artistSearchLoading: Bool { artistsLane.isSearching }
+    public var hasArtistSearchedOnce: Bool { artistsLane.hasSearchedOnce }
+    public var hasMoreArtistSearchResults: Bool { artistsLane.hasMoreSearchResults }
 
     // MARK: - Playlist browse facade
 
-    var playlists: [Playlist] { playlistsLane.items }
-    var playlistsLoading: Bool { playlistsLane.isLoading }
-    var hasMorePlaylists: Bool { playlistsLane.hasMorePages }
+    public var playlists: [Playlist] { playlistsLane.items }
+    public var playlistsLoading: Bool { playlistsLane.isLoading }
+    public var hasMorePlaylists: Bool { playlistsLane.hasMorePages }
 
     // MARK: - Playlist search facade
 
-    var playlistSearchResults: [Playlist] { playlistsLane.searchResults }
-    var playlistSearchLoading: Bool { playlistsLane.isSearching }
-    var hasPlaylistSearchedOnce: Bool { playlistsLane.hasSearchedOnce }
-    var hasMorePlaylistSearchResults: Bool { playlistsLane.hasMoreSearchResults }
+    public var playlistSearchResults: [Playlist] { playlistsLane.searchResults }
+    public var playlistSearchLoading: Bool { playlistsLane.isSearching }
+    public var hasPlaylistSearchedOnce: Bool { playlistsLane.hasSearchedOnce }
+    public var hasMorePlaylistSearchResults: Bool { playlistsLane.hasMoreSearchResults }
 
     // MARK: - Dependencies
 
@@ -131,7 +131,7 @@ final class LibraryBrowser {
 
     /// - Parameter preferences: Supplies the song sort order and the autofill
     ///   algorithm, and saves a newly chosen sort order.
-    init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
+    public init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
         self.libraryCatalog = libraryCatalog
         self.preferences = preferences
 
@@ -192,7 +192,7 @@ final class LibraryBrowser {
 
     /// Saves `option` as the song sort order and reloads the songs lane in
     /// that order. Choosing the current order does nothing.
-    func chooseSortOption(_ option: SortOption) {
+    public func chooseSortOption(_ option: SortOption) {
         guard option != preferences.sortOption else { return }
         preferences.sortOption = option
         Task { await songsLane.loadInitial(force: true) }
@@ -221,7 +221,7 @@ final class LibraryBrowser {
 
     // MARK: - Song Browse
 
-    func loadInitialPage() async {
+    public func loadInitialPage() async {
         await songsLane.loadInitial(force: false)
     }
 
@@ -246,13 +246,13 @@ final class LibraryBrowser {
         await songsLane.loadMore()
     }
 
-    func loadMorePages() async {
+    public func loadMorePages() async {
         await songsLane.loadMore()
     }
 
     // MARK: - Song Search
 
-    func loadMoreSearchResults() async {
+    public func loadMoreSearchResults() async {
         await songsLane.loadMoreSearchResults()
     }
 
@@ -262,13 +262,13 @@ final class LibraryBrowser {
         await artistsLane.loadInitial(force: false)
     }
 
-    func loadMoreArtists() async {
+    public func loadMoreArtists() async {
         await artistsLane.loadMore()
     }
 
     // MARK: - Artist Search
 
-    func loadMoreArtistSearchResults() async {
+    public func loadMoreArtistSearchResults() async {
         await artistsLane.loadMoreSearchResults()
     }
 
@@ -278,19 +278,19 @@ final class LibraryBrowser {
         await playlistsLane.loadInitial(force: false)
     }
 
-    func loadMorePlaylists() async {
+    public func loadMorePlaylists() async {
         await playlistsLane.loadMore()
     }
 
     // MARK: - Playlist Search
 
-    func loadMorePlaylistSearchResults() async {
+    public func loadMorePlaylistSearchResults() async {
         await playlistsLane.loadMoreSearchResults()
     }
 
     // MARK: - Error
 
-    func clearError() {
+    public func clearError() {
         songsLane.clearError()
         artistsLane.clearError()
         playlistsLane.clearError()
@@ -299,7 +299,7 @@ final class LibraryBrowser {
     // MARK: - Autofill
 
     /// Fills the draft from the library with the saved autofill algorithm.
-    func autofill(into draft: SessionDraftStore) async {
+    public func autofill(into draft: SessionDraftStore) async {
         let source = LibraryAutofillSource(
             libraryCatalog: libraryCatalog,
             algorithm: preferences.autofillAlgorithm
@@ -319,7 +319,7 @@ final class LibraryBrowser {
         }
     }
 
-    func resetAutofillState() {
+    public func resetAutofillState() {
         autofillState = .idle
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum PlaybackState: Equatable, Sendable {
+public nonisolated enum PlaybackState: Equatable, Sendable {
     case empty
     case stopped
     case loading(Song)
@@ -8,7 +8,7 @@ nonisolated enum PlaybackState: Equatable, Sendable {
     case paused(Song)
     case error(Error)
 
-    var currentSong: Song? {
+    public var currentSong: Song? {
         switch self {
         case .loading(let song), .playing(let song), .paused(let song):
             return song
@@ -17,12 +17,12 @@ nonisolated enum PlaybackState: Equatable, Sendable {
         }
     }
 
-    var isPlaying: Bool {
+    public var isPlaying: Bool {
         if case .playing = self { return true }
         return false
     }
 
-    static func == (lhs: PlaybackState, rhs: PlaybackState) -> Bool {
+    public static func == (lhs: PlaybackState, rhs: PlaybackState) -> Bool {
         switch (lhs, rhs) {
         case (.empty, .empty), (.stopped, .stopped):
             return true
@@ -39,7 +39,7 @@ nonisolated enum PlaybackState: Equatable, Sendable {
 }
 
 nonisolated extension PlaybackState {
-    var isActive: Bool {
+    public var isActive: Bool {
         switch self {
         case .playing, .paused, .loading:
             return true
@@ -48,7 +48,7 @@ nonisolated extension PlaybackState {
         }
     }
 
-    var currentSongId: String? {
+    public var currentSongId: String? {
         currentSong?.id
     }
 }

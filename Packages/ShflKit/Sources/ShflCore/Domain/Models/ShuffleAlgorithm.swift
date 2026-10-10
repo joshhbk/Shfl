@@ -1,13 +1,13 @@
 import Foundation
 
-nonisolated enum ShuffleAlgorithm: String, Codable, CaseIterable, Sendable, Hashable {
+public nonisolated enum ShuffleAlgorithm: String, Codable, CaseIterable, Sendable, Hashable {
     case pureRandom = "pureRandom"
     case noRepeat = "noRepeat"
     case weightedByRecency = "weightedByRecency"
     case weightedByPlayCount = "weightedByPlayCount"
     case artistSpacing = "artistSpacing"
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .pureRandom: return "Pure Random"
         case .noRepeat: return "Full Shuffle"
@@ -17,7 +17,7 @@ nonisolated enum ShuffleAlgorithm: String, Codable, CaseIterable, Sendable, Hash
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .pureRandom:
             return "Picks songs randomly. The same song may play again before others."
@@ -33,7 +33,7 @@ nonisolated enum ShuffleAlgorithm: String, Codable, CaseIterable, Sendable, Hash
     }
 
     /// SF Symbol name for Dynamic Island display
-    var iconName: String {
+    public var iconName: String {
         switch self {
         case .pureRandom: return "dice"
         case .noRepeat: return "arrow.triangle.2.circlepath"

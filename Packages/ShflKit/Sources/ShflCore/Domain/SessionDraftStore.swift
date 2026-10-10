@@ -8,7 +8,7 @@ import Foundation
 /// `songPoolChanges` fires and the algorithm whenever `algorithmChanges` does.
 @Observable
 @MainActor
-final class SessionDraftStore {
+public final class SessionDraftStore {
     private(set) var draft: SessionDraft {
         didSet {
             if draft.songs != oldValue.songs {
@@ -27,7 +27,7 @@ final class SessionDraftStore {
     @ObservationIgnored private var songPoolContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
     @ObservationIgnored private var algorithmContinuations: [UUID: AsyncStream<ShuffleAlgorithm>.Continuation] = [:]
 
-    init(algorithm: ShuffleAlgorithm = SessionDraft.defaultAlgorithm) {
+    public init(algorithm: ShuffleAlgorithm = SessionDraft.defaultAlgorithm) {
         draft = SessionDraft(algorithm: algorithm)
     }
 
@@ -70,13 +70,13 @@ final class SessionDraftStore {
 
     // MARK: - Reading
 
-    var songs: [Song] { draft.songs }
-    var algorithm: ShuffleAlgorithm { draft.algorithm }
-    var songCount: Int { draft.songs.count }
-    var capacity: Int { SessionDraft.maxSongs }
-    var remainingCapacity: Int { draft.remainingCapacity }
-    var isEmpty: Bool { draft.songs.isEmpty }
-    var isAtCapacity: Bool { draft.remainingCapacity == 0 }
+    public var songs: [Song] { draft.songs }
+    public var algorithm: ShuffleAlgorithm { draft.algorithm }
+    public var songCount: Int { draft.songs.count }
+    public var capacity: Int { SessionDraft.maxSongs }
+    public var remainingCapacity: Int { draft.remainingCapacity }
+    public var isEmpty: Bool { draft.songs.isEmpty }
+    public var isAtCapacity: Bool { draft.remainingCapacity == 0 }
 
     func contains(_ songID: String) -> Bool {
         draft.songs.contains { $0.id == songID }
@@ -86,7 +86,7 @@ final class SessionDraftStore {
 
     /// Adds the songs that aren't already in the pool. If they don't all fit,
     /// throws `.capacityReached` and leaves the pool as it was.
-    func add(_ songs: [Song]) throws {
+    public func add(_ songs: [Song]) throws {
         draft = try draft.adding(songs)
     }
 
@@ -99,13 +99,13 @@ final class SessionDraftStore {
     }
 
     /// Empties the pool. Whatever is playing now keeps playing.
-    func removeAll() {
+    public func removeAll() {
         draft = draft.removingAll()
     }
 
     /// Chooses the algorithm for the next shuffle. The listening session
     /// already playing keeps its order.
-    func stage(_ algorithm: ShuffleAlgorithm) {
+    public func stage(_ algorithm: ShuffleAlgorithm) {
         draft = draft.using(algorithm)
     }
 

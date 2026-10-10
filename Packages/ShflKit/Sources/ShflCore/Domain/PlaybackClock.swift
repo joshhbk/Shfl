@@ -2,7 +2,7 @@ import Foundation
 
 /// Timer-based progress tracking for playback position
 @Observable @MainActor
-final class PlaybackClock {
+public final class PlaybackClock {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     enum PollingMode: Equatable {
         case disabled
@@ -10,8 +10,8 @@ final class PlaybackClock {
         case steady
     }
 
-    private(set) var currentTime: TimeInterval = 0
-    private(set) var duration: TimeInterval = 0
+    public private(set) var currentTime: TimeInterval = 0
+    public private(set) var duration: TimeInterval = 0
     private(set) var pollingMode: PollingMode = .disabled
 
     private let playbackTransport: PlaybackTransport
@@ -33,7 +33,7 @@ final class PlaybackClock {
         timerInterval
     }
 
-    init(
+    public init(
         playbackTransport: PlaybackTransport,
         boostedUpdateInterval: TimeInterval = 0.12,
         steadyUpdateInterval: TimeInterval = 0.45,
@@ -47,7 +47,7 @@ final class PlaybackClock {
         self.nowProvider = nowProvider
     }
 
-    func startUpdating(playbackState: PlaybackState = .empty) {
+    public func startUpdating(playbackState: PlaybackState = .empty) {
         stopUpdating()
         isTrackingEnabled = true
         self.playbackState = playbackState
@@ -58,7 +58,7 @@ final class PlaybackClock {
         updatePollingSchedule()
     }
 
-    func stopUpdating() {
+    public func stopUpdating() {
         isTrackingEnabled = false
         clearBoostWindow()
         invalidateTimer()
@@ -68,7 +68,7 @@ final class PlaybackClock {
         duration = playbackTransport.currentSongDuration
     }
 
-    func handlePlaybackStateChange(_ newState: PlaybackState) {
+    public func handlePlaybackStateChange(_ newState: PlaybackState) {
         playbackState = newState
         refreshNow()
 
@@ -87,7 +87,7 @@ final class PlaybackClock {
     }
 
     /// Updates displayed time immediately after user-initiated seeks.
-    func handleUserSeek(to time: TimeInterval) {
+    public func handleUserSeek(to time: TimeInterval) {
         setCurrentTime(time)
         beginBoostWindow()
         updatePollingSchedule()

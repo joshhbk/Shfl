@@ -2,13 +2,13 @@ import Foundation
 
 // MARK: - Shared types
 
-enum SortOption: String, CaseIterable, Sendable {
+public enum SortOption: String, CaseIterable, Sendable {
     case mostPlayed
     case recentlyPlayed
     case recentlyAdded
     case alphabetical
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .mostPlayed: "Most Played"
         case .recentlyPlayed: "Recently Played"
@@ -18,34 +18,49 @@ enum SortOption: String, CaseIterable, Sendable {
     }
 }
 
-struct LibraryPage: Sendable {
-    let songs: [Song]
-    let hasMore: Bool
+public nonisolated struct LibraryPage: Sendable {
+    public let songs: [Song]
+    public let hasMore: Bool
+
+    public init(songs: [Song], hasMore: Bool) {
+        self.songs = songs
+        self.hasMore = hasMore
+    }
 }
 
-struct ArtistPage: Sendable {
-    let artists: [Artist]
-    let hasMore: Bool
+public nonisolated struct ArtistPage: Sendable {
+    public let artists: [Artist]
+    public let hasMore: Bool
+
+    public init(artists: [Artist], hasMore: Bool) {
+        self.artists = artists
+        self.hasMore = hasMore
+    }
 }
 
-struct PlaylistPage: Sendable {
-    let playlists: [Playlist]
-    let hasMore: Bool
+public nonisolated struct PlaylistPage: Sendable {
+    public let playlists: [Playlist]
+    public let hasMore: Bool
+
+    public init(playlists: [Playlist], hasMore: Bool) {
+        self.playlists = playlists
+        self.hasMore = hasMore
+    }
 }
 
-nonisolated struct PlaybackLoadRequest: Sendable, Equatable {
+public nonisolated struct PlaybackLoadRequest: Sendable, Equatable {
     let sessionID: UUID
-    let queue: [Song]
-    let currentSongID: String
-    let playbackPosition: TimeInterval
-    let autoplay: Bool
+    public let queue: [Song]
+    public let currentSongID: String
+    public let playbackPosition: TimeInterval
+    public let autoplay: Bool
 }
 
-nonisolated enum PlaybackLoadError: LocalizedError, Sendable, Equatable {
+public nonisolated enum PlaybackLoadError: LocalizedError, Sendable, Equatable {
     case emptyQueue
     case currentSongMissing(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .emptyQueue:
             return "Cannot load an empty listening session."
@@ -55,7 +70,7 @@ nonisolated enum PlaybackLoadError: LocalizedError, Sendable, Equatable {
     }
 }
 
-nonisolated enum PlaybackEvent: Sendable, Equatable {
+public nonisolated enum PlaybackEvent: Sendable, Equatable {
     case stateChanged(PlaybackState)
     case sessionEnded
 }
@@ -63,7 +78,7 @@ nonisolated enum PlaybackEvent: Sendable, Equatable {
 // MARK: - MusicAuthorizing
 
 /// Authorization-only interface. Consumers that only need auth gate depend on this.
-protocol MusicAuthorizing: Sendable {
+public nonisolated protocol MusicAuthorizing: Sendable {
     /// Request authorization to access Apple Music
     func requestAuthorization() async -> Bool
 
@@ -74,7 +89,7 @@ protocol MusicAuthorizing: Sendable {
 // MARK: - LibraryCatalog
 
 /// Library browsing and search interface. Consumers like pickers, lanes, autofill depend on this.
-protocol LibraryCatalog: Sendable {
+public nonisolated protocol LibraryCatalog: Sendable {
     /// Fetch songs from user's library with sorting and pagination
     func fetchLibrarySongs(
         sortedBy: SortOption,
@@ -107,7 +122,7 @@ protocol LibraryCatalog: Sendable {
 // MARK: - PlaybackTransport
 
 /// Playback transport interface. Consumers that queue songs and control playback depend on this.
-protocol PlaybackTransport: Sendable {
+public nonisolated protocol PlaybackTransport: Sendable {
     /// Atomically install one immutable listening session.
     func load(_ request: PlaybackLoadRequest) async throws
 
@@ -149,4 +164,4 @@ protocol PlaybackTransport: Sendable {
 // MARK: - Combined typealias (backward compat)
 
 /// Combined interface for consumers that need all three capabilities.
-typealias MusicService = MusicAuthorizing & LibraryCatalog & PlaybackTransport
+public typealias MusicService = MusicAuthorizing & LibraryCatalog & PlaybackTransport

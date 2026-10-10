@@ -4,7 +4,7 @@ import SwiftData
 /// One row holds the entire cross-launch session: the editable song pool and
 /// the active listening session. Committing replaces the row atomically.
 @Model
-final class PersistedSession {
+public final class PersistedSession {
     var savedAt: Date
     var poolJSON: String
     var sessionJSON: String?
