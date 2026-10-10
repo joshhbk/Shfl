@@ -2,8 +2,6 @@ import ShflCore
 import SwiftUI
 
 struct NowPlayingBar: View {
-    let makePlaybackClock: () -> PlaybackClock
-
     @Environment(ShufflePlayer.self) private var player
 
     var body: some View {
@@ -13,7 +11,7 @@ struct NowPlayingBar: View {
                 .frame(minWidth: 140, maxWidth: 260, alignment: .leading)
             Spacer(minLength: 8)
             TransportButtons()
-            PlaybackScrubber(makePlaybackClock: makePlaybackClock)
+            PlaybackScrubber()
                 .frame(minWidth: 200, maxWidth: 380)
             Spacer(minLength: 8)
             SelectedMeter()

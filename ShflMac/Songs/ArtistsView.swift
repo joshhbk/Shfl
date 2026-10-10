@@ -2,14 +2,14 @@ import ShflCore
 import SwiftUI
 
 struct ArtistsView: View {
-    let makeSongs: (Artist) -> ArtistDetailViewModel
+    @Environment(\.screenFactories) private var screens
 
     var body: some View {
         NavigationStack {
             ArtistList()
                 .navigationTitle("Artists")
                 .navigationDestination(for: Artist.self) { artist in
-                    ArtistSongsView(songs: makeSongs(artist))
+                    ArtistSongsView(songs: screens.makeSongs(by: artist))
                 }
         }
     }
@@ -52,7 +52,7 @@ private struct ArtistList: View {
 
 private struct ArtistSongsView: View {
     @State private var songs: ArtistDetailViewModel
-    @State private var sortOrder: [KeyPathComparator<Song>] = []
+    @Environment(DraftEditing.self) private var drafting
 
     init(songs: ArtistDetailViewModel) {
         _songs = State(wrappedValue: songs)
@@ -60,10 +60,11 @@ private struct ArtistSongsView: View {
 
     var body: some View {
         SongsTable(
-            songs: songs.songs.sorted(using: sortOrder),
-            sortOrder: $sortOrder,
+            songs: songs.songs,
             onReachEnd: { Task { await songs.loadMorePages() } }
-        )
+        ) { selected in
+            AddToSelectedButton(songs: selected, drafting: drafting)
+        }
         .overlay {
             if songs.songs.isEmpty && songs.isLoading { ProgressView() }
         }

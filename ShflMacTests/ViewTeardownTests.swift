@@ -16,21 +16,15 @@ final class ViewTeardownTests: XCTestCase {
 
     func test_leavingEachPlaceReleasesItsStateWithoutCrashing() async throws {
         let model = AppModel.preview()
-        for item in SidebarItem.allCases {
-            try await showThenTearDown(model) {
-                DetailColumn(
-                    item: item,
-                    makeArtistSongs: model.makeSongs(by:),
-                    makePlaylistSongs: model.makeSongs(in:)
-                )
-            }
+        for place in SidebarItem.allCases {
+            try await showThenTearDown(model) { PlaceHost(place: place) }
         }
     }
 
     func test_closingTheNowPlayingBarReleasesItsClockWithoutCrashing() async throws {
         let model = AppModel.preview()
         try await showThenTearDown(model) {
-            NowPlayingBar(makePlaybackClock: model.makePlaybackClock)
+            NowPlayingBar()
         }
     }
 
@@ -63,5 +57,14 @@ final class ViewTeardownTests: XCTestCase {
         // SwiftUI releases view state on a later run-loop pass, outside any task.
         try await Task.sleep(for: .milliseconds(500))
         XCTAssertNil(weakHost)
+    }
+}
+
+struct PlaceHost: View {
+    let place: SidebarItem
+    @FocusState private var isSearchFocused: Bool
+
+    var body: some View {
+        DetailColumn(place: place, isSearchFocused: $isSearchFocused)
     }
 }

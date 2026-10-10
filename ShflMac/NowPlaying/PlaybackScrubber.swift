@@ -2,9 +2,8 @@ import ShflCore
 import SwiftUI
 
 struct PlaybackScrubber: View {
-    let makePlaybackClock: () -> PlaybackClock
-
     @State private var clock: PlaybackClock?
+    @Environment(\.screenFactories) private var screens
     @Environment(ShufflePlayer.self) private var player
 
     var body: some View {
@@ -16,7 +15,7 @@ struct PlaybackScrubber: View {
             }
         }
         .onAppear {
-            if clock == nil { clock = makePlaybackClock() }
+            if clock == nil { clock = screens.makePlaybackClock() }
             clock?.startUpdating(playbackState: player.playbackState)
         }
         .onDisappear { clock?.stopUpdating() }

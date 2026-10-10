@@ -20,13 +20,19 @@ final class ShflMacAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // Tests host the app; keep it from taking focus from the person using the Mac.
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             NSApp.setActivationPolicy(.prohibited)
         }
     }
 
-    // Quitting from an active window never changes the scene phase.
+    func applicationDidResignActive(_ notification: Notification) {
+        model.sceneDidLeaveForeground()
+    }
+
+    func applicationDidHide(_ notification: Notification) {
+        model.sceneDidLeaveForeground()
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         model.sceneDidLeaveForeground()
     }

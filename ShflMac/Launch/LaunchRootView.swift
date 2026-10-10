@@ -4,21 +4,10 @@ import SwiftUI
 struct LaunchRootView: View {
     let model: AppModel
 
-    @Environment(\.scenePhase) private var scenePhase
-
     var body: some View {
         content
             .frame(minWidth: 820, minHeight: 520)
-            .task {
-                // Reopening the window must not restore the session again.
-                guard model.launchPhase == .loading else { return }
-                await model.launch()
-            }
-            .onChange(of: scenePhase) { oldPhase, newPhase in
-                if oldPhase == .active && newPhase != .active {
-                    model.sceneDidLeaveForeground()
-                }
-            }
+            .task { await model.launch() }
     }
 
     @ViewBuilder
@@ -31,11 +20,7 @@ struct LaunchRootView: View {
         case .authorizationDenied:
             AuthorizationDeniedView()
         case .ready:
-            MainSplitView(
-                makePlaybackClock: model.makePlaybackClock,
-                makeArtistSongs: model.makeSongs(by:),
-                makePlaylistSongs: model.makeSongs(in:)
-            )
+            MainSplitView()
         }
     }
 }

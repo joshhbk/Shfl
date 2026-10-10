@@ -25,5 +25,6 @@ extension View {
             .environment(shell.browser)
             .environment(shell.drafting)
             .environment(\.artworkStore, shell.model.artworkStore)
+            .environment(\.screenFactories, ScreenFactories(model: shell.model))
     }
 }
