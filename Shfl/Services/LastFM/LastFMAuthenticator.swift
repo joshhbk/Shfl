@@ -1,7 +1,5 @@
 import Foundation
 import Security
-import AuthenticationServices
-import UIKit
 
 nonisolated struct LastFMSession: Codable, Equatable, Sendable {
     let sessionKey: String
@@ -13,7 +11,6 @@ enum LastFMAuthError: Error {
     case authenticationFailed(String)
     case tokenExchangeFailed
     case cancelled
-    case missingPresentationAnchor
 }
 
 extension LastFMAuthError: LocalizedError {
@@ -27,27 +24,39 @@ extension LastFMAuthError: LocalizedError {
             return "Unable to complete Last.fm sign-in."
         case .cancelled:
             return nil
-        case .missingPresentationAnchor:
-            return "No active window is available to present Last.fm sign-in. Try again once the app window is active."
         }
     }
 }
 
+/// Signs the listener in to Last.fm and keeps their session in the keychain.
+///
+/// Sign-in is two steps around a web authentication session the shell runs:
+/// open `signInURL()` watching for `callbackURLScheme`, then hand the URL
+/// Last.fm redirects to back to `completeSignIn(callbackURL:)`.
 actor LastFMAuthenticator {
+    /// Fetches a Last.fm API URL's response body.
+    typealias Fetch = @Sendable (URL) async throws -> Data
+
+    /// The scheme Last.fm redirects to once the listener approves Shfl.
+    nonisolated static let callbackURLScheme = "shfl"
+
     private let apiKey: String
     private let sharedSecret: String
     private let keychainService: String
+    private let fetch: Fetch
 
     private var cachedSession: LastFMSession?
 
     init(
         apiKey: String,
         sharedSecret: String,
-        keychainService: String = "com.shfl.lastfm.session"
+        keychainService: String = "com.shfl.lastfm.session",
+        fetch: @escaping Fetch = { try await URLSession.shared.data(from: $0).0 }
     ) {
         self.apiKey = apiKey
         self.sharedSecret = sharedSecret
         self.keychainService = keychainService
+        self.fetch = fetch
     }
 
     var isAuthenticated: Bool {
@@ -76,10 +85,6 @@ actor LastFMAuthenticator {
 
         cachedSession = session
         return session
-    }
-
-    private func storeSessionAsync(_ session: LastFMSession) async throws {
-        try storeSession(session)
     }
 
     func storeSession(_ session: LastFMSession) throws {
@@ -121,60 +126,29 @@ actor LastFMAuthenticator {
         cachedSession = nil
     }
 
-    // MARK: - Web Authentication
+    // MARK: - Sign-in
 
-    @MainActor
-    func authenticate() async throws -> LastFMSession {
-        let authURLString = "https://www.last.fm/api/auth/?api_key=\(apiKey)&cb=shfl://lastfm"
+    /// The Last.fm page where the listener approves Shfl. It redirects to
+    /// `callbackURLScheme` with a token.
+    nonisolated func signInURL() throws -> URL {
+        let authURLString = "https://www.last.fm/api/auth/?api_key=\(apiKey)&cb=\(Self.callbackURLScheme)://lastfm"
         guard let authURL = URL(string: authURLString) else {
             throw LastFMAuthError.authenticationFailed("Invalid auth URL")
         }
-
-        let token = try await performWebAuth(url: authURL)
-        let session = try await exchangeTokenForSession(token: token)
-        try await storeSessionAsync(session)
-        return session
+        return authURL
     }
 
-    @MainActor
-    private func performWebAuth(url: URL) async throws -> String {
-        guard WebAuthContextProvider.shared.currentPresentationAnchor() != nil else {
-            throw LastFMAuthError.missingPresentationAnchor
+    /// Finishes sign-in with the URL Last.fm redirected to: trades its token
+    /// for a session and stores the session in the keychain.
+    func completeSignIn(callbackURL: URL) async throws -> LastFMSession {
+        guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
+            throw LastFMAuthError.authenticationFailed("No token in callback")
         }
 
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-            let session = ASWebAuthenticationSession(
-                url: url,
-                callbackURLScheme: "shfl"
-            ) { callbackURL, error in
-                if let error = error as? ASWebAuthenticationSessionError,
-                   error.code == .canceledLogin {
-                    continuation.resume(throwing: LastFMAuthError.cancelled)
-                    return
-                }
-
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                guard let callbackURL = callbackURL,
-                      let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
-                      let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
-                    continuation.resume(throwing: LastFMAuthError.authenticationFailed("No token in callback"))
-                    return
-                }
-
-                continuation.resume(returning: token)
-            }
-
-            session.prefersEphemeralWebBrowserSession = false
-            session.presentationContextProvider = WebAuthContextProvider.shared
-            guard session.start() else {
-                continuation.resume(throwing: LastFMAuthError.authenticationFailed("Unable to start Last.fm sign-in. Please try again."))
-                return
-            }
-        }
+        let session = try await exchangeTokenForSession(token: token)
+        try storeSession(session)
+        return session
     }
 
     nonisolated private func exchangeTokenForSession(token: String) async throws -> LastFMSession {
@@ -196,7 +170,7 @@ actor LastFMAuthenticator {
             throw LastFMAuthError.tokenExchangeFailed
         }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let data = try await fetch(url)
 
         struct SessionResponse: Decodable {
             let session: SessionData
@@ -212,61 +186,6 @@ actor LastFMAuthenticator {
             return LastFMSession(sessionKey: response.session.key, username: response.session.name)
         } catch {
             throw LastFMAuthError.tokenExchangeFailed
-        }
-    }
-}
-
-// MARK: - Presentation Context
-
-@MainActor
-final class WebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
-    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    static let shared = WebAuthContextProvider()
-
-    private override init() {
-        super.init()
-    }
-
-    func currentPresentationAnchor() -> ASPresentationAnchor? {
-        let windowScenes = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .sorted { lhs, rhs in
-                lhs.activationState.sortPriority < rhs.activationState.sortPriority
-            }
-
-        for scene in windowScenes {
-            if let keyWindow = scene.windows.first(where: { $0.isKeyWindow }) {
-                return keyWindow
-            }
-            if let visibleWindow = scene.windows.first(where: { !$0.isHidden }) {
-                return visibleWindow
-            }
-            if let anyWindow = scene.windows.first {
-                return anyWindow
-            }
-        }
-
-        return nil
-    }
-
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        currentPresentationAnchor() ?? ASPresentationAnchor()
-    }
-}
-
-private extension UIScene.ActivationState {
-    var sortPriority: Int {
-        switch self {
-        case .foregroundActive:
-            return 0
-        case .foregroundInactive:
-            return 1
-        case .background:
-            return 2
-        case .unattached:
-            return 3
-        @unknown default:
-            return 4
         }
     }
 }

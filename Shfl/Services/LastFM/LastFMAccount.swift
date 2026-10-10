@@ -40,9 +40,16 @@ enum RecentTracksState: Equatable {
     }
 }
 
+/// The listener's Last.fm connection as the settings screen shows it: whether
+/// they're signed in, their recent scrobbles, and connecting or disconnecting.
 @Observable
 @MainActor
-final class LastFMSettingsViewModel {
+final class LastFMAccount {
+    /// Runs Last.fm's sign-in page in a web authentication session and returns
+    /// the URL it redirects to with `callbackURLScheme`. Throws
+    /// `LastFMAuthError.cancelled` when the listener backs out.
+    typealias WebSignIn = (_ signInURL: URL, _ callbackURLScheme: String) async throws -> URL
+
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     var connectionState: ConnectionState = .disconnected
     var isRefreshing = false
@@ -89,13 +96,18 @@ final class LastFMSettingsViewModel {
         isRefreshing = false
     }
 
-    func connect() async {
+    /// Signs in through `webSignIn`, then loads recent tracks.
+    func connect(using webSignIn: WebSignIn) async {
         guard let transport else { return }
         connectionState = .connecting
         errorMessage = nil
 
         do {
-            let session = try await transport.authenticate()
+            let callbackURL = try await webSignIn(
+                try transport.signInURL(),
+                LastFMAuthenticator.callbackURLScheme
+            )
+            let session = try await transport.completeSignIn(callbackURL: callbackURL)
             connectionState = .connected(username: session.username)
             await refreshActivity(showLoading: true)
         } catch LastFMAuthError.cancelled {
