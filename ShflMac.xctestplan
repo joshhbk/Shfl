@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "8D2F4A1C-3B6E-4F7A-9C2D-5E8B1A4F6C30",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Shfl.xcodeproj",
+        "identifier" : "DCAC00022F20000000000002",
+        "name" : "ShflMacTests"
+      }
+    }
+  ],
+  "version" : 1
+}
