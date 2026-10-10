@@ -14,7 +14,7 @@ public final class ArtistDetailViewModel {
 
     public let artistName: String
 
-    public init(artistName: String, libraryCatalog: LibraryCatalog) {
+    package init(artistName: String, libraryCatalog: LibraryCatalog) {
         self.artistName = artistName
         self.lane = LibraryLane<Song>(
             fetchPage: { offset, limit in

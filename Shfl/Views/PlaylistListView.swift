@@ -3,7 +3,7 @@ import SwiftUI
 
 struct PlaylistListView: View {
     @Bindable var browser: LibraryBrowser
-    let libraryCatalog: LibraryCatalog
+    let makePlaylistSongs: (Playlist) -> PlaylistDetailViewModel
     let selectedSongIds: Set<String>
     let isAtCapacity: Bool
     let onToggleSong: (Song) -> Void
@@ -62,9 +62,7 @@ struct PlaylistListView: View {
         .scrollDismissesKeyboard(.immediately)
         .navigationDestination(for: Playlist.self) { playlist in
             PlaylistDetailView(
-                playlistId: playlist.id,
-                playlistName: playlist.name,
-                libraryCatalog: libraryCatalog,
+                songs: makePlaylistSongs(playlist),
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: isAtCapacity,
                 onToggleSong: onToggleSong

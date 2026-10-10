@@ -24,7 +24,7 @@ public final class SessionDraftStore {
 
     public nonisolated static let defaultAlgorithm = SessionDraft.defaultAlgorithm
 
-    public init(algorithm: ShuffleAlgorithm = SessionDraftStore.defaultAlgorithm) {
+    package init(algorithm: ShuffleAlgorithm = SessionDraftStore.defaultAlgorithm) {
         draft = SessionDraft(algorithm: algorithm)
     }
 
@@ -80,10 +80,9 @@ public final class SessionDraftStore {
 
     // MARK: - Editing
 
-    // PR 4 → package (previews get a ShflDeterministic fixture)
     /// Adds the songs that aren't already in the pool. If they don't all fit,
     /// throws `.capacityReached` and leaves the pool as it was.
-    public func add(_ songs: [Song]) throws {
+    package func add(_ songs: [Song]) throws {
         draft = try draft.adding(songs)
     }
 

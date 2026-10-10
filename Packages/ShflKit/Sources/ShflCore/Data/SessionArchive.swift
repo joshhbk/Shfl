@@ -13,7 +13,6 @@ enum SessionArchiveError: Error {
     case encodingFailed
 }
 
-// PR 4 → package
 /// The single persistence module for the song pool and the active listening
 /// session. Hides SwiftData, JSON encoding, and atomic replacement behind one
 /// load/commit interface.
@@ -21,14 +20,13 @@ enum SessionArchiveError: Error {
 /// Only `ListeningSessionHost` writes here; it keeps the last written session
 /// record in memory, so any other writer would desynchronise it.
 @MainActor
-public final class SessionArchive {
+package final class SessionArchive {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
     private let modelContext: ModelContext
     private let container: ModelContainer
     private let saveHandler: () throws -> Void
 
-    // PR 4 → package
-    public init(
+    package init(
         modelContext: ModelContext,
         saveHandler: (() throws -> Void)? = nil
     ) {

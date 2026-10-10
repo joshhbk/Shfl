@@ -1,7 +1,10 @@
 import SwiftUI
 import XCTest
 @testable import Shfl
-@testable import ShflCore
+import ShflComposition
+import ShflCore
+import ShflDeterministic
+import ShflLastFM
 
 /// Builds real screens in a window and lets SwiftUI tear them down, the way
 /// closing a sheet or popping a screen does. Under Xcode 27, a main-actor class
@@ -10,29 +13,26 @@ import XCTest
 @MainActor
 final class ViewTeardownTests: XCTestCase {
     func test_closingTheSongPickerReleasesItsStateWithoutCrashing() async throws {
-        let suiteName = "ViewTeardownTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let draft = SessionDraftStore()
+        let model = AppModel.preview(library: .empty)
         try await showThenTearDown(
             SongPickerView(
-                libraryCatalog: DeterministicMusicService(),
-                libraryPreferences: LibraryPreferences(defaults: defaults),
+                browser: model.makeLibraryBrowser(),
+                editor: model.makeDraftEditor(),
+                makeArtistSongs: model.makeSongs(by:),
+                makePlaylistSongs: model.makeSongs(in:),
                 onDismiss: {}
             )
-            .environment(\.sessionDraft, draft)
         )
     }
 
     func test_leavingThePlayerReleasesItsStateWithoutCrashing() async throws {
-        let service = DeterministicMusicService()
-        let draft = SessionDraftStore()
+        let model = AppModel.preview(library: .empty)
         try await showThenTearDown(
             PlayerView(
-                player: ShufflePlayer(playbackTransport: service, sessionDraft: draft),
-                playbackTransport: service
+                player: model.player,
+                draft: model.sessionDraft,
+                makePlaybackClock: model.makePlaybackClock
             )
-            .environment(\.sessionDraft, draft)
         )
     }
 
@@ -41,6 +41,7 @@ final class ViewTeardownTests: XCTestCase {
             NavigationStack {
                 LastFMSettingsView()
             }
+            .environment(LastFMAccount.preview())
         )
     }
 

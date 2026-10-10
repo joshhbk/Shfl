@@ -15,7 +15,7 @@ public enum AutofillAlgorithm: String, CaseIterable, Sendable, Hashable {
 
 /// Protocol for sources that can provide songs for autofill
 /// Uses the strategy pattern to allow different sources (library, playlist) to provide songs
-public protocol AutofillSource: Sendable {
+package protocol AutofillSource: Sendable {
     /// Fetch random songs for autofill, excluding songs already in the shuffle
     /// - Parameters:
     ///   - excluding: Song IDs to exclude (already in shuffle)
@@ -27,7 +27,7 @@ public protocol AutofillSource: Sendable {
 /// An autofill source that can fetch ahead of time, so the next autofill
 /// needn't wait for the library.
 @MainActor
-public protocol WarmableAutofillSource: AutofillSource {
+package protocol WarmableAutofillSource: AutofillSource {
     /// Starts fetching songs for the next autofill, if not already doing so.
     func warm()
 }

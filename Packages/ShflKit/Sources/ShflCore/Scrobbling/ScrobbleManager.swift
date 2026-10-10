@@ -1,10 +1,9 @@
 import Foundation
 
-// PR 4 → package
-public actor ScrobbleManager {
+package actor ScrobbleManager {
     private let transports: [any ScrobbleTransport]
 
-    public init(transports: [any ScrobbleTransport]) {
+    package init(transports: [any ScrobbleTransport]) {
         self.transports = transports
     }
 

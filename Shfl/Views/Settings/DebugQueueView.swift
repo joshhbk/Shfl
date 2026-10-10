@@ -1,3 +1,4 @@
+import ShflComposition
 import ShflCore
 import SwiftUI
 import UIKit
@@ -17,7 +18,7 @@ struct DebugQueueView: View {
 private struct DebugListeningSessionContent: View {
     let player: ShufflePlayer
 
-    @Environment(\.sessionDraft) private var sessionDraft
+    @Environment(SessionDraftStore.self) private var sessionDraft
     @State private var showingResetConfirmation = false
     @State private var copiedAt: Date?
 
@@ -141,11 +142,10 @@ private struct DebugListeningSessionContent: View {
 }
 
 #Preview {
-    NavigationStack {
+    let model = AppModel.preview()
+    return NavigationStack {
         DebugQueueView()
-            .environment(
-                \.shufflePlayer,
-                ShufflePlayer(playbackTransport: DeterministicMusicService(), sessionDraft: SessionDraftStore())
-            )
+            .environment(\.shufflePlayer, model.player)
+            .environment(model.sessionDraft)
     }
 }

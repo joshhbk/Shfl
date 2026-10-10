@@ -8,18 +8,12 @@ struct PlaylistDetailView: View {
     let onToggleSong: (Song) -> Void
 
     init(
-        playlistId: String,
-        playlistName: String,
-        libraryCatalog: LibraryCatalog,
+        songs: PlaylistDetailViewModel,
         selectedSongIds: Set<String>,
         isAtCapacity: Bool,
         onToggleSong: @escaping (Song) -> Void
     ) {
-        self._viewModel = State(wrappedValue: PlaylistDetailViewModel(
-            playlistId: playlistId,
-            playlistName: playlistName,
-            libraryCatalog: libraryCatalog
-        ))
+        self._viewModel = State(wrappedValue: songs)
         self.selectedSongIds = selectedSongIds
         self.isAtCapacity = isAtCapacity
         self.onToggleSong = onToggleSong

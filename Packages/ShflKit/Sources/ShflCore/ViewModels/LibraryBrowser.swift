@@ -126,7 +126,7 @@ public final class LibraryBrowser {
 
     // MARK: - Init
 
-    public init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
+    package init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
         self.libraryCatalog = libraryCatalog
         self.preferences = preferences
 
@@ -290,7 +290,7 @@ public final class LibraryBrowser {
 
     // MARK: - Autofill
 
-    public func autofill(into draft: SessionDraftStore) async {
+    package func autofill(into draft: SessionDraftStore) async {
         let source = LibraryAutofillSource(
             libraryCatalog: libraryCatalog,
             algorithm: preferences.autofillAlgorithm

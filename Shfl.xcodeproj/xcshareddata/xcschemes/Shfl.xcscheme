@@ -35,6 +35,76 @@
                ReferencedContainer = "container:Packages/ShflKit">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ShflDeterministicTests"
+               BuildableName = "ShflDeterministicTests"
+               BlueprintName = "ShflDeterministicTests"
+               ReferencedContainer = "container:Packages/ShflKit">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ShflAppleMusicTests"
+               BuildableName = "ShflAppleMusicTests"
+               BlueprintName = "ShflAppleMusicTests"
+               ReferencedContainer = "container:Packages/ShflKit">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ShflAppleMusicUITests"
+               BuildableName = "ShflAppleMusicUITests"
+               BlueprintName = "ShflAppleMusicUITests"
+               ReferencedContainer = "container:Packages/ShflKit">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ShflLastFMTests"
+               BuildableName = "ShflLastFMTests"
+               BlueprintName = "ShflLastFMTests"
+               ReferencedContainer = "container:Packages/ShflKit">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "ShflCompositionTests"
+               BuildableName = "ShflCompositionTests"
+               BlueprintName = "ShflCompositionTests"
+               ReferencedContainer = "container:Packages/ShflKit">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

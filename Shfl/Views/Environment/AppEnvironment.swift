@@ -8,9 +8,5 @@ extension EnvironmentValues {
 
     @Entry var shufflePlayer: ShufflePlayer? = nil
 
-    @Entry var lastFMTransport: LastFMTransport? = nil
-
-    @Entry var sessionDraft = SessionDraftStore()
-
     @Entry var listeningSessionHost: ListeningSessionHost? = nil
 }
