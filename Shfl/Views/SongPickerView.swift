@@ -15,8 +15,7 @@ enum BrowseMode: String, CaseIterable {
         }
     }
 
-    /// The catalog lane this tab browses; the picks aren't a catalog lane.
-    /// The tab showing `lane`; no lane means the picks.
+    /// The tab showing `lane`; nil means the picks.
     init(lane: LibraryLaneKind?) {
         switch lane {
         case .songs: self = .songs
@@ -26,6 +25,7 @@ enum BrowseMode: String, CaseIterable {
         }
     }
 
+    /// The catalog lane this tab browses, or nil for the picks.
     var laneKind: LibraryLaneKind? {
         switch self {
         case .songs: .songs

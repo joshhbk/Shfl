@@ -35,7 +35,6 @@ final class LibraryBrowser {
 
     // MARK: - Song sort
 
-    /// The saved order the songs lane is sorted by.
     var sortOption: SortOption { preferences.sortOption }
 
     // MARK: - Active lane

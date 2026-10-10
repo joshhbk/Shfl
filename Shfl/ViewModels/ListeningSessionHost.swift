@@ -167,8 +167,7 @@ final class ListeningSessionHost {
         }
     }
 
-    /// A lifecycle checkpoint: saves the live position on the active session.
-    /// The shell calls this when its scene goes to the background.
+    /// Saves the live playback position on the active session.
     func sceneDidLeaveForeground() {
         print("📱 Scene left the foreground - checkpointing session...")
         checkpoint(position: playbackTransport.currentPlaybackTime)

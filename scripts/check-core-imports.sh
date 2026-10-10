@@ -17,10 +17,8 @@ core_paths=(
 
 forbidden='^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+((typealias|struct|class|enum|protocol|var|func)[[:space:]]+)?(SwiftUI|UIKit|AppKit|MusicKit|MediaPlayer)([.[:space:]]|$)'
 
-# Files that still import a forbidden framework and are fixed in a later PR.
-# PR 2 (artwork and Last.fm seams) owns artwork and Last.fm sign-in; none of
-# those files live under the core paths yet, so this list is empty. Add a
-# path here, with the PR that fixes it, only for a known, scheduled exception.
+# Core-bound files allowed a forbidden import until a scheduled PR removes it;
+# name that PR beside each path.
 known_exceptions=()
 
 is_known_exception() {

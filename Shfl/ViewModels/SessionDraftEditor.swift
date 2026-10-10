@@ -5,7 +5,6 @@ enum DraftEdit: Equatable {
     /// The song joined the pool, which now holds `songCount` songs.
     case added(songCount: Int, reachedMilestone: Bool)
     case removed
-    /// The pool was full, so the song stayed out.
     case rejectedAtCapacity
     /// The edit failed; the message is also shown as `actionErrorMessage`.
     case failed(String)
@@ -23,7 +22,6 @@ final class SessionDraftEditor {
 
     // MARK: - Editing
 
-    /// Adds the song to the draft, or removes it when it is already there.
     @discardableResult
     func toggle(_ song: Song, in draft: SessionDraftStore) -> DraftEdit {
         autofillIsExhausted = false

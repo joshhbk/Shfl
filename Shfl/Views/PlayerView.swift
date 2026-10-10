@@ -110,9 +110,8 @@ struct PlayerView: View {
         .onChange(of: colorExtractor.extractedColor) { _, newColor in
             tintProvider.update(albumColor: newColor, theme: themeController.currentTheme)
         }
-        // Bi-directional theme sync: ThemeController ↔ AppearanceSettings
-        // Loop prevention relies on ThemeController.setTheme(byId:) and AppearanceSettings.currentThemeId
-        // both guarding against no-op writes, breaking the onChange cycle.
+        // Two-way theme sync with AppearanceSettings; the onChange cycle ends only because
+        // ThemeController.setTheme(byId:) and AppearanceSettings.currentThemeId both ignore no-op writes.
         .onChange(of: themeController.currentTheme) { _, newTheme in
             tintProvider.update(albumColor: colorExtractor.extractedColor, theme: newTheme)
             appearanceSettings?.currentThemeId = newTheme.id

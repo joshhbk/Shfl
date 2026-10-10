@@ -17,7 +17,6 @@ final class AppModel {
     enum LaunchPhase: Equatable {
         /// Restoring the saved session and checking Apple Music access.
         case loading
-        /// Apple Music access hasn't been granted yet.
         case needsAuthorization
         /// The listener was asked for Apple Music access and declined.
         case authorizationDenied
@@ -76,8 +75,7 @@ final class AppModel {
         launchPhase = await authStatus ? .ready : .needsAuthorization
     }
 
-    /// A lifecycle checkpoint for when the shell's scene goes to the
-    /// background: the session host saves the live playback position.
+    /// Saves the live playback position on the active session.
     func sceneDidLeaveForeground() {
         sessionHost.sceneDidLeaveForeground()
     }

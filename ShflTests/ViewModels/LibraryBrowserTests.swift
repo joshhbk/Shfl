@@ -31,7 +31,7 @@ final class LibraryBrowserTests: XCTestCase {
         XCTAssertTrue(browser.searchResults.isEmpty)
         XCTAssertEqual(browser.searchText, "")
         XCTAssertEqual(browser.currentMode, .browse)
-        XCTAssertFalse(browser.isLoading)  // Lane starts with isLoading=false until loadInitial
+        XCTAssertFalse(browser.isLoading)
         XCTAssertEqual(browser.sortOption, .mostPlayed)
     }
 

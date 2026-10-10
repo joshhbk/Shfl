@@ -1,11 +1,10 @@
 import SwiftUI
 
 extension EnvironmentValues {
-    /// Library sort order and autofill algorithm. `MainView` provides the
-    /// app's preferences.
+    /// Provided by `MainView`; nil outside it, such as in previews.
     @Entry var libraryPreferences: LibraryPreferences? = nil
 
-    /// The current theme. `MainView` provides the app's settings.
+    /// Provided by `MainView`; nil outside it, such as in previews.
     @Entry var appearanceSettings: AppearanceSettings? = nil
 
     @Entry var shufflePlayer: ShufflePlayer? = nil
