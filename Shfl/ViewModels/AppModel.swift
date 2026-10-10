@@ -1,5 +1,5 @@
+import Foundation
 import SwiftData
-import SwiftUI
 
 @Observable
 @MainActor
@@ -13,12 +13,18 @@ final class AppModel {
     @ObservationIgnored private let appSettings: AppSettings
     @ObservationIgnored private let scrobbleTracker: ScrobbleTracker
 
-    var showingPicker = false
-    var showingSettings = false
+    /// Where this launch is on the way to a playable library.
+    enum LaunchPhase: Equatable {
+        /// Restoring the saved session and checking Apple Music access.
+        case loading
+        /// Apple Music access hasn't been granted yet.
+        case needsAuthorization
+        /// The listener was asked for Apple Music access and declined.
+        case authorizationDenied
+        case ready
+    }
 
-    var isAuthorized = false
-    var isLoading = true
-    var authorizationError: String?
+    private(set) var launchPhase: LaunchPhase = .loading
 
     var player: ShufflePlayer { sessionHost.player }
     var sessionDraft: SessionDraftStore { sessionHost.sessionDraft }
@@ -65,30 +71,12 @@ final class AppModel {
     func onAppear() async {
         async let authStatus = library.isAuthorized
         await sessionHost.restoreSavedSession()
-        isAuthorized = await authStatus
-        isLoading = false
+        launchPhase = await authStatus ? .ready : .needsAuthorization
     }
 
+    /// Asks for Apple Music access. Afterwards the launch phase is `.ready`
+    /// or `.authorizationDenied`.
     func requestAuthorization() async {
-        isAuthorized = await library.requestAuthorization()
-        if !isAuthorized {
-            authorizationError = "Apple Music access is required to use Shuffled. Please enable it in Settings."
-        }
-    }
-
-    func openPicker() {
-        showingPicker = true
-    }
-
-    func closePicker() {
-        showingPicker = false
-    }
-
-    func openSettings() {
-        showingSettings = true
-    }
-
-    func closeSettings() {
-        showingSettings = false
+        launchPhase = await library.requestAuthorization() ? .ready : .authorizationDenied
     }
 }

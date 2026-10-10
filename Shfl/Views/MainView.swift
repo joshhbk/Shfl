@@ -1,9 +1,12 @@
 import SwiftUI
 
 struct MainView: View {
-    @Bindable var model: AppModel
+    let model: AppModel
     let appSettings: AppSettings
 
+    @State private var showingPicker = false
+    @State private var showingSettings = false
+    @State private var showingAuthorizationAlert = false
     @State private var hasStartedInitialLoad = false
     @State private var hasCompletedInitialLoad = false
     @State private var hasCompletedSplashTimeline = false
@@ -20,21 +23,8 @@ struct MainView: View {
         _hasDismissedStartupSplash = State(initialValue: !showsStartupSplash)
     }
 
-    private enum LaunchPhase: Int {
-        case loading
-        case unauthorized
-        case ready
-    }
-
     private var loadingTheme: ShuffleTheme {
         ShuffleTheme.theme(byId: appSettings.currentThemeId) ?? .pink
-    }
-
-    private var launchPhase: LaunchPhase {
-        if model.isLoading {
-            return .loading
-        }
-        return model.isAuthorized ? .ready : .unauthorized
     }
 
     private var shouldShowStartupSplash: Bool {
@@ -53,7 +43,7 @@ struct MainView: View {
 
             if shouldRenderLaunchContent {
                 launchContent
-                    .animation(.easeInOut(duration: 0.35), value: launchPhase)
+                    .animation(.easeInOut(duration: 0.35), value: model.launchPhase)
                     .zIndex(0)
             }
 
@@ -71,26 +61,23 @@ struct MainView: View {
         .task {
             await startInitialLoadIfNeeded()
         }
-        .onChange(of: model.isLoading) { _, _ in
+        .onChange(of: model.launchPhase) { _, _ in
             dismissSplashIfReady()
         }
         .onChange(of: appSettings.shuffleAlgorithm) { _, newAlgorithm in
             model.sessionDraft.stage(newAlgorithm)
         }
-        .sheet(isPresented: $model.showingPicker, onDismiss: { model.closePicker() }) {
-            songPickerSheet(onDismiss: { model.closePicker() })
+        .sheet(isPresented: $showingPicker) {
+            songPickerSheet(onDismiss: { showingPicker = false })
         }
-        .sheet(isPresented: $model.showingSettings) {
+        .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .tint(deviceAccentColor)
                 .environment(\.appSettings, appSettings)
                 .environment(\.shufflePlayer, model.player)
                 .environment(\.lastFMTransport, model.lastFMTransport)
         }
-        .alert("Authorization Required", isPresented: .init(
-            get: { model.authorizationError != nil },
-            set: { if !$0 { model.authorizationError = nil } }
-        )) {
+        .alert("Authorization Required", isPresented: $showingAuthorizationAlert) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -98,9 +85,7 @@ struct MainView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            if let error = model.authorizationError {
-                Text(error)
-            }
+            Text("Apple Music access is required to use Shuffled. Please enable it in Settings.")
         }
         // Kept last so the sheets above can read them too.
         .environment(\.sessionDraft, model.sessionDraft)
@@ -129,24 +114,25 @@ struct MainView: View {
 
     @ViewBuilder
     private var launchContent: some View {
-        if model.isLoading {
+        switch model.launchPhase {
+        case .loading:
             LoadingView(message: "Loading...")
                 .environment(\.shuffleTheme, loadingTheme)
                 .transition(.opacity)
-        } else if model.isAuthorized {
+        case .ready:
             PlayerView(
                 player: model.player,
                 playbackTransport: model.playbackTransport,
                 initialThemeId: appSettings.currentThemeId,
-                onAddTapped: { model.openPicker() },
-                onSettingsTapped: { model.openSettings() },
+                onAddTapped: { showingPicker = true },
+                onSettingsTapped: { showingSettings = true },
                 onSkipForwardTapped: { Task { try? await model.player.skipToNext() } },
                 onSkipBackTapped: { Task { try? await model.player.restartOrSkipToPrevious() } }
             )
             .transition(.opacity)
-        } else {
+        case .needsAuthorization, .authorizationDenied:
             WelcomeView {
-                Task { await model.requestAuthorization() }
+                Task { await requestAuthorization() }
             }
             .transition(.opacity)
         }
@@ -164,12 +150,19 @@ struct MainView: View {
         dismissSplashIfReady()
     }
 
+    private func requestAuthorization() async {
+        await model.requestAuthorization()
+        if model.launchPhase == .authorizationDenied {
+            showingAuthorizationAlert = true
+        }
+    }
+
     @MainActor
     private func dismissSplashIfReady() {
         guard !hasDismissedStartupSplash,
               hasCompletedSplashTimeline,
               hasCompletedInitialLoad,
-              !model.isLoading else { return }
+              model.launchPhase != .loading else { return }
         withAnimation(.easeOut(duration: 0.2)) {
             hasDismissedStartupSplash = true
         }

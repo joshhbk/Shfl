@@ -31,7 +31,7 @@ final class AppCompositionTests: XCTestCase {
         XCTAssertFalse(composition.showsStartupSplash)
 
         await model.onAppear()
-        XCTAssertTrue(model.isAuthorized)
+        XCTAssertEqual(model.launchPhase, .ready)
 
         // Play on an empty draft autofills it from the library first.
         await model.sessionHost.togglePlayback()

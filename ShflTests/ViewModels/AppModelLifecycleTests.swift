@@ -80,4 +80,32 @@ final class AppModelLifecycleTests: XCTestCase {
 
         XCTAssertEqual(persistCallCount, 1, "A single background transition should trigger one persistence pass")
     }
+
+    func testLaunchIsReadyWhenAppleMusicAccessWasAlreadyGranted() async {
+        let model = makeModel(service: DeterministicMusicService())
+        XCTAssertEqual(model.launchPhase, .loading)
+
+        await model.onAppear()
+
+        XCTAssertEqual(model.launchPhase, .ready)
+    }
+
+    func testLaunchWithoutAccessAsksAndReportsADenial() async {
+        let model = makeModel(service: DeterministicMusicService(configuration: .init(isAuthorized: false)))
+
+        await model.onAppear()
+        XCTAssertEqual(model.launchPhase, .needsAuthorization)
+
+        await model.requestAuthorization()
+        XCTAssertEqual(model.launchPhase, .authorizationDenied)
+    }
+
+    private func makeModel(service: DeterministicMusicService) -> AppModel {
+        AppModel(
+            library: service,
+            playbackTransport: service,
+            modelContext: modelContext,
+            appSettings: appSettings
+        )
+    }
 }
