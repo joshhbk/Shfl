@@ -10,12 +10,13 @@ struct SidebarView: View {
         List(selection: $selection) {
             Section("Library") {
                 ForEach(SidebarItem.library, id: \.self) { item in
-                    SidebarRow(item: item)
+                    SidebarRow(item: item).tag(item)
                 }
             }
             Section("Session") {
                 SelectedSidebarRow(songCount: drafting.draft.songCount, capacity: drafting.draft.capacity)
-                SidebarRow(item: .upNext)
+                    .tag(SidebarItem.selected)
+                SidebarRow(item: .upNext).tag(SidebarItem.upNext)
             }
         }
         .navigationSplitViewColumnWidth(min: 180, ideal: 200)
@@ -27,7 +28,6 @@ private struct SidebarRow: View {
 
     var body: some View {
         Label(item.title, systemImage: item.systemImage)
-            .tag(item)
             .accessibilityIdentifier(item.accessibilityIdentifier)
     }
 }
