@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Shfl
+@testable import ShflCore
 
 actor MockScrobbleTransport {
     private var _isAuthenticated: Bool = true

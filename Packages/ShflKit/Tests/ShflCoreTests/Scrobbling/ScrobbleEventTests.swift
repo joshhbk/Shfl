@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Shfl
+@testable import ShflCore
 
 @Suite("ScrobbleEvent Tests")
 struct ScrobbleEventTests {

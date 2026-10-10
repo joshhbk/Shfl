@@ -1,5 +1,5 @@
 import XCTest
-@testable import Shfl
+@testable import ShflCore
 
 final class QueueShufflerTests: XCTestCase {
 
