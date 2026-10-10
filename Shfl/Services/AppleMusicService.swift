@@ -4,7 +4,10 @@ import ShflCore
 
 /// MusicKit authorization and library catalog. Playback lives in
 /// `MusicKitTransport`.
-final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
+///
+/// Nonisolated: it holds no state, and MusicKit's library requests don't need
+/// the main actor.
+nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCatalog {
     var isAuthorized: Bool {
         get async {
             MusicAuthorization.currentStatus == .authorized
