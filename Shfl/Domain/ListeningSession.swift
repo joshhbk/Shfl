@@ -2,6 +2,8 @@ import Foundation
 
 nonisolated struct SessionDraft: Equatable, Sendable {
     static let maxSongs = 120
+    /// Song counts worth celebrating as the draft fills up.
+    static let milestones: Set<Int> = [1, 50, 100, 120]
 
     private(set) var songs: [Song]
     private(set) var algorithm: ShuffleAlgorithm

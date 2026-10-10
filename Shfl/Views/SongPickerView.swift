@@ -106,6 +106,7 @@ struct SongPickerView: View {
                 Text(error)
             }
         }
+        .animation(.default, value: editor.actionErrorMessage)
         .tint(pickerAccentColor)
     }
 
@@ -286,7 +287,7 @@ struct SongPickerView: View {
                 libraryCatalog: libraryCatalog,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
-                onToggleSong: { editor.toggle($0, in: sessionDraft) }
+                onToggleSong: toggle
             )
         case .playlists:
             PlaylistListView(
@@ -294,7 +295,7 @@ struct SongPickerView: View {
                 libraryCatalog: libraryCatalog,
                 selectedSongIds: selectedSongIds,
                 isAtCapacity: sessionDraft.isAtCapacity,
-                onToggleSong: { editor.toggle($0, in: sessionDraft) }
+                onToggleSong: toggle
             )
         case .selected:
             selectedList(songs: sessionDraft.songs)
@@ -384,7 +385,7 @@ struct SongPickerView: View {
                         song: song,
                         isSelected: selectedSongIds.contains(song.id),
                         isAtCapacity: isAtCapacity,
-                        onToggle: { editor.toggle(song, in: sessionDraft) }
+                        onToggle: { toggle(song) }
                     )
                     .equatable()
                     Divider().padding(.leading, 72)
@@ -421,7 +422,7 @@ struct SongPickerView: View {
             libraryCatalog: libraryCatalog,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
-            onToggleSong: { editor.toggle($0, in: sessionDraft) },
+            onToggleSong: toggle,
             searchResults: browser.artistSearchResults,
             hasMoreSearchResults: browser.hasMoreArtistSearchResults,
             onLoadMore: { Task { @MainActor in await browser.loadMoreArtistSearchResults() } }
@@ -445,7 +446,7 @@ struct SongPickerView: View {
             libraryCatalog: libraryCatalog,
             selectedSongIds: selectedSongIds,
             isAtCapacity: sessionDraft.isAtCapacity,
-            onToggleSong: { editor.toggle($0, in: sessionDraft) },
+            onToggleSong: toggle,
             searchResults: browser.playlistSearchResults,
             hasMoreSearchResults: browser.hasMorePlaylistSearchResults,
             onLoadMore: { Task { @MainActor in await browser.loadMorePlaylistSearchResults() } }
@@ -467,7 +468,7 @@ struct SongPickerView: View {
                         song: song,
                         isSelected: selectedSongIds.contains(song.id),
                         isAtCapacity: isAtCapacity,
-                        onToggle: { editor.toggle(song, in: sessionDraft) }
+                        onToggle: { toggle(song) }
                     )
                     .equatable()
                     Divider().padding(.leading, 72)
@@ -536,6 +537,17 @@ struct SongPickerView: View {
     }
 
     // MARK: - Helpers
+
+    private func toggle(_ song: Song) {
+        switch editor.toggle(song, in: sessionDraft) {
+        case .added(_, reachedMilestone: true):
+            HapticFeedback.milestone.trigger()
+        case .added, .removed, .rejectedAtCapacity, .failed:
+            // SongRow plays its own feedback, including the nope animation
+            // at capacity; a failure shows the error pill.
+            break
+        }
+    }
 
     private func performAutofill() {
         autofillTapCount += 1

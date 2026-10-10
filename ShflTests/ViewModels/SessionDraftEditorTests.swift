@@ -19,9 +19,34 @@ final class SessionDraftEditorTests: XCTestCase {
         let draft = SessionDraftStore()
         let editor = SessionDraftEditor()
 
-        editor.toggle(makeSongs(1)[0], in: draft)
+        let edit = editor.toggle(makeSongs(1)[0], in: draft)
 
         XCTAssertEqual(draft.songs.map(\.id), ["1"])
+        XCTAssertEqual(edit, .added(songCount: 1, reachedMilestone: true))
+    }
+
+    func test_addingReportsMilestonesOnlyAtTheirCounts() throws {
+        let draft = SessionDraftStore()
+        try draft.add(makeSongs(48))
+        let editor = SessionDraftEditor()
+
+        let toFortyNine = editor.toggle(makeSongs(1, start: 200)[0], in: draft)
+        let toFifty = editor.toggle(makeSongs(1, start: 201)[0], in: draft)
+        let toFiftyOne = editor.toggle(makeSongs(1, start: 202)[0], in: draft)
+
+        XCTAssertEqual(toFortyNine, .added(songCount: 49, reachedMilestone: false))
+        XCTAssertEqual(toFifty, .added(songCount: 50, reachedMilestone: true))
+        XCTAssertEqual(toFiftyOne, .added(songCount: 51, reachedMilestone: false))
+    }
+
+    func test_fillingTheDraftIsAMilestone() throws {
+        let draft = SessionDraftStore()
+        try draft.add(makeSongs(SessionDraft.maxSongs - 1))
+        let editor = SessionDraftEditor()
+
+        let edit = editor.toggle(makeSongs(1, start: 500)[0], in: draft)
+
+        XCTAssertEqual(edit, .added(songCount: SessionDraft.maxSongs, reachedMilestone: true))
     }
 
     func test_toggleRemovesFromTheDraft() throws {
@@ -29,9 +54,10 @@ final class SessionDraftEditorTests: XCTestCase {
         try draft.add(makeSongs(2))
         let editor = SessionDraftEditor()
 
-        editor.toggle(makeSongs(1)[0], in: draft)
+        let edit = editor.toggle(makeSongs(1)[0], in: draft)
 
         XCTAssertEqual(draft.songs.map(\.id), ["2"])
+        XCTAssertEqual(edit, .removed)
     }
 
     func test_toggleAtCapacityLeavesTheDraftAlone() throws {
@@ -39,9 +65,10 @@ final class SessionDraftEditorTests: XCTestCase {
         try draft.add(makeSongs(SessionDraft.maxSongs))
         let editor = SessionDraftEditor()
 
-        editor.toggle(makeSongs(1, start: 500)[0], in: draft)
+        let edit = editor.toggle(makeSongs(1, start: 500)[0], in: draft)
 
         XCTAssertEqual(draft.songCount, SessionDraft.maxSongs)
+        XCTAssertEqual(edit, .rejectedAtCapacity)
         XCTAssertNil(editor.actionErrorMessage)
     }
 
