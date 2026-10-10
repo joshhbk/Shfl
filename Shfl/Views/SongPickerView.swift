@@ -16,6 +16,16 @@ enum BrowseMode: String, CaseIterable {
     }
 
     /// The catalog lane this tab browses; the picks aren't a catalog lane.
+    /// The tab showing `lane`; no lane means the picks.
+    init(lane: LibraryLaneKind?) {
+        switch lane {
+        case .songs: self = .songs
+        case .artists: self = .artists
+        case .playlists: self = .playlists
+        case nil: self = .selected
+        }
+    }
+
     var laneKind: LibraryLaneKind? {
         switch self {
         case .songs: .songs
@@ -32,21 +42,19 @@ struct SongPickerView: View {
 
     @State private var browser: LibraryBrowser
     @State private var editor = SessionDraftEditor()
-    @State private var browseMode: BrowseMode = .songs
     @State private var navigationPath = NavigationPath()
     @State private var showingAutofillCompletion = false
     @State private var autofillTapCount = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFieldFocused: Bool
 
-    @Environment(\.libraryPreferences) private var libraryPreferences
     @Environment(\.sessionDraft) private var sessionDraft
     @Environment(\.listeningSessionHost) private var sessionHost
     @Environment(\.shuffleTheme) private var shuffleTheme
 
     init(
         libraryCatalog: LibraryCatalog,
-        initialSortOption: SortOption,
+        libraryPreferences: LibraryPreferences,
         onDismiss: @escaping () -> Void
     ) {
         self.libraryCatalog = libraryCatalog
@@ -54,9 +62,13 @@ struct SongPickerView: View {
         self._browser = State(
             wrappedValue: LibraryBrowser(
                 libraryCatalog: libraryCatalog,
-                initialSortOption: initialSortOption
+                preferences: libraryPreferences
             )
         )
+    }
+
+    private var browseMode: BrowseMode {
+        BrowseMode(lane: browser.activeLane)
     }
 
     var body: some View {
@@ -98,11 +110,6 @@ struct SongPickerView: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilitySortPriority(-1)
-        }
-        .onChange(of: libraryPreferences?.sortOption) { _, newOption in
-            if let newOption {
-                browser.handleSortOptionChanged(newOption)
-            }
         }
         .task {
             await browser.loadInitialPage()
@@ -194,7 +201,7 @@ struct SongPickerView: View {
                 .frame(minWidth: 44, minHeight: 44)
         }
         .accessibilityLabel("Sort songs")
-        .accessibilityValue(currentSortOption.displayName)
+        .accessibilityValue(browser.sortOption.displayName)
         .accessibilityIdentifier("songPicker.sort")
     }
 
@@ -262,15 +269,10 @@ struct SongPickerView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
-    /// Switching tabs also switches the browser's lane in the same update,
-    /// so the new lane starts loading straight away.
     private var browseModeSelection: Binding<BrowseMode> {
         Binding(
             get: { browseMode },
-            set: { mode in
-                browseMode = mode
-                browser.activeLane = mode.laneKind
-            }
+            set: { browser.activeLane = $0.laneKind }
         )
     }
 
@@ -278,14 +280,10 @@ struct SongPickerView: View {
         shuffleTheme.interactionColor
     }
 
-    private var currentSortOption: SortOption {
-        libraryPreferences?.sortOption ?? .mostPlayed
-    }
-
     private var sortSelection: Binding<SortOption> {
         Binding(
-            get: { currentSortOption },
-            set: { libraryPreferences?.sortOption = $0 }
+            get: { browser.sortOption },
+            set: { browser.chooseSortOption($0) }
         )
     }
 
@@ -577,9 +575,7 @@ struct SongPickerView: View {
         HapticFeedback.light.trigger()
         Task { @MainActor in
             let requestedCount = sessionDraft.remainingCapacity
-            let algorithm = libraryPreferences?.autofillAlgorithm ?? .random
-            let source = LibraryAutofillSource(libraryCatalog: libraryCatalog, algorithm: algorithm)
-            await browser.autofill(into: sessionDraft, using: source)
+            await browser.autofill(into: sessionDraft)
 
             if case .completed(let count) = browser.autofillState {
                 showingAutofillCompletion = count > 0
@@ -662,10 +658,9 @@ private enum PreviewPickerLibrary {
 #Preview("Songs Tab") {
     SongPickerView(
         libraryCatalog: PreviewPickerLibrary.makeService(),
-        initialSortOption: .mostPlayed,
+        libraryPreferences: LibraryPreferences(),
         onDismiss: {}
     )
-    .environment(\.libraryPreferences, LibraryPreferences())
 }
 
 #Preview("With Selected Songs") {
@@ -674,18 +669,16 @@ private enum PreviewPickerLibrary {
 
     return SongPickerView(
         libraryCatalog: PreviewPickerLibrary.makeService(),
-        initialSortOption: .mostPlayed,
+        libraryPreferences: LibraryPreferences(),
         onDismiss: {}
     )
-    .environment(\.libraryPreferences, LibraryPreferences())
     .environment(\.sessionDraft, draft)
 }
 
 #Preview("Empty Library") {
     SongPickerView(
         libraryCatalog: DeterministicMusicService(),
-        initialSortOption: .mostPlayed,
+        libraryPreferences: LibraryPreferences(),
         onDismiss: {}
     )
-    .environment(\.libraryPreferences, LibraryPreferences())
 }

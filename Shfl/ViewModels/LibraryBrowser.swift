@@ -7,13 +7,6 @@ enum LibraryLaneKind: Equatable, CaseIterable {
     case playlists
 }
 
-/// Reference box so sortOption can be captured by closures during init without capturing self.
-private final class SortOptionRef {
-    deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
-    var value: SortOption
-    init(_ value: SortOption) { self.value = value }
-}
-
 @Observable
 @MainActor
 final class LibraryBrowser {
@@ -40,17 +33,10 @@ final class LibraryBrowser {
 
     private(set) var autofillState: AutofillState = .idle
 
-    // MARK: - Song sort (wrapped in ref box for closure capture during init)
+    // MARK: - Song sort
 
-    @ObservationIgnored private let _sortOption: SortOptionRef
-
-    var sortOption: SortOption {
-        get { _sortOption.value }
-        set {
-            _sortOption.value = newValue
-            Task { await songsLane.loadInitial(force: true) }
-        }
-    }
+    /// The saved order the songs lane is sorted by.
+    var sortOption: SortOption { preferences.sortOption }
 
     // MARK: - Active lane
 
@@ -140,19 +126,21 @@ final class LibraryBrowser {
     // MARK: - Dependencies
 
     @ObservationIgnored private let libraryCatalog: LibraryCatalog
+    @ObservationIgnored private let preferences: LibraryPreferences
 
     // MARK: - Init
 
-    init(libraryCatalog: LibraryCatalog, initialSortOption: SortOption = .mostPlayed) {
+    /// - Parameter preferences: Supplies the song sort order and the autofill
+    ///   algorithm, and saves a newly chosen sort order.
+    init(libraryCatalog: LibraryCatalog, preferences: LibraryPreferences) {
         self.libraryCatalog = libraryCatalog
-        let sortRef = SortOptionRef(initialSortOption)
-        self._sortOption = sortRef
+        self.preferences = preferences
 
-        // Songs lane — captures sortRef instead of self to avoid "used before initialized"
+        // Captures preferences rather than self, which isn't initialized yet.
         self.songsLane = LibraryLane<Song>(
-            fetchPage: { [libraryCatalog, sortRef] offset, limit in
+            fetchPage: { [libraryCatalog, preferences] offset, limit in
                 let page = try await libraryCatalog.fetchLibrarySongs(
-                    sortedBy: sortRef.value,
+                    sortedBy: preferences.sortOption,
                     limit: limit,
                     offset: offset
                 )
@@ -203,9 +191,12 @@ final class LibraryBrowser {
 
     // MARK: - Sort
 
-    /// Called when sort option changes. Views should call this via onChange(of: libraryPreferences.sortOption).
-    func handleSortOptionChanged(_ newOption: SortOption) {
-        sortOption = newOption
+    /// Saves `option` as the song sort order and reloads the songs lane in
+    /// that order. Choosing the current order does nothing.
+    func chooseSortOption(_ option: SortOption) {
+        guard option != preferences.sortOption else { return }
+        preferences.sortOption = option
+        Task { await songsLane.loadInitial(force: true) }
     }
 
     // MARK: - Search
@@ -308,7 +299,12 @@ final class LibraryBrowser {
 
     // MARK: - Autofill
 
-    func autofill(into draft: SessionDraftStore, using source: AutofillSource) async {
+    /// Fills the draft from the library with the saved autofill algorithm.
+    func autofill(into draft: SessionDraftStore) async {
+        let source = LibraryAutofillSource(
+            libraryCatalog: libraryCatalog,
+            algorithm: preferences.autofillAlgorithm
+        )
         guard draft.remainingCapacity > 0 else {
             autofillState = .completed(count: 0)
             return

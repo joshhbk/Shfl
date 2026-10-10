@@ -105,7 +105,7 @@ struct MainView: View {
     private func songPickerSheet(onDismiss: @escaping () -> Void) -> some View {
         SongPickerView(
             libraryCatalog: model.library,
-            initialSortOption: libraryPreferences.sortOption,
+            libraryPreferences: libraryPreferences,
             onDismiss: onDismiss
         )
         .tint(deviceAccentColor)

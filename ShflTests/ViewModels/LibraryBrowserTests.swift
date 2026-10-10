@@ -5,10 +5,25 @@ import XCTest
 final class LibraryBrowserTests: XCTestCase {
     private var mockService: DeterministicMusicService!
     private var browser: LibraryBrowser!
+    private var defaults: UserDefaults!
+    private var defaultsSuiteName: String!
 
     override func setUp() async throws {
+        defaultsSuiteName = "LibraryBrowserTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuiteName)
         mockService = DeterministicMusicService()
-        browser = LibraryBrowser(libraryCatalog: mockService)
+        browser = LibraryBrowser(libraryCatalog: mockService, preferences: makePreferences())
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defaults = nil
+        browser = nil
+        mockService = nil
+    }
+
+    private func makePreferences() -> LibraryPreferences {
+        LibraryPreferences(defaults: defaults)
     }
 
     func test_initialState_isCorrect() {
@@ -87,11 +102,57 @@ final class LibraryBrowserTests: XCTestCase {
         XCTAssertEqual(searchResults.first?.title, "Hello World")
     }
 
+    func test_choosingASortOptionSavesItAndReloadsSongsInThatOrder() async {
+        let songs = [
+            Song(id: "b", title: "Bravo", artist: "Artist", albumTitle: "Album", artworkURL: nil, playCount: 9),
+            Song(id: "a", title: "Alpha", artist: "Artist", albumTitle: "Album", artworkURL: nil, playCount: 1)
+        ]
+        await mockService.setLibrarySongs(songs)
+        await browser.loadInitialPage()
+        XCTAssertEqual(browser.browseSongs.map(\.id), ["b", "a"])
+
+        browser.chooseSortOption(.alphabetical)
+        await waitUntil { self.browser.browseSongs.map(\.id) == ["a", "b"] }
+
+        XCTAssertEqual(browser.sortOption, .alphabetical)
+        XCTAssertEqual(LibraryPreferences(defaults: defaults).sortOption, .alphabetical)
+    }
+
+    func test_choosingTheCurrentSortOptionDoesNotReload() async {
+        await browser.loadInitialPage()
+        let fetchesBefore = await mockService.libraryFetchCount
+
+        browser.chooseSortOption(.mostPlayed)
+        await waitForStateUpdate()
+
+        let fetchesAfter = await mockService.libraryFetchCount
+        XCTAssertEqual(fetchesAfter, fetchesBefore)
+    }
+
+    func test_autofillUsesTheSavedAutofillAlgorithm() async {
+        // Random autofill pages through the whole library (500 per page);
+        // recently added reads a single page, so the fetch count tells them apart.
+        let songs = (1...600).map {
+            Song(id: "\($0)", title: "Song \($0)", artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        await mockService.setLibrarySongs(songs)
+        let preferences = makePreferences()
+        preferences.autofillAlgorithm = .recentlyAdded
+        let browser = LibraryBrowser(libraryCatalog: mockService, preferences: preferences)
+        let draft = SessionDraftStore()
+
+        await browser.autofill(into: draft)
+
+        XCTAssertEqual(draft.songCount, SessionDraft.maxSongs)
+        let fetches = await mockService.libraryFetchCount
+        XCTAssertEqual(fetches, 1)
+    }
+
     func test_switchingToALaneLoadsItsFirstPage() async {
         let service = DeterministicMusicService(
             configuration: .init(libraryPlaylists: [Playlist(id: "p1", name: "Road Trip")])
         )
-        let browser = LibraryBrowser(libraryCatalog: service)
+        let browser = LibraryBrowser(libraryCatalog: service, preferences: makePreferences())
         XCTAssertEqual(browser.activeLane, .songs)
 
         browser.activeLane = .playlists
@@ -104,7 +165,7 @@ final class LibraryBrowserTests: XCTestCase {
         let service = DeterministicMusicService(
             configuration: .init(libraryPlaylists: [Playlist(id: "p1", name: "Road Trip")])
         )
-        let browser = LibraryBrowser(libraryCatalog: service)
+        let browser = LibraryBrowser(libraryCatalog: service, preferences: makePreferences())
 
         browser.activeLane = nil
         browser.searchText = "Road"
@@ -129,9 +190,8 @@ final class LibraryBrowserTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         let draft = SessionDraftStore()
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
 
-        await browser.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         XCTAssertEqual(draft.songCount, 50)
         XCTAssertEqual(browser.autofillState, .completed(count: 50))
@@ -148,9 +208,7 @@ final class LibraryBrowserTests: XCTestCase {
         for i in 1...100 {
             try? draft.add(Song(id: "existing-\(i)", title: "Existing \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
-
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await browser.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         // Should only add 20 more (120 - 100)
         XCTAssertEqual(draft.songCount, 120)
@@ -167,9 +225,7 @@ final class LibraryBrowserTests: XCTestCase {
         // Pre-add some songs that are also in library
         try? draft.add(songs[0])
         try? draft.add(songs[1])
-
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await browser.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         // Should add 8 new songs (10 - 2 already added)
         XCTAssertEqual(draft.songCount, 10)
@@ -182,9 +238,7 @@ final class LibraryBrowserTests: XCTestCase {
         for i in 1...120 {
             try? draft.add(Song(id: "\(i)", title: "Song \(i)", artist: "Artist", albumTitle: "Album", artworkURL: nil))
         }
-
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await browser.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         XCTAssertEqual(browser.autofillState, .completed(count: 0))
     }
@@ -194,11 +248,10 @@ final class LibraryBrowserTests: XCTestCase {
         await mockService.setLibrarySongs(songs)
 
         let draft = SessionDraftStore()
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
 
         // Start autofill
         let task = Task {
-            await browser.autofill(into: draft, using: source)
+            await browser.autofill(into: draft)
         }
 
         // Verify it completes correctly
@@ -221,9 +274,7 @@ final class LibraryBrowserTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
 
         await mockService.resetPlaybackRecording()
-
-        let source = LibraryAutofillSource(libraryCatalog: mockService)
-        await browser.autofill(into: draft, using: source)
+        await browser.autofill(into: draft)
 
         XCTAssertEqual(browser.autofillState, .completed(count: 3))
         XCTAssertEqual(draft.songCount, 5)
