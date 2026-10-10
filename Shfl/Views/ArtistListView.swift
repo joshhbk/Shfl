@@ -78,7 +78,7 @@ private struct ArtistRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            EntityArtwork(entityId: artist.id, type: .artist)
+            EntityArtwork(subject: .artist(id: artist.id))
 
             Text(artist.name)
                 .font(.system(size: 16, weight: .medium))

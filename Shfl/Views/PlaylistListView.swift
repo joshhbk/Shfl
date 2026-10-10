@@ -79,7 +79,7 @@ private struct PlaylistRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            EntityArtwork(entityId: playlist.id, type: .playlist)
+            EntityArtwork(subject: .playlist(id: playlist.id))
 
             Text(playlist.name)
                 .font(.system(size: 16, weight: .medium))

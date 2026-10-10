@@ -36,6 +36,7 @@ struct ShuffledApp: App {
                 appearanceSettings: appearanceSettings,
                 showsStartupSplash: composition.showsStartupSplash
             )
+            .environment(\.artworkStore, composition.artworkStore)
         }
         .modelContainer(composition.modelContainer)
     }
