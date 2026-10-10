@@ -19,8 +19,14 @@ struct MainSplitView: View {
                 makeArtistSongs: makeArtistSongs,
                 makePlaylistSongs: makePlaylistSongs
             )
+            .toolbar { LibraryToolbar() }
         }
         .searchable(text: $browser.searchText, placement: .toolbar, prompt: searchPrompt)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                DraftFailureMessage()
+            }
+        }
         .onChange(of: selection, initial: true) {
             browser.activeLane = (selection ?? .songs).libraryLane
         }
