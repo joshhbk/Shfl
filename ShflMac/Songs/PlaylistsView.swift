@@ -10,6 +10,7 @@ struct PlaylistsView: View {
                 .navigationTitle("Playlists")
                 .navigationDestination(for: Playlist.self) { playlist in
                     PlaylistSongsView(songs: screens.makeSongs(in: playlist))
+                        .toolbar { LibraryToolbar() }
                 }
         }
     }

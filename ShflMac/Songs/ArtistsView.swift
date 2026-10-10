@@ -10,6 +10,7 @@ struct ArtistsView: View {
                 .navigationTitle("Artists")
                 .navigationDestination(for: Artist.self) { artist in
                     ArtistSongsView(songs: screens.makeSongs(by: artist))
+                        .toolbar { LibraryToolbar() }
                 }
         }
     }
