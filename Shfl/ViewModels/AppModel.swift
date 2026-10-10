@@ -76,6 +76,12 @@ final class AppModel {
         launchPhase = await authStatus ? .ready : .needsAuthorization
     }
 
+    /// A lifecycle checkpoint for when the shell's scene goes to the
+    /// background: the session host saves the live playback position.
+    func sceneDidLeaveForeground() {
+        sessionHost.sceneDidLeaveForeground()
+    }
+
     /// Asks for Apple Music access. Afterwards the launch phase is `.ready`
     /// or `.authorizationDenied`.
     func requestAuthorization() async {

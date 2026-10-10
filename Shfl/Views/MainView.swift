@@ -72,7 +72,7 @@ struct MainView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {
-                model.sessionHost.sceneDidLeaveForeground()
+                model.sceneDidLeaveForeground()
             }
         }
         .sheet(isPresented: $showingPicker) {
