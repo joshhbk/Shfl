@@ -1,5 +1,6 @@
 import XCTest
 @testable import ShflCore
+import ShflDeterministic
 
 @MainActor
 final class SessionDraftEditorTests: XCTestCase {
@@ -101,6 +102,35 @@ final class SessionDraftEditorTests: XCTestCase {
 
         XCTAssertEqual(draft.songCount, SessionDraft.maxSongs - 1)
         XCTAssertEqual(edit, .rejectedAtCapacity)
+    }
+
+    func test_addingOnlySongsAlreadyInTheDraftChangesNothing() throws {
+        let draft = SessionDraftStore()
+        try draft.add(makeSongs(2))
+        let editor = SessionDraftEditor(draft: draft)
+        editor.noteAutofillCompleted(addedCount: 0, requestedCount: 5, remainingCapacity: 5)
+
+        let edit = editor.add(makeSongs(2))
+
+        XCTAssertEqual(edit, .added(songCount: 2, reachedMilestone: false))
+        XCTAssertTrue(editor.autofillIsExhausted)
+    }
+
+    func test_canAutofillUntilTheDraftIsFullOrAutofillIsExhausted() async throws {
+        let draft = SessionDraftStore()
+        let editor = SessionDraftEditor(draft: draft)
+        let browser = LibraryBrowser(
+            libraryCatalog: DeterministicMusicService(),
+            preferences: LibraryPreferences(defaults: try XCTUnwrap(UserDefaults(suiteName: "SessionDraftEditorTests.canAutofill")))
+        )
+        XCTAssertTrue(editor.canAutofill(using: browser))
+
+        editor.noteAutofillCompleted(addedCount: 0, requestedCount: 5, remainingCapacity: 5)
+        XCTAssertFalse(editor.canAutofill(using: browser))
+
+        editor.clearAll()
+        try draft.add(makeSongs(SessionDraft.maxSongs))
+        XCTAssertFalse(editor.canAutofill(using: browser))
     }
 
     func test_clearAllEmptiesTheDraft() throws {
