@@ -6,11 +6,4 @@ nonisolated enum ArtworkSubject: Hashable, Sendable {
     case song(id: String)
     case artist(id: String)
     case playlist(id: String)
-
-    var id: String {
-        switch self {
-        case .song(let id), .artist(let id), .playlist(let id):
-            id
-        }
-    }
 }

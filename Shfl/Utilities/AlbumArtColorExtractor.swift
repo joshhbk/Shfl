@@ -58,6 +58,7 @@ final class AlbumArtColorExtractor {
                 #if DEBUG
                 print("[ColorExtractor] No artwork available for songId: \(songId)")
                 #endif
+                candidateCache[songId] = []
                 extractedColor = nil
                 return
             }
