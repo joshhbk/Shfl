@@ -3,15 +3,18 @@ import SwiftUI
 
 struct LibrarySongsView: View {
     @Environment(LibraryBrowser.self) private var browser
+    @Environment(DraftEditing.self) private var drafting
 
     private var isSearching: Bool { !browser.searchText.isEmpty }
 
     var body: some View {
-        SongsTable(
+        SortableSongsTable(
             songs: isSearching ? browser.searchResults : browser.browseSongs,
             sortOrder: sortOrder,
             onReachEnd: loadMore
-        )
+        ) { songs in
+            AddToSelectedButton(songs: songs, drafting: drafting)
+        }
         .overlay { emptyState }
         .task { await browser.loadInitialPage() }
     }

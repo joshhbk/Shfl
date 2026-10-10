@@ -30,4 +30,13 @@ final class LibrarySongOrderTests: XCTestCase {
         XCTAssertTrue(LibrarySongOrder.sortOrder(for: .recentlyPlayed).isEmpty)
         XCTAssertTrue(LibrarySongOrder.sortOrder(for: .recentlyAdded).isEmpty)
     }
+
+    func test_oneWayKeepsEachColumnInItsOptionsDirection() {
+        let flippedTitle = LibrarySongOrder.oneWay([KeyPathComparator(\Song.title, order: .reverse)])
+        let flippedPlays = LibrarySongOrder.oneWay([KeyPathComparator(\Song.playCount)])
+
+        XCTAssertEqual(flippedTitle.first?.order, .forward)
+        XCTAssertEqual(flippedPlays.first?.order, .reverse)
+        XCTAssertTrue(LibrarySongOrder.oneWay([KeyPathComparator(\Song.artist)]).isEmpty)
+    }
 }

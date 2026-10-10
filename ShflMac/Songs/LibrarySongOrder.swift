@@ -17,4 +17,9 @@ enum LibrarySongOrder {
         default: nil
         }
     }
+
+    // Keeps each column to one direction, so clicking its header again doesn't flip it.
+    static func oneWay(_ sortOrder: [KeyPathComparator<Song>]) -> [KeyPathComparator<Song>] {
+        option(for: sortOrder).map { Self.sortOrder(for: $0) } ?? []
+    }
 }

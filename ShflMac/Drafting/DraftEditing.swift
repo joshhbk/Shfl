@@ -31,6 +31,15 @@ final class DraftEditing {
         give(feedbackFor: editor.add(songs))
     }
 
+    func remove(_ songs: [Song]) {
+        let inDraft = songIDs
+        for song in songs where inDraft.contains(song.id) {
+            give(feedbackFor: editor.toggle(song))
+        }
+    }
+
+    var canAutofill: Bool { editor.canAutofill(using: browser) }
+
     func clearAll() {
         failureMessage = nil
         editor.clearAll()
