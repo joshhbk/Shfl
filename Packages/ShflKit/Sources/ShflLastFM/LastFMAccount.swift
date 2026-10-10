@@ -1,45 +1,6 @@
 import Foundation
 import Observation
 
-public enum ConnectionState: Equatable {
-    case disconnected
-    case connecting
-    case connected(username: String)
-
-    public var isConnected: Bool {
-        if case .connected = self { return true }
-        return false
-    }
-
-    public var isConnecting: Bool {
-        if case .connecting = self { return true }
-        return false
-    }
-
-    public var username: String? {
-        if case .connected(let name) = self { return name }
-        return nil
-    }
-}
-
-public enum RecentTracksState: Equatable {
-    case idle
-    case loading
-    case loaded([LastFMRecentTrack])
-    case empty
-    case error
-
-    public var tracks: [LastFMRecentTrack] {
-        if case .loaded(let tracks) = self { return tracks }
-        return []
-    }
-
-    public var hasLoadedTracks: Bool {
-        if case .loaded = self { return true }
-        return false
-    }
-}
-
 /// What `LastFMAccount` needs from Last.fm. `LastFMTransport` is the live
 /// one; tests supply their own.
 package nonisolated protocol LastFMConnection: Sendable {
@@ -76,6 +37,11 @@ public final class LastFMAccount {
         self.connection = connection
     }
 
+    /// Signed out for good, for previews and view tests.
+    public static func preview() -> LastFMAccount {
+        LastFMAccount(connection: nil)
+    }
+
     public func syncConnectionStatusOnly() async {
         guard let connection else { return }
         if let session = await connection.storedSession() {
@@ -86,11 +52,12 @@ public final class LastFMAccount {
         }
     }
 
+    /// Clears any earlier error, including one from a failed connect.
     public func refreshActivity(showLoading: Bool) async {
-        guard connection != nil else { return }
-        guard !isRefreshing else { return }
+        guard connection != nil, !isRefreshing else { return }
 
         isRefreshing = true
+        errorMessage = nil
         if showLoading {
             recentTracksState = .loading
         }
@@ -146,6 +113,47 @@ public final class LastFMAccount {
             errorMessage = nil
         } catch {
             errorMessage = "Failed to disconnect."
+        }
+    }
+}
+
+extension LastFMAccount {
+    public enum ConnectionState: Equatable {
+        case disconnected
+        case connecting
+        case connected(username: String)
+
+        public var isConnected: Bool {
+            if case .connected = self { return true }
+            return false
+        }
+
+        public var isConnecting: Bool {
+            if case .connecting = self { return true }
+            return false
+        }
+
+        public var username: String? {
+            if case .connected(let name) = self { return name }
+            return nil
+        }
+    }
+
+    public enum RecentTracksState: Equatable {
+        case idle
+        case loading
+        case loaded([LastFMRecentTrack])
+        case empty
+        case error
+
+        public var tracks: [LastFMRecentTrack] {
+            if case .loaded(let tracks) = self { return tracks }
+            return []
+        }
+
+        public var hasLoadedTracks: Bool {
+            if case .loaded = self { return true }
+            return false
         }
     }
 }

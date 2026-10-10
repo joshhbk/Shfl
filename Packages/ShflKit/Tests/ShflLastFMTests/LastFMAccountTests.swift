@@ -31,6 +31,18 @@ struct LastFMAccountTests {
         #expect(account.errorMessage == "No token in callback")
     }
 
+    @Test("A refresh after a failed connect clears the error")
+    func refreshClearsAnEarlierConnectError() async {
+        let account = makeAccount()
+        await account.connect { _ in URL(string: "shfl://lastfm") }
+        #expect(account.errorMessage != nil)
+
+        await account.refreshActivity(showLoading: !account.recentTracksState.hasLoadedTracks)
+
+        #expect(account.errorMessage == nil)
+        #expect(account.connectionState == .disconnected)
+    }
+
     @Test("Signing in shows the username and the recent tracks")
     func signingInLoadsRecentTracks() async {
         let track = LastFMRecentTrack(
