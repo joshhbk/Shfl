@@ -5,6 +5,8 @@ struct MainView: View {
     let libraryPreferences: LibraryPreferences
     let appearanceSettings: AppearanceSettings
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var showingPicker = false
     @State private var showingSettings = false
     @State private var showingAuthorizationAlert = false
@@ -67,6 +69,11 @@ struct MainView: View {
         }
         .onChange(of: model.launchPhase) { _, _ in
             dismissSplashIfReady()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                model.sessionHost.sceneDidLeaveForeground()
+            }
         }
         .sheet(isPresented: $showingPicker) {
             songPickerSheet(onDismiss: { showingPicker = false })

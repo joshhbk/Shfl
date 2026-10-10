@@ -1,5 +1,4 @@
 import SwiftData
-import UIKit
 import XCTest
 @testable import Shfl
 
@@ -34,7 +33,7 @@ final class AppModelLifecycleTests: XCTestCase {
         defaults = nil
     }
 
-    func testHandleDidEnterBackgroundPersistsSongsAndPlaybackState() async throws {
+    func testSceneDidLeaveForegroundPersistsSongsAndPlaybackState() async throws {
         let model = AppModel(
             library: mockService,
             playbackTransport: mockService,
@@ -55,11 +54,9 @@ final class AppModelLifecycleTests: XCTestCase {
         await model.sessionHost.startFreshShuffle()
         await mockService.setPlaybackTime(42)
 
-        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        model.sessionHost.sceneDidLeaveForeground()
 
-        let archive = SessionArchive(modelContext: modelContext)
-        await waitUntil { (try? archive.load().session?.playbackPosition) == 42 }
-        let saved = try await archive.loadAsync()
+        let saved = try await SessionArchive(modelContext: modelContext).loadAsync()
 
         XCTAssertEqual(saved.pool.map(\.id), ["1"])
         XCTAssertNotNil(saved.session)
@@ -67,7 +64,7 @@ final class AppModelLifecycleTests: XCTestCase {
         XCTAssertEqual(saved.session?.playbackPosition, 42)
     }
 
-    func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
+    func testSceneDidLeaveForegroundRunsOnePersistencePass() async throws {
         var persistCallCount = 0
         let model = AppModel(
             library: mockService,
@@ -77,14 +74,8 @@ final class AppModelLifecycleTests: XCTestCase {
             savedAlgorithm: SavedShuffleAlgorithm(defaults: defaults),
             lifecyclePersistenceHook: { persistCallCount += 1 }
         )
-        _ = model
 
-        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
-
-        for _ in 0..<10 {
-            if persistCallCount == 1 { break }
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
+        model.sessionHost.sceneDidLeaveForeground()
 
         XCTAssertEqual(persistCallCount, 1, "A single background transition should trigger one persistence pass")
     }

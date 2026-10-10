@@ -1,12 +1,11 @@
 import Foundation
-import UIKit
 
 /// Owns the listening session for one app launch: the session draft, the
 /// player, starting listening sessions, restoring the last session at launch,
 /// and saving.
 ///
 /// Saving happens on its own whenever something changes: songs are added or
-/// removed, a song starts playing, or the app goes to the background. Each
+/// removed, a song starts playing, or the scene leaves the foreground. Each
 /// save stores the song pool and the current session together, so they
 /// always match. A newly staged shuffle algorithm is handed to `saveAlgorithm`.
 @Observable
@@ -37,7 +36,6 @@ final class ListeningSessionHost {
     @ObservationIgnored private var transitionTask: Task<Void, Never>?
     @ObservationIgnored private var songPoolTask: Task<Void, Never>?
     @ObservationIgnored private var algorithmTask: Task<Void, Never>?
-    @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
 
     /// - Parameters:
     ///   - autofillSource: Where autofill finds songs. It is warmed whenever
@@ -72,16 +70,12 @@ final class ListeningSessionHost {
         self.lifecyclePersistenceHook = lifecyclePersistenceHook
 
         startRecording()
-        subscribeToBackgroundNotification()
     }
 
     deinit {
         transitionTask?.cancel()
         songPoolTask?.cancel()
         algorithmTask?.cancel()
-        if let observer = backgroundObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
 
     // MARK: - Starting
@@ -173,9 +167,10 @@ final class ListeningSessionHost {
         }
     }
 
-    /// A lifecycle checkpoint captures the live position on the active session.
-    func handleDidEnterBackground() {
-        print("📱 App entering background - checkpointing session...")
+    /// A lifecycle checkpoint: saves the live position on the active session.
+    /// The shell calls this when its scene goes to the background.
+    func sceneDidLeaveForeground() {
+        print("📱 Scene left the foreground - checkpointing session...")
         checkpoint(position: playbackTransport.currentPlaybackTime)
         lifecyclePersistenceHook?()
     }
@@ -291,18 +286,6 @@ final class ListeningSessionHost {
             #endif
         } catch {
             print("💾 Failed to commit session: \(error)")
-        }
-    }
-
-    private func subscribeToBackgroundNotification() {
-        backgroundObserver = NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.handleDidEnterBackground()
-            }
         }
     }
 }

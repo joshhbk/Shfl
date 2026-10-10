@@ -1,5 +1,4 @@
 import SwiftData
-import UIKit
 import XCTest
 @testable import Shfl
 
@@ -28,7 +27,7 @@ final class ListeningSessionHostTests: XCTestCase {
         mockService = nil
     }
 
-    func testHandleDidEnterBackgroundCheckpointsSession() async throws {
+    func testSceneDidLeaveForegroundCheckpointsSession() async throws {
         let host = makeHost()
         let player = host.player
 
@@ -45,7 +44,7 @@ final class ListeningSessionHostTests: XCTestCase {
         await waitUntil { (try? self.archive.load().session) != nil }
 
         await mockService.setPlaybackTime(42)
-        host.handleDidEnterBackground()
+        host.sceneDidLeaveForeground()
 
         let saved = try archive.load()
         XCTAssertEqual(saved.pool.map(\.id), ["1"])
@@ -137,7 +136,7 @@ final class ListeningSessionHostTests: XCTestCase {
         await host.player.clearSession()
         await waitUntil { (try? self.archive.load().session) == nil }
         await waitForStateUpdate()
-        host.handleDidEnterBackground()
+        host.sceneDidLeaveForeground()
         let saved = try archive.load()
         XCTAssertTrue(saved.pool.isEmpty)
         XCTAssertNil(saved.session)
@@ -157,7 +156,7 @@ final class ListeningSessionHostTests: XCTestCase {
         let session = try XCTUnwrap(player.activeSession)
         let restored = await player.restore(session, currentSongID: selectedID, playbackPosition: 23)
         XCTAssertTrue(restored)
-        host.handleDidEnterBackground()
+        host.sceneDidLeaveForeground()
         let saved = try archive.load()
         XCTAssertEqual(saved.session?.currentSongID, selectedID)
         XCTAssertEqual(saved.session?.playbackPosition, 23)
@@ -177,7 +176,7 @@ final class ListeningSessionHostTests: XCTestCase {
         // An unrecognized report must not be interpreted as an explicit clear.
         await mockService.simulatePlaybackState(.playing(catalogSong))
         await waitUntil { player.playbackState.currentSongId == catalogSong.id }
-        host.handleDidEnterBackground()
+        host.sceneDidLeaveForeground()
         XCTAssertEqual(try archive.load().session, validRecord)
     }
 
@@ -191,19 +190,13 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(saved, [.artistSpacing])
     }
 
-    func testDidEnterBackgroundNotificationTriggersSinglePersistenceCall() async throws {
+    func testSceneDidLeaveForegroundRunsOnePersistencePass() async throws {
         var persistCallCount = 0
         let host = makeHost(lifecyclePersistenceHook: { persistCallCount += 1 })
 
-        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
-
-        for _ in 0..<10 {
-            if persistCallCount == 1 { break }
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
+        host.sceneDidLeaveForeground()
 
         XCTAssertEqual(persistCallCount, 1)
-        withExtendedLifetime(host) {}
     }
 
     func testTransitionsDriveScrobblingAndPersistenceAcrossRestoreResumeAndFreshShuffle() async throws {
