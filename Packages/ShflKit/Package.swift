@@ -2,8 +2,8 @@
 import PackageDescription
 
 /// Mirrors the app target's settings (SWIFT_APPROACHABLE_CONCURRENCY turns on
-/// the last five), so code keeps its isolation when it moves into the package.
-/// Change both together.
+/// the last five), so code is isolated the same way in the app and the
+/// package. Change both together.
 let upcomingFeatures: [SwiftSetting] = [
     .enableUpcomingFeature("MemberImportVisibility"),
     .enableUpcomingFeature("DisableOutwardActorInference"),
