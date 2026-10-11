@@ -18,6 +18,12 @@ public nonisolated struct DeterministicLibrary: Sendable {
 
     public static let empty = DeterministicLibrary()
 
+    private static let referenceDate = Date(timeIntervalSinceReferenceDate: 812_000_000)
+
+    private static func addedDaysAgo(_ days: Int) -> Date {
+        referenceDate.addingTimeInterval(-Double(days) * 86_400)
+    }
+
     /// Playback scenarios depend on these songs and their play counts.
     public static let launch: DeterministicLibrary = {
         let songs = [
@@ -27,7 +33,9 @@ public nonisolated struct DeterministicLibrary: Sendable {
                 artist: "Harbour Lights",
                 albumTitle: "Deterministic Sessions",
                 artworkURL: nil,
-                playCount: 0
+                playCount: 0,
+                duration: 212,
+                dateAdded: addedDaysAgo(2)
             ),
             Song(
                 id: "scenario-second-wind",
@@ -35,7 +43,9 @@ public nonisolated struct DeterministicLibrary: Sendable {
                 artist: "Northern Static",
                 albumTitle: "Deterministic Sessions",
                 artworkURL: nil,
-                playCount: 1
+                playCount: 1,
+                duration: 247,
+                dateAdded: addedDaysAgo(5)
             ),
             Song(
                 id: "scenario-afterglow",
@@ -43,7 +53,9 @@ public nonisolated struct DeterministicLibrary: Sendable {
                 artist: "Paper Satellites",
                 albumTitle: "Deterministic Sessions",
                 artworkURL: nil,
-                playCount: 2
+                playCount: 2,
+                duration: 198,
+                dateAdded: addedDaysAgo(11)
             )
         ]
         return DeterministicLibrary(
@@ -55,16 +67,16 @@ public nonisolated struct DeterministicLibrary: Sendable {
 
     public static let sample: DeterministicLibrary = {
         let songs = [
-            Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil, playCount: 142),
-            Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil, playCount: 98),
-            Song(id: "3", title: "Hotel California", artist: "Eagles", albumTitle: "Hotel California", artworkURL: nil, playCount: 76),
-            Song(id: "4", title: "Comfortably Numb", artist: "Pink Floyd", albumTitle: "The Wall", artworkURL: nil, playCount: 63),
-            Song(id: "5", title: "Sweet Child O' Mine", artist: "Guns N' Roses", albumTitle: "Appetite for Destruction", artworkURL: nil, playCount: 55),
-            Song(id: "6", title: "Wish You Were Here", artist: "Pink Floyd", albumTitle: "Wish You Were Here", artworkURL: nil, playCount: 49),
-            Song(id: "7", title: "Back in Black", artist: "AC/DC", albumTitle: "Back in Black", artworkURL: nil, playCount: 41),
-            Song(id: "8", title: "Imagine", artist: "John Lennon", albumTitle: "Imagine", artworkURL: nil, playCount: 37),
-            Song(id: "9", title: "Hey Jude", artist: "The Beatles", albumTitle: "Hey Jude", artworkURL: nil, playCount: 30),
-            Song(id: "10", title: "Smells Like Teen Spirit", artist: "Nirvana", albumTitle: "Nevermind", artworkURL: nil, playCount: 25),
+            Song(id: "1", title: "Bohemian Rhapsody", artist: "Queen", albumTitle: "A Night at the Opera", artworkURL: nil, playCount: 142, duration: 354, dateAdded: addedDaysAgo(9)),
+            Song(id: "2", title: "Stairway to Heaven", artist: "Led Zeppelin", albumTitle: "Led Zeppelin IV", artworkURL: nil, playCount: 98, duration: 482, dateAdded: addedDaysAgo(18)),
+            Song(id: "3", title: "Hotel California", artist: "Eagles", albumTitle: "Hotel California", artworkURL: nil, playCount: 76, duration: 391, dateAdded: addedDaysAgo(27)),
+            Song(id: "4", title: "Comfortably Numb", artist: "Pink Floyd", albumTitle: "The Wall", artworkURL: nil, playCount: 63, duration: 382, dateAdded: addedDaysAgo(36)),
+            Song(id: "5", title: "Sweet Child O' Mine", artist: "Guns N' Roses", albumTitle: "Appetite for Destruction", artworkURL: nil, playCount: 55, duration: 356, dateAdded: addedDaysAgo(45)),
+            Song(id: "6", title: "Wish You Were Here", artist: "Pink Floyd", albumTitle: "Wish You Were Here", artworkURL: nil, playCount: 49, duration: 334, dateAdded: addedDaysAgo(54)),
+            Song(id: "7", title: "Back in Black", artist: "AC/DC", albumTitle: "Back in Black", artworkURL: nil, playCount: 41, duration: 255, dateAdded: addedDaysAgo(63)),
+            Song(id: "8", title: "Imagine", artist: "John Lennon", albumTitle: "Imagine", artworkURL: nil, playCount: 37, duration: 183, dateAdded: addedDaysAgo(72)),
+            Song(id: "9", title: "Hey Jude", artist: "The Beatles", albumTitle: "Hey Jude", artworkURL: nil, playCount: 30, duration: 431, dateAdded: addedDaysAgo(81)),
+            Song(id: "10", title: "Smells Like Teen Spirit", artist: "Nirvana", albumTitle: "Nevermind", artworkURL: nil, playCount: 25, duration: 301, dateAdded: addedDaysAgo(90)),
         ]
         return DeterministicLibrary(
             songs: songs,

@@ -153,7 +153,9 @@ final class FakeMusicPlayer: MusicPlayerSurface {
             albumTitle: song.albumTitle,
             artworkURL: nil,
             playCount: song.playCount,
-            lastPlayedDate: song.lastPlayedDate
+            lastPlayedDate: song.lastPlayedDate,
+            duration: song.duration,
+            dateAdded: song.dateAdded
         )
     }
 

@@ -1,3 +1,4 @@
+import Foundation
 import ShflCore
 
 enum DeterministicSongs {
@@ -9,7 +10,9 @@ enum DeterministicSongs {
                 artist: "Artist \(index % 7)",
                 albumTitle: "Album \(index % 5)",
                 artworkURL: nil,
-                playCount: index
+                playCount: index,
+                duration: TimeInterval(150 + index),
+                dateAdded: Date(timeIntervalSinceReferenceDate: 812_000_000 - Double(index) * 86_400)
             )
         }
     }

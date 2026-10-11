@@ -44,15 +44,7 @@ final class ApplicationPlayerSurface: MusicPlayerSurface {
         }
         return PlayerEntry(
             id: entry.id,
-            song: Song(
-                id: song.id.rawValue,
-                title: song.title,
-                artist: song.artistName,
-                albumTitle: song.albumTitle ?? "",
-                artworkURL: song.artwork?.url(width: 1200, height: 1200),
-                playCount: song.playCount ?? 0,
-                lastPlayedDate: song.lastPlayedDate
-            ),
+            song: ShflCore.Song(song, artworkURL: song.artwork?.url(width: 1200, height: 1200)),
             duration: song.duration ?? 0
         )
     }

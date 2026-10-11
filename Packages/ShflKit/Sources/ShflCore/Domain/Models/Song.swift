@@ -8,6 +8,8 @@ public nonisolated struct Song: Codable, Equatable, Identifiable, Sendable {
     public let artworkURL: URL?
     public let playCount: Int
     public let lastPlayedDate: Date?
+    public let duration: TimeInterval?
+    public let dateAdded: Date?
 
     public init(
         id: String,
@@ -16,7 +18,9 @@ public nonisolated struct Song: Codable, Equatable, Identifiable, Sendable {
         albumTitle: String,
         artworkURL: URL?,
         playCount: Int = 0,
-        lastPlayedDate: Date? = nil
+        lastPlayedDate: Date? = nil,
+        duration: TimeInterval? = nil,
+        dateAdded: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -25,5 +29,7 @@ public nonisolated struct Song: Codable, Equatable, Identifiable, Sendable {
         self.artworkURL = artworkURL
         self.playCount = playCount
         self.lastPlayedDate = lastPlayedDate
+        self.duration = duration
+        self.dateAdded = dateAdded
     }
 }

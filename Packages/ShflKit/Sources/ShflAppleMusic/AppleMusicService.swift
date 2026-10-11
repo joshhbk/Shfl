@@ -39,17 +39,7 @@ package nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCata
 
         let response = try await request.response()
 
-        let songs = response.items.map { musicKitSong in
-            Song(
-                id: musicKitSong.id.rawValue,
-                title: musicKitSong.title,
-                artist: musicKitSong.artistName,
-                albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil,
-                playCount: musicKitSong.playCount ?? 0,
-                lastPlayedDate: musicKitSong.lastPlayedDate
-            )
-        }
+        let songs = response.items.map { ShflCore.Song($0) }
 
         // hasMore is true if we got a full page (might be more)
         let hasMore = response.items.count == limit
@@ -104,17 +94,7 @@ package nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCata
 
         let response = try await request.response()
 
-        let songs = response.items.map { musicKitSong in
-            Song(
-                id: musicKitSong.id.rawValue,
-                title: musicKitSong.title,
-                artist: musicKitSong.artistName,
-                albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil,
-                playCount: musicKitSong.playCount ?? 0,
-                lastPlayedDate: musicKitSong.lastPlayedDate
-            )
-        }
+        let songs = response.items.map { ShflCore.Song($0) }
 
         let hasMore = response.items.count == limit
         return LibraryPage(songs: songs, hasMore: hasMore)
@@ -140,15 +120,7 @@ package nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCata
 
         let allSongs = tracks.compactMap { track -> ShflCore.Song? in
             guard case .song(let musicKitSong) = track else { return nil }
-            return Song(
-                id: musicKitSong.id.rawValue,
-                title: musicKitSong.title,
-                artist: musicKitSong.artistName,
-                albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil,
-                playCount: musicKitSong.playCount ?? 0,
-                lastPlayedDate: musicKitSong.lastPlayedDate
-            )
+            return ShflCore.Song(musicKitSong)
         }
 
         // Manual pagination over the track list
@@ -169,17 +141,7 @@ package nonisolated final class AppleMusicService: MusicAuthorizing, LibraryCata
 
         let response = try await request.response()
 
-        let allSongs = response.songs.map { musicKitSong in
-            Song(
-                id: musicKitSong.id.rawValue,
-                title: musicKitSong.title,
-                artist: musicKitSong.artistName,
-                albumTitle: musicKitSong.albumTitle ?? "",
-                artworkURL: nil,
-                playCount: musicKitSong.playCount ?? 0,
-                lastPlayedDate: musicKitSong.lastPlayedDate
-            )
-        }
+        let allSongs = response.songs.map { ShflCore.Song($0) }
 
         // Slice to get only the requested page
         let startIndex = min(offset, allSongs.count)
