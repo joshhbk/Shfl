@@ -12,12 +12,13 @@ public final class PlaylistDetailViewModel {
     public var hasMorePages: Bool { lane.hasMorePages }
     var errorMessage: String? { lane.errorMessage }
 
-    let playlistId: String
-    public let playlistName: String
+    public let playlist: Playlist
+    public var playlistName: String { playlist.name }
+    public var hasLoadedAllSongs: Bool { !lane.hasMorePages }
 
-    package init(playlistId: String, playlistName: String, libraryCatalog: LibraryCatalog) {
-        self.playlistId = playlistId
-        self.playlistName = playlistName
+    package init(playlist: Playlist, libraryCatalog: LibraryCatalog) {
+        self.playlist = playlist
+        let playlistId = playlist.id
         self.lane = LibraryLane<Song>(
             fetchPage: { [libraryCatalog, playlistId] offset, limit in
                 let page = try await libraryCatalog.fetchSongs(
@@ -39,5 +40,9 @@ public final class PlaylistDetailViewModel {
 
     public func loadMorePages() async {
         await lane.loadMore()
+    }
+
+    public func loadAllSongs() async {
+        await lane.loadAll()
     }
 }
