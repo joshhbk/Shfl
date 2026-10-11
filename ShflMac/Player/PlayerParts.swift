@@ -118,13 +118,3 @@ struct PlayingNowIcon: View {
             .accessibilityLabel("Playing now")
     }
 }
-
-struct ShuffledAtText: View {
-    let timeline: SessionTimeline
-
-    var body: some View {
-        if let shuffledAt = timeline.shuffledAt {
-            Text("Shuffled \(shuffledAt.formatted(date: .omitted, time: .shortened)) · fixed order")
-        }
-    }
-}

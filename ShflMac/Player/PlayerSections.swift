@@ -10,7 +10,7 @@ struct UpNextSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            SectionHeader("Up Next") { ShuffledAtText(timeline: timeline) }
+            SectionHeader("Up Next")
             if timeline.upcoming.isEmpty {
                 Text("This is the last song in the session.")
                     .font(.secondaryText)
@@ -36,7 +36,7 @@ struct SessionList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            SectionHeader("Session") { ShuffledAtText(timeline: timeline) }
+            SectionHeader("Session")
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -88,7 +88,7 @@ struct UpNextPlaceholder: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             SectionHeader("Up Next")
-            Text("Songs appear here once a shuffle starts. Each shuffle plays in a fixed order you can see ahead of time.")
+            Text("Songs appear here once a shuffle starts.")
                 .font(.secondaryText)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
