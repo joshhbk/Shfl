@@ -13,12 +13,6 @@ struct DetailColumn: View {
             ArtistsView()
         case .playlists:
             PlaylistsView()
-        case .picks:
-            PicksView()
-                .navigationTitle("Picks")
-        case .upNext:
-            UpNextView()
-                .navigationTitle("Up Next")
         }
     }
 }

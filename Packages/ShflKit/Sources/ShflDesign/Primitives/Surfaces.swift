@@ -13,6 +13,11 @@ extension View {
             .background(.surfaceContent)
     }
 
+    public func paneSurface() -> some View {
+        foregroundStyle(.textPrimary, .textSecondary, .textTertiary)
+            .background(.surfacePane)
+    }
+
     public func elevatedSurface() -> some View {
         foregroundStyle(.textPrimary, .textSecondary, .textTertiary)
             .background(.surfaceElevated)
