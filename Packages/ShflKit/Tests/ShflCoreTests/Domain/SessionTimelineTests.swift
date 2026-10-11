@@ -12,10 +12,17 @@ struct SessionTimelineTests {
         ListeningSession(songOrder: songs, algorithm: .noRepeat, seed: 1)
     }
 
+    func draft(_ ids: String..., algorithm: ShuffleAlgorithm = .noRepeat) -> SessionDraft {
+        let pool = ids.map { id in
+            songs.first { $0.id == id } ?? Song(id: id, title: id, artist: "Artist", albumTitle: "Album", artworkURL: nil)
+        }
+        return SessionDraft(songs: pool, algorithm: algorithm)
+    }
+
     @Test("Splits the session around the current song")
     func splitsAroundCurrent() {
         let timeline = SessionTimeline(
-            phase: .active(session), currentSongID: "c", draftSongIDs: ["a", "b", "c", "d"]
+            phase: .active(session), currentSongID: "c", draft: draft("a", "b", "c", "d")
         )
 
         #expect(timeline.status == .active)
@@ -30,7 +37,7 @@ struct SessionTimelineTests {
     @Test("A current song the session doesn't know leaves everything upcoming")
     func unknownCurrent() {
         let timeline = SessionTimeline(
-            phase: .active(session), currentSongID: "elsewhere", draftSongIDs: []
+            phase: .active(session), currentSongID: "elsewhere", draft: draft()
         )
 
         #expect(timeline.current == nil)
@@ -41,16 +48,28 @@ struct SessionTimelineTests {
     @Test("Compares the draft with the session both ways")
     func draftChanges() {
         let timeline = SessionTimeline(
-            phase: .active(session), currentSongID: "a", draftSongIDs: ["a", "b", "new"]
+            phase: .active(session), currentSongID: "a", draft: draft("a", "b", "new")
         )
 
-        #expect(timeline.joiningNextShuffle == ["new"])
-        #expect(timeline.leftPool == ["c", "d"])
+        #expect(timeline.changes.joiningNextShuffle == ["new"])
+        #expect(timeline.changes.leftPool == ["c", "d"])
+        #expect(!timeline.changes.algorithmChanged)
+    }
+
+    @Test("A new shuffle style alone counts as a change")
+    func algorithmChange() {
+        let timeline = SessionTimeline(
+            phase: .active(session), currentSongID: "a", draft: draft("a", "b", "c", "d", algorithm: .artistSpacing)
+        )
+
+        #expect(timeline.changes.joiningNextShuffle.isEmpty)
+        #expect(timeline.changes.leftPool.isEmpty)
+        #expect(!timeline.changes.isEmpty)
     }
 
     @Test("An ended session is all played")
     func ended() {
-        let timeline = SessionTimeline(phase: .ended(session), currentSongID: nil, draftSongIDs: [])
+        let timeline = SessionTimeline(phase: .ended(session), currentSongID: nil, draft: draft())
 
         #expect(timeline.status == .ended)
         #expect(timeline.played.map(\.id) == ["a", "b", "c", "d"])
@@ -60,10 +79,9 @@ struct SessionTimelineTests {
 
     @Test("With no session there's nothing to show or compare")
     func idle() {
-        let timeline = SessionTimeline(phase: .none, currentSongID: nil, draftSongIDs: ["a"])
+        let timeline = SessionTimeline(phase: .none, currentSongID: nil, draft: draft("a"))
 
         #expect(timeline == .idle)
-        #expect(timeline.joiningNextShuffle.isEmpty)
     }
 }
 

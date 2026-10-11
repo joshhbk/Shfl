@@ -49,9 +49,7 @@ public final class ShufflePlayer {
     public var hasPendingSessionChanges: Bool {
         let draft = sessionDraft.draft
         guard let activeSession else { return !draft.songs.isEmpty }
-        return activeSession.songIDs.count != draft.songs.count
-            || Set(activeSession.songIDs) != Set(draft.songs.map(\.id))
-            || activeSession.algorithm != draft.algorithm
+        return !DraftChanges(session: activeSession, draft: draft).isEmpty
     }
 
     /// - Parameter sessionDraft: The songs and algorithm used when a new

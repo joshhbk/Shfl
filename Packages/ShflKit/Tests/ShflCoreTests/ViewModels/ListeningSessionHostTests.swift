@@ -456,7 +456,7 @@ final class ListeningSessionHostTests: XCTestCase {
         try host.sessionDraft.add(makeSongs("three"))
 
         XCTAssertEqual(host.intents.shuffle, .changedDraft(songCount: 3))
-        XCTAssertEqual(host.timeline.joiningNextShuffle, ["three"])
+        XCTAssertEqual(host.timeline.changes.joiningNextShuffle, ["three"])
     }
 
     func testSeekMovesTheTransport() async throws {

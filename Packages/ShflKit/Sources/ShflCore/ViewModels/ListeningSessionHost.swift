@@ -82,7 +82,7 @@ public final class ListeningSessionHost {
         SessionTimeline(
             phase: player.sessionPhase,
             currentSongID: player.playbackState.currentSongId,
-            draftSongIDs: Set(sessionDraft.songs.map(\.id))
+            draft: sessionDraft.draft
         )
     }
 
