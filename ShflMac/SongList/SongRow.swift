@@ -6,10 +6,10 @@ import SwiftUI
 struct SongRow<Cells: View>: View {
     private let item: SongItem
     private let stat: SongStat?
-    private let columns: Set<ListColumn>
+    private let columns: [ListColumn]
     private let cells: Cells
 
-    init(_ item: SongItem, stat: SongStat?, columns: Set<ListColumn>, @ViewBuilder cells: () -> Cells) {
+    init(_ item: SongItem, stat: SongStat?, columns: [ListColumn], @ViewBuilder cells: () -> Cells) {
         self.item = item
         self.stat = stat
         self.columns = columns

@@ -3,21 +3,6 @@ import ShflCore
 import ShflDesign
 import SwiftUI
 
-/// The player's pill of actions, pinned to the top trailing corner.
-struct PlayerHeader: View {
-    var body: some View {
-        HStack {
-            Spacer(minLength: 0)
-            PillToolbar {
-                SettingsLink {
-                    Label("Settings", systemImage: "gearshape")
-                }
-            }
-        }
-        .frame(height: 52)
-    }
-}
-
 struct SongArtwork: View {
     let song: Song?
     let size: CGFloat

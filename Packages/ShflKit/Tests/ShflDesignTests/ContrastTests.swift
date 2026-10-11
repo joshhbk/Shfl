@@ -48,11 +48,9 @@ struct ContrastTests {
         }
     }
 
-    @Test("Wheel and chrome glyphs hold 4.5:1", arguments: schemes)
-    func darkChrome(scheme: ColorScheme) {
-        let environment = environment(theme: .pink, scheme: scheme)
-        expectReadable(.wheelGlyph, on: .wheel, in: environment)
-        expectReadable(.chromeGlyph, on: .chrome, in: environment)
+    @Test("Wheel glyphs hold 4.5:1", arguments: schemes)
+    func wheelGlyphs(scheme: ColorScheme) {
+        expectReadable(.wheelGlyph, on: .wheel, in: environment(theme: .pink, scheme: scheme))
     }
 
     private func expectReadable(

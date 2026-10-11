@@ -5,7 +5,7 @@ import SwiftUI
 struct PlaylistSongsView: View {
     @State private var songs: PlaylistDetailViewModel
 
-    private static let columns: Set<ListColumn> = [.artwork, .title, .detail, .time, .accessory]
+    private static let columns: [ListColumn] = [.artwork, .title, .detail, .time, .accessory]
 
     init(songs: PlaylistDetailViewModel) {
         _songs = State(wrappedValue: songs)

@@ -94,6 +94,7 @@ struct PickToggle: View {
         .toggleStyle(.pick)
         .disabled(item.mark.pick == .full)
         .focusable(false)
+        .help(item.mark.pick == .full ? "Picks are full" : "")
         .accessibilityIdentifier("mac.songs.pick.\(item.song.id)")
     }
 }

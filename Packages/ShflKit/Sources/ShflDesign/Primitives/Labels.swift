@@ -69,6 +69,51 @@ public struct ColumnLabel: View {
     }
 }
 
+/// A column heading that sorts the list. The sorted column reads in full ink with a chevron.
+public struct ColumnSortButtonStyle: ButtonStyle {
+    private let isSorted: Bool
+
+    public init(isSorted: Bool) {
+        self.isSorted = isSorted
+    }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        ColumnSortLabel(isSorted: isSorted, isPressed: configuration.isPressed) { configuration.label }
+    }
+}
+
+private struct ColumnSortLabel<Label: View>: View {
+    let isSorted: Bool
+    let isPressed: Bool
+    @ViewBuilder let label: Label
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: Spacing.s2) {
+            label
+            if isSorted {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .accessibilityHidden(true)
+            }
+        }
+        .font(.columnLabel)
+        .foregroundStyle(isSorted || isHovered ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+        .lineLimit(1)
+        .opacity(isPressed ? 0.6 : 1)
+        .contentShape(.rect)
+        .onHover { isHovered = $0 }
+        .accessibilityAddTraits(isSorted ? .isSelected : [])
+    }
+}
+
+extension ButtonStyle where Self == ColumnSortButtonStyle {
+    public static func columnSort(isSorted: Bool) -> ColumnSortButtonStyle {
+        .init(isSorted: isSorted)
+    }
+}
+
 private struct TagText: View {
     let text: String
 
@@ -98,26 +143,5 @@ public struct SectionHeader: View {
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityAddTraits(.isHeader)
-    }
-}
-
-/// A dark capsule of icon buttons, such as Settings above the player.
-public struct PillToolbar<Content: View>: View {
-    private let content: Content
-
-    public init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    public var body: some View {
-        HStack(spacing: 0) {
-            content
-        }
-        .buttonStyle(.pillIcon)
-        .padding(.horizontal, Spacing.s4)
-        .frame(height: 32)
-        .background(.chrome, in: .capsule)
-        .overlay { Capsule().strokeBorder(.white.opacity(0.08)) }
-        .elevation(.pill)
     }
 }
