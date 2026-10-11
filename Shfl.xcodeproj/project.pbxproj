@@ -11,6 +11,7 @@
 		DCAC00222F20000000000022 /* ShflCore in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00122F20000000000012 /* ShflCore */; };
 		DCAC00232F20000000000023 /* ShflAppleMusicUI in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00132F20000000000013 /* ShflAppleMusicUI */; };
 		DCAC00242F20000000000024 /* ShflLastFM in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00142F20000000000014 /* ShflLastFM */; };
+		DCAC00252F20000000000025 /* ShflDesign in Frameworks */ = {isa = PBXBuildFile; productRef = DCAC00152F20000000000015 /* ShflDesign */; };
 		DC190C9D2F4B7EDB0005FDF6 /* Vortex in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00022F10000000000002 /* Vortex */; };
 		DCAA00042F10000000000004 /* ShflCore in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00032F10000000000003 /* ShflCore */; };
 		DCAA00112F10000000000011 /* ShflDeterministic in Frameworks */ = {isa = PBXBuildFile; productRef = DCAA00102F10000000000010 /* ShflDeterministic */; };
@@ -102,6 +103,7 @@
 				DCAC00222F20000000000022 /* ShflCore in Frameworks */,
 				DCAC00232F20000000000023 /* ShflAppleMusicUI in Frameworks */,
 				DCAC00242F20000000000024 /* ShflLastFM in Frameworks */,
+				DCAC00252F20000000000025 /* ShflDesign in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,6 +201,7 @@
 				DCAC00122F20000000000012 /* ShflCore */,
 				DCAC00132F20000000000013 /* ShflAppleMusicUI */,
 				DCAC00142F20000000000014 /* ShflLastFM */,
+				DCAC00152F20000000000015 /* ShflDesign */,
 			);
 			productName = ShflMac;
 			productReference = DCAC00032F20000000000003 /* Shuffled.app */;
@@ -978,6 +981,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
 			productName = ShflLastFM;
+		};
+		DCAC00152F20000000000015 /* ShflDesign */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCAA00052F10000000000005 /* XCLocalSwiftPackageReference "Packages/ShflKit" */;
+			productName = ShflDesign;
 		};
 		DCAA00022F10000000000002 /* Vortex */ = {
 			isa = XCSwiftPackageProductDependency;
