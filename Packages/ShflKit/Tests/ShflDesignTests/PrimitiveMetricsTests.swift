@@ -9,6 +9,7 @@ struct PrimitiveMetricsTests {
         (ArtworkSize.hero, CornerRadius.card),
         (ArtworkSize.compact, CornerRadius.regular),
         (ArtworkSize.menuBar, CornerRadius.regular),
+        (ArtworkSize.songRow, CornerRadius.tag),
         (ArtworkSize.listRow, CornerRadius.tile),
     ])
     func artworkRadius(size: CGFloat, radius: CGFloat) {
@@ -55,5 +56,28 @@ struct PrimitiveMetricsTests {
         #expect(Scrubber.fraction(of: 60, in: 10...110) == 0.5)
         #expect(Scrubber.fraction(of: 500, in: 10...110) == 1)
         #expect(Scrubber.fraction(of: 0, in: 0...0) == 0)
+    }
+
+    @Test("List columns keep fixed widths and share the rest between title and detail")
+    func listColumnWidths() {
+        let frames = ListColumns.columnFrames(ListColumn.allCases, in: 800)
+        #expect(frames[.artwork] == 0...34)
+        #expect(frames[.accessory]?.upperBound == 800)
+        let title = frames[.title].map { $0.upperBound - $0.lowerBound } ?? 0
+        let detail = frames[.detail].map { $0.upperBound - $0.lowerBound } ?? 0
+        #expect(abs(title / detail - 1.6) < 0.001)
+    }
+
+    @Test("A list without a detail column gives its share to the title")
+    func listColumnsWithoutDetail() {
+        let frames = ListColumns.columnFrames([.artwork, .title, .stat, .time, .accessory], in: 500)
+        #expect(frames[.detail] == nil)
+        #expect(frames[.title] == CGFloat(46)...CGFloat(330))
+    }
+
+    @Test("Columns never get a negative width when the row is too narrow")
+    func narrowListColumns() {
+        let frames = ListColumns.columnFrames(ListColumn.allCases, in: 100)
+        #expect(frames.values.allSatisfy { $0.upperBound >= $0.lowerBound })
     }
 }

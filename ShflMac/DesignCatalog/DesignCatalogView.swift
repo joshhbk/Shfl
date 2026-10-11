@@ -16,6 +16,8 @@ struct DesignCatalogView: View {
                 CatalogSection("Colour") { ColorSwatches() }
                 CatalogSection("Type") { TypeSpecimens() }
                 CatalogSection("Buttons") { ButtonSpecimens() }
+                CatalogSection("Song list") { SongListSpecimen() }
+                CatalogSection("Empty states") { EmptyStateSpecimens() }
                 CatalogSection("Player") {
                     HStack(alignment: .top, spacing: Spacing.s20) {
                         PlayerSpecimen()
@@ -74,7 +76,7 @@ private struct CatalogSection<Content: View>: View {
 
 private struct ColorSwatches: View {
     private let tokens: [(String, DesignColor)] = [
-        ("surfaceElevated", .surfaceElevated), ("quietFill", .quietFill),
+        ("surfaceContent", .surfaceContent), ("surfaceElevated", .surfaceElevated), ("quietFill", .quietFill),
         ("textPrimary", .textPrimary), ("textSecondary", .textSecondary), ("textTertiary", .textTertiary),
         ("accentFill", .accentFill), ("accentText", .accentText),
         ("playerBody", .playerBody), ("ink", .ink), ("inkSecondary", .inkSecondary),
@@ -100,9 +102,9 @@ private struct ColorSwatches: View {
 private struct TypeSpecimens: View {
     private let roles: [(String, Font)] = [
         ("playerTitle", .playerTitle), ("playerTitleCompact", .playerTitleCompact),
-        ("cardTitle", .cardTitle), ("sectionTitle", .sectionTitle),
+        ("cardTitle", .cardTitle), ("emptyStateTitle", .emptyStateTitle), ("sectionTitle", .sectionTitle),
         ("bodyEmphasis", .bodyEmphasis), ("bodyText", .bodyText), ("secondaryText", .secondaryText),
-        ("rowTitle", .rowTitle), ("columnLabel", .columnLabel), ("meta", .meta), ("tag", .tag),
+        ("rowTitle", .rowTitle), ("columnLabel", .columnLabel), ("meta", .meta), ("tag", .tag), ("keyHint", .keyHint),
     ]
 
     var body: some View {
@@ -128,6 +130,95 @@ private struct ButtonSpecimens: View {
                 }
                 .controlSize(size)
             }
+        }
+    }
+}
+
+private struct SongListSpecimen: View {
+    @State private var picked: Set<Int> = [0, 2]
+
+    private let columns: Set<ListColumn> = Set(ListColumn.allCases)
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ListColumns(columns) {
+                ColumnLabel("Title").listColumn(.title)
+                ColumnLabel("Album").listColumn(.detail)
+                ColumnLabel("Plays").listColumn(.stat)
+                ColumnLabel("Time").listColumn(.time)
+            }
+            .frame(height: 28)
+            .padding(.horizontal, Spacing.s20)
+            Divider()
+            ForEach(Array(CatalogSample.library.enumerated()), id: \.offset) { index, song in
+                ListColumns(columns) {
+                    ArtworkFrame(size: ArtworkSize.songRow) { ArtworkPlaceholder() }
+                        .listColumn(.artwork)
+                    HStack(spacing: Spacing.s6) {
+                        RowTitles(song.title, subtitle: song.artist).fixedSize()
+                        if index == 2 { AccentTag("Next shuffle") }
+                        Spacer(minLength: 0)
+                    }
+                    .listColumn(.title)
+                    Text(song.album).font(.secondaryText).foregroundStyle(.secondary).listColumn(.detail)
+                    Text(song.plays, format: .number).font(.secondaryText.monospacedDigit()).foregroundStyle(.secondary).listColumn(.stat)
+                    Text("3:04").font(.secondaryText.monospacedDigit()).foregroundStyle(.secondary).listColumn(.time)
+                    Toggle("Pick \(song.title)", isOn: isPicked(index))
+                        .toggleStyle(.pick)
+                        .disabled(index == 3)
+                        .listColumn(.accessory)
+                }
+                .frame(height: 46)
+                .padding(.horizontal, Spacing.s20)
+                .background(index == 1 ? AnyShapeStyle(.accentFill) : AnyShapeStyle(.clear))
+                .environment(\.backgroundProminence, index == 1 ? .increased : .standard)
+                Divider()
+            }
+            FloatingBar {
+                Text("3 selected")
+                Button {} label: {
+                    HStack(spacing: Spacing.s8) {
+                        Text("Add to Picks")
+                        KeyHint("↩")
+                    }
+                }
+                .buttonStyle(.primary)
+            }
+            .padding(Spacing.s16)
+        }
+        .frame(width: 720)
+        .contentSurface()
+        .clipShape(.rect(cornerRadius: CornerRadius.card))
+    }
+
+    private func isPicked(_ index: Int) -> Binding<Bool> {
+        Binding(
+            get: { picked.contains(index) },
+            set: { isOn in
+                if isOn { picked.insert(index) } else { picked.remove(index) }
+            }
+        )
+    }
+}
+
+private struct EmptyStateSpecimens: View {
+    var body: some View {
+        HStack(spacing: Spacing.s20) {
+            EmptyState("No songs match “radiohed”", message: "Check the spelling, or try the same search in Artists.") {
+                Button("Clear Search") {}
+                Button("Search Artists") {}
+            }
+            .frame(width: 340, height: 220)
+            .contentSurface()
+            .clipShape(.rect(cornerRadius: CornerRadius.card))
+            EmptyState("No songs in your library yet", message: "Shuffled plays what’s in your Apple Music library. Add music in the Music app and it shows up here.") {
+                EmptyStateSymbol("music.note")
+            } actions: {
+                Button("Open Music") {}
+            }
+            .frame(width: 340, height: 220)
+            .contentSurface()
+            .clipShape(.rect(cornerRadius: CornerRadius.card))
         }
     }
 }
@@ -235,6 +326,12 @@ private struct EmptyPlayerSpecimen: View {
 private enum CatalogSample {
     static let tone = Color.Resolved(red: 0.12, green: 0.16, blue: 0.35)
     static let current = (title: "Kyoto", artist: "Phoebe Bridgers")
+    static let library: [(title: String, artist: String, album: String, plays: Int)] = [
+        ("Kyoto", "Phoebe Bridgers", "Punisher", 212),
+        ("Green Light", "Lorde", "Melodrama", 169),
+        ("Starburster", "Fontaines D.C.", "Romance", 151),
+        ("Alright", "Kendrick Lamar", "To Pimp a Butterfly", 131),
+    ]
     static let upNext: [(title: String, artist: String)] = [
         ("Kyoto", "Phoebe Bridgers"),
         ("Red Eyes", "The War on Drugs"),

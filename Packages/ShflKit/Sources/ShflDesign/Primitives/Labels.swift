@@ -18,6 +18,43 @@ public struct OutlinedTag: View {
     }
 }
 
+/// Marks something picked since the shuffle that plays from the next one.
+public struct AccentTag: View {
+    private let text: String
+
+    @Environment(\.backgroundProminence) private var prominence
+
+    public init(_ text: String) {
+        self.text = text
+    }
+
+    public var body: some View {
+        let isOnSelection = prominence == .increased
+        TagText(text)
+            .foregroundStyle(isOnSelection ? AnyShapeStyle(.primary) : AnyShapeStyle(.accentText))
+            .background(
+                isOnSelection ? AnyShapeStyle(.primary.opacity(0.2)) : AnyShapeStyle(.accentText.opacity(0.14)),
+                in: .rect(cornerRadius: CornerRadius.tag)
+            )
+    }
+}
+
+/// A list column's heading, laid out by `ListColumns` like the rows below it.
+public struct ColumnLabel: View {
+    private let title: String
+
+    public init(_ title: String) {
+        self.title = title
+    }
+
+    public var body: some View {
+        Text(title)
+            .font(.columnLabel)
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+    }
+}
+
 private struct TagText: View {
     let text: String
 
