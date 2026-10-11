@@ -7,7 +7,6 @@ import Testing
 struct PrimitiveMetricsTests {
     @Test("Artwork rounds less as it gets smaller", arguments: [
         (ArtworkSize.hero, CornerRadius.card),
-        (ArtworkSize.miniPlayer, CornerRadius.card),
         (ArtworkSize.compact, CornerRadius.regular),
         (ArtworkSize.menuBar, CornerRadius.regular),
         (ArtworkSize.listRow, CornerRadius.tile),

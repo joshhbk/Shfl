@@ -21,3 +21,16 @@ final class SessionCopyTests: XCTestCase {
         XCTAssertEqual(copy.subtitle, host.timeline.current?.byline)
     }
 }
+
+@MainActor
+final class MenuBarPoolSummaryTests: XCTestCase {
+    func test_summaryNamesSongChangesOrANewStyle() async throws {
+        let model = AppModel.preview(draft: DeterministicSongs.make(3))
+        await model.sessionHost.startFreshShuffle()
+        XCTAssertNil(MenuBarPool.summary(of: model.sessionHost.timeline.changes))
+
+        let other = ShuffleAlgorithm.allCases.first { $0 != model.sessionDraft.algorithm }!
+        model.sessionDraft.stage(other)
+        XCTAssertEqual(MenuBarPool.summary(of: model.sessionHost.timeline.changes), "New shuffle style")
+    }
+}
