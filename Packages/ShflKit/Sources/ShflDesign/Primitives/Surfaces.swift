@@ -8,6 +8,11 @@ extension View {
             .background(.playerBody)
     }
 
+    public func contentSurface() -> some View {
+        foregroundStyle(.textPrimary, .textSecondary, .textTertiary)
+            .background(.surfaceContent)
+    }
+
     public func elevatedSurface() -> some View {
         foregroundStyle(.textPrimary, .textSecondary, .textTertiary)
             .background(.surfaceElevated)

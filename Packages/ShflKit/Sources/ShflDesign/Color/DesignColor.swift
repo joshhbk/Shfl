@@ -4,6 +4,8 @@ import SwiftUI
 public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
     enum Role: Hashable, Sendable {
         case fixed(ColorPair)
+        /// Neutral text that turns `onAccent` on a selected list row.
+        case text(ColorPair, selectedOpacity: Float)
         case accent
         case accentText
         case playerBody
@@ -21,6 +23,9 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
         switch role {
         case .fixed(let pair):
             return pair.resolved(for: scheme)
+        case .text(let pair, let selectedOpacity):
+            guard environment.backgroundProminence == .increased else { return pair.resolved(for: scheme) }
+            return Palette.onAccent.resolved(for: scheme).opacity(selectedOpacity)
         case .accent:
             return theme.accent.resolved(for: scheme)
         case .accentText:
@@ -47,16 +52,17 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
 }
 
 nonisolated extension ShapeStyle where Self == DesignColor {
+    /// Lists and the library's main column.
+    public static var surfaceContent: DesignColor { .init(role: .fixed(Palette.content)) }
     /// Popovers, menus and settings panels.
     public static var surfaceElevated: DesignColor { .init(role: .fixed(Palette.elevated)) }
 
     public static var hairline: DesignColor { .init(role: .hairline) }
     public static var quietFill: DesignColor { .init(role: .fixed(Palette.quietFill)) }
 
-    public static var textPrimary: DesignColor { .init(role: .fixed(Palette.textPrimary)) }
-    public static var textSecondary: DesignColor { .init(role: .fixed(Palette.textSecondary)) }
-    public static var textTertiary: DesignColor { .init(role: .fixed(Palette.textTertiary)) }
-
+    public static var textPrimary: DesignColor { .init(role: .text(Palette.textPrimary, selectedOpacity: 1)) }
+    public static var textSecondary: DesignColor { .init(role: .text(Palette.textSecondary, selectedOpacity: 1)) }
+    public static var textTertiary: DesignColor { .init(role: .text(Palette.textTertiary, selectedOpacity: 0.8)) }
 
     /// Fills: selected rows, primary buttons, tray tiles.
     public static var accentFill: DesignColor { .init(role: .accent) }

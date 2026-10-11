@@ -25,6 +25,8 @@ public enum CornerRadius {
     public static let panel: CGFloat = 10
     /// Large artwork, cards and notices.
     public static let card: CGFloat = 12
+    /// Bars floating over a list, like the selection bar.
+    public static let floating: CGFloat = 14
 }
 
 public enum ArtworkSize {
@@ -32,4 +34,5 @@ public enum ArtworkSize {
     public static let compact: CGFloat = 68
     public static let menuBar: CGFloat = 56
     public static let listRow: CGFloat = 26
+    public static let songRow: CGFloat = 34
 }

@@ -16,6 +16,7 @@ public nonisolated struct Elevation: Hashable, Sendable {
     public static let artworkSmall = Elevation(opacity: 0.30, cssBlur: 12, y: 4)
     public static let wheel = Elevation(opacity: 0.28, cssBlur: 26, y: 10)
     public static let pill = Elevation(opacity: 0.20, cssBlur: 8, y: 2)
+    public static let floating = Elevation(opacity: 0.22, cssBlur: 32, y: 10)
 }
 
 extension View {

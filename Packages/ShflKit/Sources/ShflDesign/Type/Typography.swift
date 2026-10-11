@@ -4,6 +4,7 @@ import SwiftUI
 /// Counts and times also take `.monospacedDigit()`.
 extension Font {
     public static let cardTitle = Font.system(size: 14, weight: .heavy, design: .rounded)
+    public static let emptyStateTitle = Font.system(size: 16, weight: .bold, design: .rounded)
 
     public static let playerTitle = Font.system(size: 20, weight: .bold)
     public static let playerTitleCompact = Font.system(size: 17, weight: .bold)
@@ -16,6 +17,7 @@ extension Font {
     public static let meta = Font.system(size: 11)
     public static let columnLabel = Font.system(size: 11, weight: .semibold)
     public static let tag = Font.system(size: 10.5, weight: .semibold)
+    public static let keyHint = Font.system(size: 11, weight: .semibold)
 
     /// For 28–32pt-tall buttons.
     public static let buttonSmall = Font.system(size: 13, weight: .bold, design: .rounded)
