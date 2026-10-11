@@ -14,8 +14,7 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
     let playedSongIDs: Set<String>
     let playbackPosition: TimeInterval
     let savedAt: Date
-    /// Missing from records saved before it was added; those restore as shuffled when saved.
-    let shuffledAt: Date?
+    let shuffledAt: Date
 
     init(
         sessionID: UUID = UUID(),
@@ -26,7 +25,7 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
         playedSongIDs: Set<String>,
         playbackPosition: TimeInterval,
         savedAt: Date,
-        shuffledAt: Date? = nil
+        shuffledAt: Date
     ) {
         self.sessionID = sessionID
         self.songOrder = songOrder
@@ -52,7 +51,7 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
             songOrder: songOrder,
             algorithm: algorithm,
             seed: seed,
-            shuffledAt: shuffledAt ?? savedAt
+            shuffledAt: shuffledAt
         )
         return .restore(
             session: session,
