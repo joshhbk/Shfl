@@ -75,7 +75,8 @@ public struct ClickWheel<Center: View, Top: View, Leading: View, Trailing: View,
         .buttonStyle(.wheel)
         .toggleStyle(.wheel)
         .frame(width: ClickWheelMetrics.diameter, height: ClickWheelMetrics.diameter)
-        .focusable()
+        // .activate takes focus only under Keyboard Navigation, so a click doesn't leave the ring behind.
+        .focusable(interactions: .activate)
         .focused($isFocused)
         .focusEffectDisabled()
         .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow]) { press in

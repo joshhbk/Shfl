@@ -38,7 +38,7 @@ public struct Scrubber: View {
             .gesture(drag(width: geometry.size.width), isEnabled: isEnabled)
         }
         .frame(height: 16)
-        .focusable(isEnabled)
+        .focusable(isEnabled, interactions: .activate)
         .onKeyPress(.leftArrow) { nudge(by: -step) }
         .onKeyPress(.rightArrow) { nudge(by: step) }
         .accessibilityRepresentation {
