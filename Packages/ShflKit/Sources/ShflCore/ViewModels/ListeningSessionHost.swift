@@ -88,12 +88,13 @@ public final class ListeningSessionHost {
     }
 
     public var intents: TransportIntents {
-        TransportIntents(
-            hasActiveSession: player.activeSession != nil,
-            isPlaying: player.playbackState.isPlaying,
+        let session: TransportIntents.SessionState = player.activeSession == nil
+            ? .none
+            : .active(isPlaying: player.playbackState.isPlaying, draftDiffers: player.hasPendingSessionChanges)
+        return TransportIntents(
+            session: session,
             draftSongCount: sessionDraft.songCount,
-            autofillSongCount: sessionDraft.capacity,
-            draftDiffersFromSession: player.hasPendingSessionChanges
+            autofillSongCount: sessionDraft.capacity
         )
     }
 

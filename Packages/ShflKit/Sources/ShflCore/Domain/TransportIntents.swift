@@ -22,29 +22,28 @@ public nonisolated struct TransportIntents: Equatable, Sendable {
     public let play: Play
     public let shuffle: Shuffle
 
-    init(
-        hasActiveSession: Bool,
-        isPlaying: Bool,
-        draftSongCount: Int,
-        autofillSongCount: Int,
-        draftDiffersFromSession: Bool
-    ) {
-        switch (hasActiveSession, draftSongCount) {
-        case (true, _):
+    enum SessionState: Equatable, Sendable {
+        case none
+        case active(isPlaying: Bool, draftDiffers: Bool)
+    }
+
+    init(session: SessionState, draftSongCount: Int, autofillSongCount: Int) {
+        switch (session, draftSongCount) {
+        case (.active(let isPlaying, _), _):
             play = isPlaying ? .pause : .resume
-        case (false, 0):
+        case (.none, 0):
             play = .autofillAndShuffle(songCount: autofillSongCount)
-        case (false, let count):
+        case (.none, let count):
             play = .shuffleDraft(songCount: count)
         }
 
-        switch (hasActiveSession, draftSongCount) {
+        switch (session, draftSongCount) {
         case (_, 0):
             shuffle = .autofillAndShuffle(songCount: autofillSongCount)
-        case (false, let count):
+        case (.none, let count):
             shuffle = .draft(songCount: count)
-        case (true, let count):
-            shuffle = draftDiffersFromSession ? .changedDraft(songCount: count) : .again
+        case (.active(_, let draftDiffers), let count):
+            shuffle = draftDiffers ? .changedDraft(songCount: count) : .again
         }
     }
 }
