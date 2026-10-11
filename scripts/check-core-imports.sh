@@ -53,7 +53,7 @@ for dir in "$sources"/*/; do
 done
 
 check_imports Shfl 'Foundation|Observation|SwiftUI|UIKit|MediaPlayer|AuthenticationServices|Vortex|ShflCore|ShflAppleMusicUI|ShflLastFM|ShflDeterministic|ShflComposition'
-check_imports ShflMac 'Foundation|Observation|SwiftUI|AppKit|AuthenticationServices|ShflCore|ShflAppleMusicUI|ShflLastFM|ShflComposition'
+check_imports ShflMac 'Foundation|Observation|SwiftUI|AppKit|AuthenticationServices|ShflCore|ShflAppleMusicUI|ShflDesign|ShflLastFM|ShflComposition'
 while IFS= read -r match; do
     [[ -z "$match" ]] && continue
     echo "$match"
