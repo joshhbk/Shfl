@@ -21,6 +21,12 @@ final class ViewTeardownTests: XCTestCase {
         }
     }
 
+    func test_closingThePicksColumnReleasesItsStateWithoutCrashing() async throws {
+        let model = AppModel.preview(draft: DeterministicSongs.make(3))
+        await model.sessionHost.startFreshShuffle()
+        try await showThenTearDown(model) { PicksColumn() }
+    }
+
     func test_closingThePlayerReleasesItsClockWithoutCrashing() async throws {
         let model = AppModel.preview(draft: DeterministicSongs.make(3))
         await model.sessionHost.startFreshShuffle()

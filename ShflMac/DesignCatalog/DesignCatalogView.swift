@@ -17,6 +17,7 @@ struct DesignCatalogView: View {
                 CatalogSection("Type") { TypeSpecimens() }
                 CatalogSection("Buttons") { ButtonSpecimens() }
                 CatalogSection("Song list") { SongListSpecimen() }
+                CatalogSection("Picks") { PicksSpecimen() }
                 CatalogSection("Collections") { CollectionSpecimens() }
                 CatalogSection("Empty states") { EmptyStateSpecimens() }
                 CatalogSection("Player") {
@@ -199,6 +200,37 @@ private struct SongListSpecimen: View {
                 if isOn { picked.insert(index) } else { picked.remove(index) }
             }
         )
+    }
+}
+
+private struct PicksSpecimen: View {
+    private let tones: [Color] = [
+        Color(red: 0.12, green: 0.16, blue: 0.35), Color(red: 0.94, green: 0.90, blue: 0.82), Color(red: 0.48, green: 0.25, blue: 0.63),
+        Color(red: 0.85, green: 0.26, blue: 0.18), Color(red: 0.18, green: 0.45, blue: 0.77),
+    ]
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.s20) {
+            VStack(alignment: .leading, spacing: Spacing.s14) {
+                CountFraction(46, of: 120)
+                Tray(capacity: 120, marks: [50, 100, 120]) { index in
+                    if index < 46 {
+                        PickedTile(tone: index == 7 ? nil : tones[index % tones.count]).tileRing(index >= 43)
+                    } else {
+                        EmptyTile().milestoneOutline([50, 100, 120].contains(index + 1))
+                    }
+                }
+            }
+            .frame(width: 260)
+            VStack(alignment: .leading, spacing: Spacing.s14) {
+                CountFraction(37, of: 120)
+                CapacityRule(37, of: 120, marks: [50, 100, 120])
+            }
+            .frame(width: 260)
+        }
+        .padding(Spacing.s20)
+        .paneSurface()
+        .clipShape(.rect(cornerRadius: CornerRadius.card))
     }
 }
 
