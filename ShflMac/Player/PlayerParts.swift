@@ -3,22 +3,10 @@ import ShflCore
 import ShflDesign
 import SwiftUI
 
-/// "Playing · 23 of 86" with the player's pill of actions.
+/// The player's pill of actions, pinned to the top trailing corner.
 struct PlayerHeader: View {
-    @Environment(ListeningSessionHost.self) private var sessionHost
-    @Environment(ShufflePlayer.self) private var player
-
     var body: some View {
-        let timeline = sessionHost.timeline
-        HStack(spacing: Spacing.s8) {
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.s8) {
-                Text(title(timeline))
-                    .font(.paneTitle)
-                    .accessibilityAddTraits(.isHeader)
-                Text(detail(timeline))
-                    .font(.secondaryText.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+        HStack {
             Spacer(minLength: 0)
             PillToolbar {
                 SettingsLink {
@@ -27,22 +15,6 @@ struct PlayerHeader: View {
             }
         }
         .frame(height: 52)
-    }
-
-    private func title(_ timeline: SessionTimeline) -> String {
-        switch timeline.status {
-        case .idle: "Playing"
-        case .ended: "Finished"
-        case .active: player.playbackState.isPlaying || player.isLoadingSession ? "Playing" : "Paused"
-        }
-    }
-
-    private func detail(_ timeline: SessionTimeline) -> String {
-        switch timeline.status {
-        case .idle: "Nothing yet"
-        case .ended: "\(timeline.songCount) of \(timeline.songCount) played"
-        case .active: timeline.position.map { "\($0) of \(timeline.songCount)" } ?? "\(timeline.songCount) songs"
-        }
     }
 }
 
