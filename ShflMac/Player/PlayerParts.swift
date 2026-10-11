@@ -58,9 +58,9 @@ struct SessionCopy {
     private static func nextStep(_ play: TransportIntents.Play) -> String {
         switch play {
         case .autofillAndShuffle(let count):
-            "With an empty pool, Play fills it with \(count) random songs from your library, then shuffles."
+            "With no picks, Play fills them with \(count) random songs from your library, then shuffles."
         case .shuffleDraft(let count):
-            "Play shuffles the \(count) songs in your pool."
+            "Play shuffles your \(count) picks."
         case .pause, .resume:
             ""
         }

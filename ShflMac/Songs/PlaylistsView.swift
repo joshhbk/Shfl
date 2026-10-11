@@ -64,7 +64,7 @@ private struct PlaylistSongsView: View {
             songs: songs.songs,
             onReachEnd: { Task { await songs.loadMorePages() } }
         ) { selected in
-            AddToSelectedButton(songs: selected, drafting: drafting)
+            AddToPicksButton(songs: selected, drafting: drafting)
         }
         .overlay {
             if songs.songs.isEmpty && songs.isLoading { ProgressView() }

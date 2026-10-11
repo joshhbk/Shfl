@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Marks something that no longer matches the pool but still plays this session.
+/// Marks a song that was unpicked after the shuffle but still plays this session.
 public struct OutlinedTag: View {
     private let text: String
 

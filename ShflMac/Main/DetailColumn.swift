@@ -17,10 +17,10 @@ struct DetailColumn: View {
         case .playlists:
             PlaylistsView()
                 .placeSearch("Search Playlists", isFocused: isSearchFocused)
-        case .selected:
-            SelectedSongsView()
-                .navigationTitle("Selected")
-                .placeSearch("Search Selected", isFocused: isSearchFocused)
+        case .picks:
+            PicksView()
+                .navigationTitle("Picks")
+                .placeSearch("Search Picks", isFocused: isSearchFocused)
         case .upNext:
             UpNextView()
                 .navigationTitle("Up Next")

@@ -9,7 +9,7 @@ final class SessionCopyTests: XCTestCase {
         let host = AppModel.preview().sessionHost
         let copy = SessionCopy(timeline: host.timeline, play: host.intents.play)
         XCTAssertEqual(copy.title, "Just press Play")
-        XCTAssertTrue(copy.subtitle.contains("fills it with 120 random songs"))
+        XCTAssertTrue(copy.subtitle.contains("fills them with 120 random songs"))
     }
 
     func test_activeCopyNamesTheSongThatsPlaying() async {
@@ -23,14 +23,14 @@ final class SessionCopyTests: XCTestCase {
 }
 
 @MainActor
-final class MenuBarPoolSummaryTests: XCTestCase {
+final class MenuBarPicksSummaryTests: XCTestCase {
     func test_summaryNamesSongChangesOrANewStyle() async throws {
         let model = AppModel.preview(draft: DeterministicSongs.make(3))
         await model.sessionHost.startFreshShuffle()
-        XCTAssertNil(MenuBarPool.summary(of: model.sessionHost.timeline.changes))
+        XCTAssertNil(MenuBarPicks.summary(of: model.sessionHost.timeline.changes))
 
         let other = ShuffleAlgorithm.allCases.first { $0 != model.sessionDraft.algorithm }!
         model.sessionDraft.stage(other)
-        XCTAssertEqual(MenuBarPool.summary(of: model.sessionHost.timeline.changes), "New shuffle style")
+        XCTAssertEqual(MenuBarPicks.summary(of: model.sessionHost.timeline.changes), "New shuffle style")
     }
 }

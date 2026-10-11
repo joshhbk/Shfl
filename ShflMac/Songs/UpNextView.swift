@@ -19,7 +19,7 @@ struct UpNextView: View {
             ContentUnavailableView(
                 "Nothing Playing",
                 systemImage: "shuffle",
-                description: Text("Shuffle your selected songs to start a listening session.")
+                description: Text("Shuffle your picks to start a listening session.")
             )
         }
     }
