@@ -3,7 +3,8 @@ import SwiftUI
 enum ClickWheelMetrics {
     static let diameter: CGFloat = 184
     static let centerDiameter: CGFloat = 96
-    static let edgeInset: CGFloat = 10
+    /// The middle of the ring between the centre button and the rim, where edge glyphs sit.
+    static let edgeRadius: CGFloat = (diameter + centerDiameter) / 4
 }
 
 public enum ClickWheelSlot: Hashable, Sendable {
@@ -58,18 +59,14 @@ public struct ClickWheel<Center: View, Top: View, Leading: View, Trailing: View,
                 .fill(.wheel)
                 .overlay { Circle().strokeBorder(.white.opacity(0.07)) }
                 .elevation(.wheel)
-            VStack {
-                slot(.top) { top }
-                Spacer()
-                slot(.bottom) { bottom }
-            }
-            .padding(.vertical, ClickWheelMetrics.edgeInset)
-            HStack {
-                slot(.leading) { leading }
-                Spacer()
-                slot(.trailing) { trailing }
-            }
-            .padding(.horizontal, ClickWheelMetrics.edgeInset)
+            slot(.top) { top }
+                .offset(y: -ClickWheelMetrics.edgeRadius)
+            slot(.bottom) { bottom }
+                .offset(y: ClickWheelMetrics.edgeRadius)
+            slot(.leading) { leading }
+                .offset(x: -ClickWheelMetrics.edgeRadius)
+            slot(.trailing) { trailing }
+                .offset(x: ClickWheelMetrics.edgeRadius)
             slot(.center) { center.buttonStyle(.wheelCenter) }
         }
         .buttonStyle(.wheel)
