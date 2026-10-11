@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One of the five iPod shuffle colours. Ids match the iOS `ShuffleTheme` presets so a saved choice carries over.
-public struct ShflTheme: Identifiable, Hashable, Sendable {
+public nonisolated struct ShflTheme: Identifiable, Hashable, Sendable {
     public let id: String
     public let name: String
     let accent: ColorPair
@@ -12,7 +12,7 @@ public struct ShflTheme: Identifiable, Hashable, Sendable {
     let tintShare: Float
 }
 
-extension ShflTheme {
+nonisolated extension ShflTheme {
     public static let silver = ShflTheme(
         id: "silver",
         name: "Silver",

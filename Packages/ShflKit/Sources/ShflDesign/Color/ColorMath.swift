@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum ColorMath {
+nonisolated enum ColorMath {
     /// Mixes in OKLab, matching CSS `color-mix(in oklab, …)` used by the design canvas.
     static func mix(_ base: Color.Resolved, with other: Color.Resolved, share: Float) -> Color.Resolved {
         let a = OKLab(base)
@@ -47,7 +47,7 @@ enum ColorMath {
     }
 }
 
-private struct OKLab {
+nonisolated private struct OKLab {
     let l: Float
     let a: Float
     let b: Float

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ColorPair: Hashable, Sendable {
+nonisolated struct ColorPair: Hashable, Sendable {
     let light: Color.Resolved
     let dark: Color.Resolved
 
@@ -18,7 +18,7 @@ struct ColorPair: Hashable, Sendable {
     }
 }
 
-extension Color.Resolved {
+nonisolated extension Color.Resolved {
     init(hex: UInt32, opacity: Float = 1) {
         self.init(
             red: Float((hex >> 16) & 0xFF) / 255,

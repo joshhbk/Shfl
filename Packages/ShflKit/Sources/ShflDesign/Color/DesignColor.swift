@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A design token that resolves against the current colour scheme, contrast setting, theme and artwork tint.
-public struct DesignColor: ShapeStyle, Hashable, Sendable {
+public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
     enum Role: Hashable, Sendable {
         case fixed(ColorPair)
         case accent
@@ -46,7 +46,7 @@ public struct DesignColor: ShapeStyle, Hashable, Sendable {
     }
 }
 
-extension ShapeStyle where Self == DesignColor {
+nonisolated extension ShapeStyle where Self == DesignColor {
     public static var surfaceWindow: DesignColor { .init(role: .fixed(Palette.window)) }
     public static var surfaceContent: DesignColor { .init(role: .fixed(Palette.content)) }
     /// Popovers, menus and settings panels.

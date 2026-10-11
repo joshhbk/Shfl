@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension EnvironmentValues {
+nonisolated extension EnvironmentValues {
     @Entry public var shflTheme: ShflTheme = .pink
     @Entry public var artworkTone: Color.Resolved? = nil
 }

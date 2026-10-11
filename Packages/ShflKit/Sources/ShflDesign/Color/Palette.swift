@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Theme-independent colours from the design canvas, as light/dark pairs.
-enum Palette {
+nonisolated enum Palette {
     static let window = ColorPair(light: .init(hex: 0xF3F3F5), dark: .init(hex: 0x1B1B1D))
     static let content = ColorPair(light: .init(hex: 0xFFFFFF), dark: .init(hex: 0x222225))
     static let elevated = ColorPair(light: .init(hex: 0xFFFFFF), dark: .init(hex: 0x262629))

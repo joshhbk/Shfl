@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct Elevation: Hashable, Sendable {
+public nonisolated struct Elevation: Hashable, Sendable {
     let opacity: Double
     let radius: CGFloat
     let y: CGFloat
