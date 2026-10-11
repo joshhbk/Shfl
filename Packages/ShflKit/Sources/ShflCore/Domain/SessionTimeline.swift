@@ -5,7 +5,7 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
     public enum Status: Equatable, Sendable {
         case idle
         case active
-        case ended(at: Date)
+        case ended
     }
 
     public let status: Status
@@ -47,8 +47,8 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
                 self.init(session: session, status: .active, played: [], current: nil,
                           upcoming: order, draftSongIDs: draftSongIDs)
             }
-        case .ended(let session, let endedAt):
-            self.init(session: session, status: .ended(at: endedAt), played: session.songOrder,
+        case .ended(let session):
+            self.init(session: session, status: .ended, played: session.songOrder,
                       current: nil, upcoming: [], draftSongIDs: draftSongIDs)
         }
     }

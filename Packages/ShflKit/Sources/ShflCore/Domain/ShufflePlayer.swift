@@ -285,7 +285,7 @@ public final class ShufflePlayer {
         case .sessionEnded:
             // The session host decides what follows a session end.
             guard let session = activeSession else { return }
-            sessionPhase = .ended(session, at: Date())
+            sessionPhase = .ended(session)
             updatePlaybackState(.stopped, endingSession: true)
             sessionEndCount &+= 1
             record("session-ended")

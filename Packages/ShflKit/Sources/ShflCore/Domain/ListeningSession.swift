@@ -98,7 +98,7 @@ public nonisolated struct ListeningSession: Equatable, Sendable {
 nonisolated enum SessionPhase: Equatable, Sendable {
     case none
     case active(ListeningSession)
-    case ended(ListeningSession, at: Date)
+    case ended(ListeningSession)
 }
 
 public nonisolated struct PlaybackTraceEntry: Equatable, Sendable, Identifiable {

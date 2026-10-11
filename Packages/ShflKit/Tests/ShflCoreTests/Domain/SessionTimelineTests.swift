@@ -48,14 +48,11 @@ struct SessionTimelineTests {
         #expect(timeline.leftPool == ["c", "d"])
     }
 
-    @Test("An ended session is all played, with when it ended")
+    @Test("An ended session is all played")
     func ended() {
-        let endedAt = Date(timeIntervalSince1970: 5_000)
-        let timeline = SessionTimeline(
-            phase: .ended(session, at: endedAt), currentSongID: nil, draftSongIDs: []
-        )
+        let timeline = SessionTimeline(phase: .ended(session), currentSongID: nil, draftSongIDs: [])
 
-        #expect(timeline.status == .ended(at: endedAt))
+        #expect(timeline.status == .ended)
         #expect(timeline.played.map(\.id) == ["a", "b", "c", "d"])
         #expect(timeline.current == nil)
         #expect(timeline.upcoming.isEmpty)
