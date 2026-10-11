@@ -459,25 +459,6 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(host.timeline.joiningNextShuffle, ["three"])
     }
 
-    func testRestoredSessionKeepsWhenItWasShuffled() async throws {
-        let host = makeHost(now: { Date(timeIntervalSince1970: 2_000) })
-        try host.sessionDraft.add(makeSongs("one", "two"))
-        await host.startFreshShuffle()
-        let shuffledAt = try XCTUnwrap(host.timeline.shuffledAt)
-        await waitUntil { (try? self.archive.load().session) != nil }
-
-        let nextHost = ListeningSessionHost(
-            playbackTransport: DeterministicMusicService(),
-            archive: archive,
-            autofillSource: StubAutofillSource(songs: []),
-            now: { shuffledAt.addingTimeInterval(60) }
-        )
-        let restored = await nextHost.restoreSavedSession()
-
-        XCTAssertTrue(restored)
-        XCTAssertEqual(nextHost.timeline.shuffledAt, shuffledAt)
-    }
-
     func testSeekMovesTheTransport() async throws {
         let host = makeHost()
         try host.sessionDraft.add(makeSongs("one"))

@@ -7,10 +7,9 @@ struct SessionTimelineTests {
     let songs = ["a", "b", "c", "d"].map {
         Song(id: $0, title: $0.uppercased(), artist: "Artist", albumTitle: "Album", artworkURL: nil)
     }
-    let shuffledAt = Date(timeIntervalSince1970: 1_000)
 
     var session: ListeningSession {
-        ListeningSession(songOrder: songs, algorithm: .noRepeat, seed: 1, shuffledAt: shuffledAt)
+        ListeningSession(songOrder: songs, algorithm: .noRepeat, seed: 1)
     }
 
     @Test("Splits the session around the current song")
@@ -26,7 +25,6 @@ struct SessionTimelineTests {
         #expect(timeline.songs.map(\.id) == ["a", "b", "c", "d"])
         #expect(timeline.position == 3)
         #expect(timeline.songCount == 4)
-        #expect(timeline.shuffledAt == shuffledAt)
     }
 
     @Test("A current song the session doesn't know leaves everything upcoming")

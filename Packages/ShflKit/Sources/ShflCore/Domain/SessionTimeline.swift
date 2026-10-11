@@ -12,7 +12,6 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
     public let played: [Song]
     public let current: Song?
     public let upcoming: [Song]
-    public let shuffledAt: Date?
     /// In the draft but not the session: they play from the next shuffle.
     public let joiningNextShuffle: Set<String>
     /// In the session but no longer in the draft: they still play this session.
@@ -31,7 +30,6 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
         played: [],
         current: nil,
         upcoming: [],
-        shuffledAt: nil,
         joiningNextShuffle: [],
         leftPool: []
     )
@@ -69,7 +67,6 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
             played: played,
             current: current,
             upcoming: upcoming,
-            shuffledAt: session.shuffledAt,
             joiningNextShuffle: draftSongIDs.subtracting(sessionSongIDs),
             leftPool: sessionSongIDs.subtracting(draftSongIDs)
         )
@@ -80,7 +77,6 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
         played: [Song],
         current: Song?,
         upcoming: [Song],
-        shuffledAt: Date?,
         joiningNextShuffle: Set<String>,
         leftPool: Set<String>
     ) {
@@ -88,7 +84,6 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
         self.played = played
         self.current = current
         self.upcoming = upcoming
-        self.shuffledAt = shuffledAt
         self.joiningNextShuffle = joiningNextShuffle
         self.leftPool = leftPool
     }

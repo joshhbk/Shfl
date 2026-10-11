@@ -26,8 +26,7 @@ final class ListeningSessionRecordTests: XCTestCase {
             currentSongID: songs[0].id,
             playedSongIDs: [],
             playbackPosition: 0,
-            savedAt: Date(),
-            shuffledAt: Date()
+            savedAt: Date()
         )
 
         guard case .restore(let session, _, _, _) = record.restored() else {
@@ -44,8 +43,7 @@ final class ListeningSessionRecordTests: XCTestCase {
             currentSongID: "missing",
             playedSongIDs: [],
             playbackPosition: 0,
-            savedAt: Date(),
-            shuffledAt: Date()
+            savedAt: Date()
         )
         XCTAssertEqual(record.restored(), .discard(.emptyQueue))
     }
@@ -67,8 +65,7 @@ final class ListeningSessionRecordTests: XCTestCase {
             currentSongID: "not-in-queue",
             playedSongIDs: [],
             playbackPosition: 0,
-            savedAt: Date(),
-            shuffledAt: Date()
+            savedAt: Date()
         )
         XCTAssertEqual(record.restored(), .discard(.currentSongMissing))
     }

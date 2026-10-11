@@ -72,20 +72,17 @@ public nonisolated struct ListeningSession: Equatable, Sendable {
     public let songOrder: [Song]
     public let algorithm: ShuffleAlgorithm
     public let seed: UInt64
-    public let shuffledAt: Date
 
     init(
         id: UUID = UUID(),
         songOrder: [Song],
         algorithm: ShuffleAlgorithm,
-        seed: UInt64,
-        shuffledAt: Date = Date()
+        seed: UInt64
     ) {
         self.id = id
         self.songOrder = songOrder
         self.algorithm = algorithm
         self.seed = seed
-        self.shuffledAt = shuffledAt
     }
 
     public var songIDs: [String] {
