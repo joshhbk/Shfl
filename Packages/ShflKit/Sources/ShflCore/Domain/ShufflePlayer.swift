@@ -34,7 +34,10 @@ public final class ShufflePlayer {
         }
     }
 
-    public private(set) var activeSession: ListeningSession?
+    private(set) var sessionPhase = SessionPhase.none
+    public var activeSession: ListeningSession? {
+        if case .active(let session) = sessionPhase { session } else { nil }
+    }
     public private(set) var playbackState: PlaybackState = .empty
     public private(set) var operationNotice: String?
     public private(set) var isLoadingSession = false
@@ -46,9 +49,7 @@ public final class ShufflePlayer {
     public var hasPendingSessionChanges: Bool {
         let draft = sessionDraft.draft
         guard let activeSession else { return !draft.songs.isEmpty }
-        return activeSession.songIDs.count != draft.songs.count
-            || Set(activeSession.songIDs) != Set(draft.songs.map(\.id))
-            || activeSession.algorithm != draft.algorithm
+        return !DraftChanges(session: activeSession, draft: draft).isEmpty
     }
 
     /// - Parameter sessionDraft: The songs and algorithm used when a new
@@ -76,7 +77,7 @@ public final class ShufflePlayer {
 
     /// Stops playback and ends the current listening session.
     func clearSession() async {
-        activeSession = nil
+        sessionPhase = .none
         updatePlaybackState(.empty)
         operationNotice = nil
         await playbackTransport.clear()
@@ -144,7 +145,7 @@ public final class ShufflePlayer {
         }
     }
 
-    public func seek(to time: TimeInterval) {
+    func seek(to time: TimeInterval) {
         playbackTransport.seek(to: time)
         record("seek", detail: String(format: "%.1f", time))
     }
@@ -211,14 +212,14 @@ public final class ShufflePlayer {
                     autoplay: autoplay
                 )
             )
-            activeSession = session
+            sessionPhase = .active(session)
             let currentSong = session.song(id: currentSongID)
             if let currentSong {
                 updatePlaybackState(autoplay ? .playing(currentSong) : .paused(currentSong))
             }
         } catch {
             await playbackTransport.clear()
-            activeSession = nil
+            sessionPhase = .none
             updatePlaybackState(.error(error))
             throw report("Couldn't load the listening session", error: error)
         }
@@ -281,8 +282,8 @@ public final class ShufflePlayer {
             record("transport-state", detail: state.label)
         case .sessionEnded:
             // The session host decides what follows a session end.
-            guard activeSession != nil else { return }
-            activeSession = nil
+            guard let session = activeSession else { return }
+            sessionPhase = .ended(session)
             updatePlaybackState(.stopped, endingSession: true)
             sessionEndCount &+= 1
             record("session-ended")

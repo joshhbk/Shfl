@@ -5,6 +5,7 @@ struct PlaybackScrubber: View {
     @State private var clock: PlaybackClock?
     @Environment(\.screenFactories) private var screens
     @Environment(ShufflePlayer.self) private var player
+    @Environment(ListeningSessionHost.self) private var sessionHost
 
     var body: some View {
         Group {
@@ -25,7 +26,7 @@ struct PlaybackScrubber: View {
     }
 
     private func seek(to time: TimeInterval) {
-        player.seek(to: time)
+        sessionHost.seek(to: time)
         clock?.handleUserSeek(to: time)
     }
 }
