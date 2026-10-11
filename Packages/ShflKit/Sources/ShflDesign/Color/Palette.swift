@@ -21,8 +21,6 @@ nonisolated enum Palette {
     static let wheel = ColorPair(light: .init(hex: 0x161617), dark: .init(hex: 0x0B0B0C))
     static let wheelGlyph = ColorPair(.init(hex: 0xD9D9DE))
 
-    static let chrome = ColorPair(.init(hex: 0x1C1C1E))
-    static let chromeGlyph = ColorPair(.init(hex: 0xE4E4E9))
 
     static let artworkPlaceholder = ColorPair(.init(hex: 0x2A2A2C))
     static let artworkPlaceholderGlyph = ColorPair(.init(hex: 0x8E8E94))

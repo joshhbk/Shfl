@@ -10,11 +10,17 @@ struct MainSplitView: View {
     @Environment(LibraryBrowser.self) private var browser
     @Environment(ListeningSessionHost.self) private var sessionHost
 
+    private var place: SidebarItem { selection ?? .songs }
+
     var body: some View {
+        @Bindable var browser = browser
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(selection: $selection)
         } detail: {
-            DetailColumn(place: selection ?? .songs, isSearchFocused: $isSearchFocused)
+            DetailColumn(place: place)
+                // One for the window: per-place searchables can briefly coexist, and NSToolbar throws on a second one.
+                .searchable(text: $browser.searchText, placement: .toolbarPrincipal, prompt: place.searchPrompt)
+                .searchFocused($isSearchFocused)
                 .environment(\.showPlace, ShowPlaceAction { selection = $0 })
                 .safeAreaInset(edge: .bottom, spacing: 0) { DraftFailureMessage() }
                 .toolbar { LibraryToolbar() }

@@ -70,7 +70,6 @@ private struct SongListHeader<Content: View>: View {
             .padding(.horizontal, SongListMetrics.horizontalInset)
             .background(.surfaceContent)
             .overlay(alignment: .bottom) { Rectangle().fill(.hairline).frame(height: 1) }
-            .accessibilityHidden(true)
     }
 }
 

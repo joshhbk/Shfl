@@ -3,11 +3,12 @@ import SwiftUI
 
 struct UpNextView: View {
     @Environment(ListeningSessionHost.self) private var sessionHost
+    @Environment(LibraryBrowser.self) private var browser
 
     var body: some View {
         let timeline = sessionHost.timeline
         if timeline.status == .active {
-            List(Array(timeline.songs.enumerated()), id: \.element.id) { offset, song in
+            List(Self.matching(browser.searchText, in: timeline.songs), id: \.element.id) { offset, song in
                 UpNextRow(
                     position: offset + 1,
                     song: song,
@@ -21,6 +22,15 @@ struct UpNextView: View {
                 systemImage: "shuffle",
                 description: Text("Shuffle your picks to start a listening session.")
             )
+        }
+    }
+
+    static func matching(_ query: String, in songs: [Song]) -> [(offset: Int, element: Song)] {
+        songs.enumerated().filter { _, song in
+            query.isEmpty
+                || song.title.localizedStandardContains(query)
+                || song.artist.localizedStandardContains(query)
+                || song.albumTitle.localizedStandardContains(query)
         }
     }
 }

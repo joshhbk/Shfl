@@ -22,6 +22,7 @@ struct PlayingColumn: View {
             }
         }
         .padding(.horizontal, Spacing.s20)
+        .padding(.top, Spacing.s16)
         .padding(.bottom, Spacing.s14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .playerSurface()
@@ -42,7 +43,6 @@ private struct ArtworkPlayer: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                PlayerHeader()
                 SongArtwork(song: timeline.current, size: ArtworkSize.hero)
                     .elevation(.artworkLarge)
                 SessionHeadline(timeline: timeline)
@@ -68,7 +68,6 @@ private struct WholeSessionPlayer: View {
     var body: some View {
         let copy = SessionCopy(timeline: timeline, play: sessionHost.intents.play)
         VStack(spacing: 0) {
-            PlayerHeader()
             HStack(spacing: Spacing.s12) {
                 SongArtwork(song: timeline.current, size: ArtworkSize.compact)
                     .elevation(.artworkSmall)
@@ -102,7 +101,6 @@ private struct EmptyPlayer: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                PlayerHeader()
                 ArtworkFrame(size: ArtworkSize.hero) { ArtworkPlaceholder() }
                     .elevation(.artworkLarge)
                 SessionHeadline(timeline: timeline)
@@ -126,7 +124,6 @@ private struct FinishedPlayer: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                PlayerHeader()
                 ArtworkFrame(size: ArtworkSize.hero) { ArtworkPlaceholder(systemImage: "checkmark.circle") }
                     .elevation(.artworkLarge)
                 SessionHeadline(timeline: timeline)

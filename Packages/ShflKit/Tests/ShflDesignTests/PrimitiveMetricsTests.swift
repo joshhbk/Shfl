@@ -60,7 +60,7 @@ struct PrimitiveMetricsTests {
 
     @Test("List columns keep fixed widths and share the rest between title and detail")
     func listColumnWidths() {
-        let frames = ListColumns.columnFrames(ListColumn.allCases, in: 800)
+        let frames = ListColumns.columnFrames([.artwork, .title, .detail, .stat("plays", width: 64), .time, .accessory], in: 800)
         #expect(frames[.artwork] == 0...34)
         #expect(frames[.accessory]?.upperBound == 800)
         let title = frames[.title].map { $0.upperBound - $0.lowerBound } ?? 0
@@ -70,14 +70,14 @@ struct PrimitiveMetricsTests {
 
     @Test("A list without a detail column gives its share to the title")
     func listColumnsWithoutDetail() {
-        let frames = ListColumns.columnFrames([.artwork, .title, .stat, .time, .accessory], in: 500)
+        let frames = ListColumns.columnFrames([.artwork, .title, .stat("plays", width: 64), .time, .accessory], in: 500)
         #expect(frames[.detail] == nil)
         #expect(frames[.title] == CGFloat(46)...CGFloat(330))
     }
 
     @Test("Columns never get a negative width when the row is too narrow")
     func narrowListColumns() {
-        let frames = ListColumns.columnFrames(ListColumn.allCases, in: 100)
+        let frames = ListColumns.columnFrames([.artwork, .title, .detail, .time, .accessory], in: 100)
         #expect(frames.values.allSatisfy { $0.upperBound >= $0.lowerBound })
     }
 }

@@ -69,9 +69,8 @@ final class ViewTeardownTests: XCTestCase {
 
 struct PlaceHost: View {
     let place: SidebarItem
-    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
-        DetailColumn(place: place, isSearchFocused: $isSearchFocused)
+        DetailColumn(place: place)
     }
 }

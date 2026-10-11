@@ -19,6 +19,8 @@ enum SidebarItem: Hashable, CaseIterable {
         }
     }
 
+    var searchPrompt: String { "Search \(title)" }
+
     var systemImage: String {
         switch self {
         case .songs: "music.note"

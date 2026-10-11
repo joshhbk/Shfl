@@ -79,9 +79,6 @@ nonisolated extension ShapeStyle where Self == DesignColor {
     public static var wheel: DesignColor { .init(role: .fixed(Palette.wheel)) }
     public static var wheelGlyph: DesignColor { .init(role: .fixed(Palette.wheelGlyph)) }
 
-    /// The dark capsule behind toolbar pills and the mini player's session panel, in every theme.
-    public static var chrome: DesignColor { .init(role: .fixed(Palette.chrome)) }
-    public static var chromeGlyph: DesignColor { .init(role: .fixed(Palette.chromeGlyph)) }
 
     public static var artworkPlaceholder: DesignColor { .init(role: .fixed(Palette.artworkPlaceholder)) }
     public static var artworkPlaceholderGlyph: DesignColor { .init(role: .fixed(Palette.artworkPlaceholderGlyph)) }
