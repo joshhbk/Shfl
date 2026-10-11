@@ -78,6 +78,29 @@ public final class ListeningSessionHost {
 
     public var canSkip: Bool { player.activeSession != nil && !isStartingSession }
 
+    public var timeline: SessionTimeline {
+        SessionTimeline(
+            phase: player.sessionPhase,
+            currentSongID: player.playbackState.currentSongId,
+            draft: sessionDraft.draft
+        )
+    }
+
+    public var intents: TransportIntents {
+        let session: TransportIntents.SessionState = player.activeSession == nil
+            ? .none
+            : .active(isPlaying: player.playbackState.isPlaying, draftDiffers: player.hasPendingSessionChanges)
+        return TransportIntents(
+            session: session,
+            draftSongCount: sessionDraft.songCount,
+            autofillSongCount: sessionDraft.capacity
+        )
+    }
+
+    public func seek(to time: TimeInterval) {
+        player.seek(to: time)
+    }
+
     public func skipToNext() async {
         try? await player.skipToNext()
     }

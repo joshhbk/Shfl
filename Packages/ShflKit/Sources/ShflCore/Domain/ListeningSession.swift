@@ -72,20 +72,17 @@ public nonisolated struct ListeningSession: Equatable, Sendable {
     public let songOrder: [Song]
     public let algorithm: ShuffleAlgorithm
     public let seed: UInt64
-    let createdAt: Date
 
     init(
         id: UUID = UUID(),
         songOrder: [Song],
         algorithm: ShuffleAlgorithm,
-        seed: UInt64,
-        createdAt: Date = Date()
+        seed: UInt64
     ) {
         self.id = id
         self.songOrder = songOrder
         self.algorithm = algorithm
         self.seed = seed
-        self.createdAt = createdAt
     }
 
     public var songIDs: [String] {
@@ -95,6 +92,13 @@ public nonisolated struct ListeningSession: Equatable, Sendable {
     func song(id: String) -> Song? {
         songOrder.first { $0.id == id }
     }
+}
+
+/// A session that played to its end stays `.ended` until another loads or the session is cleared.
+nonisolated enum SessionPhase: Equatable, Sendable {
+    case none
+    case active(ListeningSession)
+    case ended(ListeningSession)
 }
 
 public nonisolated struct PlaybackTraceEntry: Equatable, Sendable, Identifiable {
