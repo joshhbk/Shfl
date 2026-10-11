@@ -36,6 +36,11 @@ final class AccessibilityWalkTests: XCTestCase {
         _ = try await walk(LastFMSettingsTab(), model: model)
     }
 
+    func test_walkingTheDesignCatalogDoesNotCrash() async throws {
+        let nodes = try await walk(DesignCatalogView(), model: .preview())
+        XCTAssertGreaterThan(nodes, 50)
+    }
+
     /// Shows `view` in a window shorter than its content, so lists and tables have rows out of sight.
     private func walk(_ view: some View, model: AppModel) async throws -> Int {
         let window = NSWindow(

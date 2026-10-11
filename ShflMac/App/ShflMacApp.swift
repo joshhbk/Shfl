@@ -17,7 +17,17 @@ struct ShflMacApp: App {
                 player: appDelegate.model.player
             )
             SongsCommands(drafting: appDelegate.shell.drafting)
+            #if DEBUG
+            DesignCatalogCommands()
+            #endif
         }
+
+        #if DEBUG
+        Window("Design Catalog", id: DesignCatalogView.windowID) {
+            DesignCatalogView()
+        }
+        .defaultSize(width: 980, height: 820)
+        #endif
 
         Settings {
             ShflSettingsView()
