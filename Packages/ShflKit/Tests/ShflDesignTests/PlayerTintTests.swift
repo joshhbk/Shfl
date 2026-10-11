@@ -35,6 +35,22 @@ struct PlayerTintTests {
         #expect(DesignColor.inkSecondary.resolve(in: environment).opacity == 1)
     }
 
+    @Test("A tone that would wash out the ink leaves the body untinted")
+    func brightToneIsIgnored() {
+        let body = DesignColor.playerBody.resolve(in: environment(theme: .pink, scheme: .light, tone: .init(hex: 0xFFFFFF)))
+        #expect(hex(body) == 0xC93A7C)
+    }
+
+    @Test("Picks the artwork's darkest strong colour and ignores greys")
+    func pickTone() {
+        let navy = Color.Resolved(hex: 0x1E2A5A)
+        let coral = Color.Resolved(hex: 0xE0603A)
+        let nearBlack = Color.Resolved(hex: 0x111111)
+        #expect(ArtworkTone.pick(from: [coral, nearBlack, navy]).map(hex) == 0x1E2A5A)
+        #expect(ArtworkTone.pick(from: [nearBlack, .init(hex: 0xEEEEEE)]) == nil)
+        #expect(ArtworkTone.pick(from: []) == nil)
+    }
+
     @Test("Secondary ink stays at 84% where that's readable, and firms up where it isn't")
     func secondaryInk() {
         let dark = DesignColor.inkSecondary.resolve(in: environment(theme: .pink, scheme: .dark))

@@ -28,7 +28,10 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
         case .playerBody:
             let body = theme.body.resolved(for: scheme)
             guard let tone = environment.artworkTone, !increasedContrast else { return body }
-            return ColorMath.mix(body, with: tone, share: theme.tintShare)
+            let tinted = ColorMath.mix(body, with: tone, share: theme.tintShare)
+            let ink = theme.ink.resolved(for: scheme)
+            let keepsInkReadable = ColorMath.contrastRatio(ink, on: tinted) >= ColorMath.minimumTextContrast
+            return keepsInkReadable ? tinted : body
         case .ink:
             return theme.ink.resolved(for: scheme)
         case .inkSecondary:

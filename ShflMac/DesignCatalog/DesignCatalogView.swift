@@ -168,7 +168,7 @@ private struct PlayerSpecimen: View {
             .foregroundStyle(.secondary)
             .padding(.top, Spacing.s8)
 
-            ClickWheel {
+            ClickWheel(onKeyboardPress: { if $0 == .center { isPlaying.toggle() } }) {
                 Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill") {
                     isPlaying.toggle()
                 }

@@ -16,6 +16,15 @@ struct PrimitiveMetricsTests {
         #expect(ArtworkFrame<EmptyView>.cornerRadius(for: size) == radius)
     }
 
+    @Test("Arrow keys walk the wheel's slots, and the opposite arrow returns to the centre")
+    func wheelSlots() {
+        #expect(ClickWheelSlot.center.moved(.upArrow) == .top)
+        #expect(ClickWheelSlot.top.moved(.downArrow) == .center)
+        #expect(ClickWheelSlot.leading.moved(.rightArrow) == .center)
+        #expect(ClickWheelSlot.top.moved(.leftArrow) == .leading)
+        #expect(ClickWheelSlot.bottom.moved(.upArrow) == .center)
+    }
+
     @Test("The scrubber maps a drag across its width onto its range, clamped at both ends")
     func scrubberValue() {
         let bounds = 10.0...110.0

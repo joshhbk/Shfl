@@ -36,6 +36,13 @@ final class AccessibilityWalkTests: XCTestCase {
         _ = try await walk(LastFMSettingsTab(), model: model)
     }
 
+    func test_walkingThePlayerWithASessionDoesNotCrash() async throws {
+        let model = AppModel.preview(library: DeterministicLibrary(songs: songs), draft: Array(songs.prefix(20)))
+        await model.sessionHost.startFreshShuffle()
+        let nodes = try await walk(PlayingColumn(), model: model)
+        XCTAssertGreaterThan(nodes, 20)
+    }
+
     func test_walkingTheDesignCatalogDoesNotCrash() async throws {
         let nodes = try await walk(DesignCatalogView(), model: .preview())
         XCTAssertGreaterThan(nodes, 50)

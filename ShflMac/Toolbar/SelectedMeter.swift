@@ -15,6 +15,8 @@ struct SelectedMeter: View {
                 .progressViewStyle(.linear)
                 .frame(width: 96)
         }
+        .fixedSize()
+        .padding(.horizontal, 6)
         .keyframeAnimator(initialValue: 1.0, trigger: drafting.milestonePulses) { content, scale in
             content.scaleEffect(scale, anchor: .trailing)
         } keyframes: { _ in
