@@ -87,14 +87,20 @@ public final class ListeningSessionHost {
     }
 
     public var intents: TransportIntents {
-        let session: TransportIntents.SessionState = player.activeSession == nil
-            ? .none
-            : .active(isPlaying: player.playbackState.isPlaying, draftDiffers: player.hasPendingSessionChanges)
+        let session: TransportIntents.SessionState = player.activeSession.map {
+            .active(isPlaying: player.playbackState.isPlaying, pending: pendingChange(since: $0))
+        } ?? .none
         return TransportIntents(
             session: session,
             draftSongCount: sessionDraft.songCount,
             autofillSongCount: sessionDraft.capacity
         )
+    }
+
+    private func pendingChange(since session: ListeningSession) -> TransportIntents.PendingChange {
+        let changes = DraftChanges(session: session, draft: sessionDraft.draft)
+        if !changes.joiningNextShuffle.isEmpty || !changes.leftPool.isEmpty { return .songs }
+        return changes.algorithmChanged ? .style(playing: session.algorithm) : .none
     }
 
     public func seek(to time: TimeInterval) {

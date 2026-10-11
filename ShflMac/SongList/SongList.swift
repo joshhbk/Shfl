@@ -46,7 +46,7 @@ struct SongList<Header: View, Row: View>: View {
             PickMenuItems(selection: SongSelection(songs: songs.filter { ids.contains($0.id) }, marks: marks), drafting: drafting)
         }
         .onKeyPress(.return) {
-            guard selected.canAdd else { return .ignored }
+            guard selected.action == .add else { return .ignored }
             drafting.add(selected.songs)
             return .handled
         }
@@ -80,7 +80,8 @@ private struct SelectionBar: View {
     var body: some View {
         FloatingBar {
             Text("\(selection.songs.count) selected")
-            if selection.canAdd {
+            switch selection.action {
+            case .add:
                 Button { drafting.add(selection.songs) } label: {
                     HStack(spacing: Spacing.s8) {
                         Text("Add to Picks")
@@ -89,7 +90,7 @@ private struct SelectionBar: View {
                 }
                 .buttonStyle(.primary)
                 .accessibilityIdentifier("mac.songs.selectionBar.add")
-            } else {
+            case .remove:
                 Button { drafting.remove(selection.songs) } label: {
                     HStack(spacing: Spacing.s8) {
                         Text("Remove from Picks")
@@ -98,6 +99,10 @@ private struct SelectionBar: View {
                 }
                 .buttonStyle(.primary)
                 .accessibilityIdentifier("mac.songs.selectionBar.remove")
+            case .full:
+                Text("Picks are full")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("mac.songs.selectionBar.full")
             }
         }
     }
@@ -110,7 +115,7 @@ struct PickMenuItems: View {
 
     var body: some View {
         Button("Add to Picks") { drafting.add(selection?.songs ?? []) }
-            .disabled(!(selection?.canAdd ?? false))
+            .disabled(selection?.action != .add)
         Button("Remove from Picks") { drafting.remove(selection?.songs ?? []) }
             .disabled(!(selection?.canRemove ?? false))
     }

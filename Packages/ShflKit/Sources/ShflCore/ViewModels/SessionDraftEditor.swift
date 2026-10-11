@@ -1,7 +1,7 @@
 import Foundation
 
 public enum DraftEdit: Equatable {
-    case added(songCount: Int, reachedMilestone: Bool)
+    case added(songCount: Int, milestone: Int?)
     case removed
     case rejectedAtCapacity
     case failed(String)
@@ -35,7 +35,7 @@ public final class SessionDraftEditor {
     public func add(_ songs: [Song]) -> DraftEdit {
         let before = draft.songCount
         guard songs.contains(where: { !draft.contains($0.id) }) else {
-            return .added(songCount: before, reachedMilestone: false)
+            return .added(songCount: before, milestone: nil)
         }
         autofillIsExhausted = false
         do {
@@ -48,7 +48,7 @@ public final class SessionDraftEditor {
         let after = draft.songCount
         return .added(
             songCount: after,
-            reachedMilestone: SessionDraft.milestones.contains { $0 > before && $0 <= after }
+            milestone: SessionDraft.milestones.filter { $0 > before && $0 <= after }.max()
         )
     }
 

@@ -133,3 +133,33 @@ final class SongOrderTests: XCTestCase {
         XCTAssertEqual(SongCount.text(41), "41 songs")
     }
 }
+
+@MainActor
+final class SongSelectionTests: XCTestCase {
+    func test_addsWhileAnySongIsOpen() {
+        let songs = DeterministicSongs.make(2)
+        let selection = SongSelection(songs: songs, marks: marks(picked: [songs[0]], isFull: false))
+
+        XCTAssertEqual(selection.action, .add)
+        XCTAssertTrue(selection.canRemove)
+    }
+
+    func test_removesWhenEverySongIsPicked() {
+        let songs = DeterministicSongs.make(2)
+        let selection = SongSelection(songs: songs, marks: marks(picked: songs, isFull: true))
+
+        XCTAssertEqual(selection.action, .remove)
+    }
+
+    func test_isFullWhenAnUnpickedSongHasNoRoom() {
+        let songs = DeterministicSongs.make(2)
+        let selection = SongSelection(songs: songs, marks: marks(picked: [songs[0]], isFull: true))
+
+        XCTAssertEqual(selection.action, .full)
+        XCTAssertTrue(selection.canRemove)
+    }
+
+    private func marks(picked: [Song], isFull: Bool) -> SongMarks {
+        SongMarks(pickedIDs: Set(picked.map(\.id)), isFull: isFull, timeline: AppModel.preview().sessionHost.timeline)
+    }
+}

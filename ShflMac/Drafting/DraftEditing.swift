@@ -59,9 +59,9 @@ final class DraftEditing {
 
     private func give(feedbackFor edit: DraftEdit) {
         switch edit {
-        case .added(_, let reachedMilestone):
+        case .added(_, let milestone):
             failureMessage = nil
-            if reachedMilestone { milestonePulses += 1 }
+            if milestone != nil { milestonePulses += 1 }
         case .removed:
             failureMessage = nil
         case .rejectedAtCapacity:
