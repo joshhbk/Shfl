@@ -103,7 +103,7 @@ public final class AppModel {
     }
 
     public func makeSongs(in playlist: Playlist) -> PlaylistDetailViewModel {
-        PlaylistDetailViewModel(playlistId: playlist.id, playlistName: playlist.name, libraryCatalog: library)
+        PlaylistDetailViewModel(playlist: playlist, libraryCatalog: library)
     }
 
     public func makeDraftEditor() -> SessionDraftEditor {

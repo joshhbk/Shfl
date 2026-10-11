@@ -67,29 +67,14 @@ struct ArtistSongsView: View {
 private struct ArtistHeader: View {
     let songs: ArtistDetailViewModel
 
-    @Environment(DraftEditing.self) private var drafting
-
     var body: some View {
-        let isLoaded = songs.hasLoadedAllSongs
-        let pickedIDs = drafting.songIDs
-        let allPicked = !songs.songs.isEmpty && songs.songs.allSatisfy { pickedIDs.contains($0.id) }
         CollectionHeader(
             songs.artistName,
-            subtitle: isLoaded ? SongCount.text(songs.songs.count) : "Loading songs…"
+            subtitle: SongCount.subtitle(songs.songs.count, isLoaded: songs.hasLoadedAllSongs)
         ) {
             ArtistArtwork(artist: songs.artist, size: ArtworkSize.collection)
         } actions: {
-            Button(allPicked ? "All Picked" : "Add All") { drafting.add(songs.songs) }
-                .buttonStyle(.primary)
-                .disabled(!isLoaded || songs.songs.isEmpty || allPicked)
-                .help(allPicked ? "Every song by \(songs.artistName) is in your picks" : "Add every song by \(songs.artistName) to your picks")
-                .accessibilityIdentifier("mac.artist.addAll")
+            AddAllButton(songs: songs.songs, isLoaded: songs.hasLoadedAllSongs, owner: songs.artistName)
         }
-    }
-}
-
-enum SongCount {
-    static func text(_ count: Int) -> String {
-        count == 1 ? "1 song" : "\(count.formatted()) songs"
     }
 }
