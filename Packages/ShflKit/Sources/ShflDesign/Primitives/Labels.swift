@@ -145,24 +145,3 @@ public struct SectionHeader: View {
             .accessibilityAddTraits(.isHeader)
     }
 }
-
-/// A dark capsule of icon buttons, such as Settings above the player.
-public struct PillToolbar<Content: View>: View {
-    private let content: Content
-
-    public init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    public var body: some View {
-        HStack(spacing: 0) {
-            content
-        }
-        .buttonStyle(.pillIcon)
-        .padding(.horizontal, Spacing.s4)
-        .frame(height: 32)
-        .background(.chrome, in: .capsule)
-        .overlay { Capsule().strokeBorder(.white.opacity(0.08)) }
-        .elevation(.pill)
-    }
-}

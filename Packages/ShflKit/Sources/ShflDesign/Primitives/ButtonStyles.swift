@@ -61,22 +61,6 @@ public struct QuietButtonStyle: ButtonStyle {
     }
 }
 
-/// Icon buttons inside a `PillToolbar`.
-public struct PillIconButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .labelStyle(.iconOnly)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(.chromeGlyph)
-            .frame(width: 32, height: 28)
-            .background(.white.opacity(configuration.isPressed ? 0.12 : 0), in: .capsule)
-            .contentShape(.capsule)
-            .opacity(isEnabled ? 1 : 0.4)
-    }
-}
-
 /// The wheel's four edge buttons. `isOn` marks an edge that shows a mode, like the whole session.
 public struct WheelButtonStyle: ButtonStyle {
     var isOn = false
@@ -132,10 +116,6 @@ extension ButtonStyle where Self == PrimaryButtonStyle {
 
 extension ButtonStyle where Self == QuietButtonStyle {
     public static var quiet: QuietButtonStyle { .init() }
-}
-
-extension ButtonStyle where Self == PillIconButtonStyle {
-    public static var pillIcon: PillIconButtonStyle { .init() }
 }
 
 extension ButtonStyle where Self == WheelButtonStyle {

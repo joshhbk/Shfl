@@ -80,7 +80,7 @@ private struct ColorSwatches: View {
         ("textPrimary", .textPrimary), ("textSecondary", .textSecondary), ("textTertiary", .textTertiary),
         ("accentFill", .accentFill), ("accentText", .accentText),
         ("playerBody", .playerBody), ("ink", .ink), ("inkSecondary", .inkSecondary),
-        ("wheel", .wheel), ("wheelGlyph", .wheelGlyph), ("chrome", .chrome),
+        ("wheel", .wheel), ("wheelGlyph", .wheelGlyph),
         ("artworkPlaceholder", .artworkPlaceholder), ("hairline", .hairline),
     ]
 
@@ -230,14 +230,6 @@ private struct PlayerSpecimen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                PillToolbar {
-                    Button("Settings", systemImage: "gearshape") {}
-                }
-            }
-            .frame(height: 52)
-
             ArtworkFrame(size: ArtworkSize.hero) { ArtworkPlaceholder() }
                 .elevation(.artworkLarge)
             Text(CatalogSample.current.title)
@@ -289,7 +281,7 @@ private struct PlayerSpecimen: View {
             }
         }
         .padding(.horizontal, Spacing.s20)
-        .padding(.bottom, Spacing.s14)
+        .padding(.vertical, Spacing.s16)
         .frame(width: 340)
         .playerSurface()
         .clipShape(.rect(cornerRadius: CornerRadius.card))

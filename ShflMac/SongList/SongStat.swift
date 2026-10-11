@@ -34,7 +34,7 @@ enum SongStat: Equatable {
 
     private static let playsColumn = ListColumn.stat("plays", width: 48)
     private static let lastPlayedColumn = ListColumn.stat("lastPlayed", width: 78)
-    private static let addedColumn = ListColumn.stat("added", width: 64)
+    private static let addedColumn = ListColumn.stat("added", width: 78)
 
     var title: String {
         switch self {
