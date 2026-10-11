@@ -3,7 +3,6 @@ import SwiftUI
 
 struct LibraryToolbar: ToolbarContent {
     var body: some ToolbarContent {
-        ToolbarItem { SelectedMeter() }
         ToolbarItem { SortMenu() }
         ToolbarItem { AutofillButton() }
         ToolbarItem { ShuffleButton() }
