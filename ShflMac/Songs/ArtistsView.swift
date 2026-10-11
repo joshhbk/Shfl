@@ -50,26 +50,3 @@ private struct ArtistList: View {
         }
     }
 }
-
-private struct ArtistSongsView: View {
-    @State private var songs: ArtistDetailViewModel
-    @Environment(DraftEditing.self) private var drafting
-
-    init(songs: ArtistDetailViewModel) {
-        _songs = State(wrappedValue: songs)
-    }
-
-    var body: some View {
-        SongsTable(
-            songs: songs.songs,
-            onReachEnd: { Task { await songs.loadMorePages() } }
-        ) { selected in
-            AddToPicksButton(songs: selected, drafting: drafting)
-        }
-        .overlay {
-            if songs.songs.isEmpty && songs.isLoading { ProgressView() }
-        }
-        .navigationTitle(songs.artistName)
-        .task { await songs.loadInitialPage() }
-    }
-}

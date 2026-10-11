@@ -39,6 +39,20 @@ public struct AccentTag: View {
     }
 }
 
+/// The speaker beside the song that's playing now.
+public struct NowPlayingGlyph: View {
+    @Environment(\.backgroundProminence) private var prominence
+
+    public init() {}
+
+    public var body: some View {
+        Image(systemName: "speaker.wave.2.fill")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(prominence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(.accentText))
+            .accessibilityLabel("Playing now")
+    }
+}
+
 /// A list column's heading, laid out by `ListColumns` like the rows below it.
 public struct ColumnLabel: View {
     private let title: String
