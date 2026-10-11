@@ -12,21 +12,21 @@ struct DesignCatalogView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s32) {
+            VStack(alignment: .leading, spacing: Spacing.s20) {
                 CatalogSection("Colour") { ColorSwatches() }
                 CatalogSection("Type") { TypeSpecimens() }
                 CatalogSection("Buttons") { ButtonSpecimens() }
                 CatalogSection("Player") {
-                    HStack(alignment: .top, spacing: Spacing.s24) {
+                    HStack(alignment: .top, spacing: Spacing.s20) {
                         PlayerSpecimen()
                         EmptyPlayerSpecimen()
                     }
                 }
             }
-            .padding(Spacing.s24)
+            .padding(Spacing.s20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .contentSurface()
+        .elevatedSurface()
         .environment(\.colorScheme, scheme)
         .shflTheme(theme)
         .artworkTint(isTinted ? CatalogSample.tone : nil)
@@ -66,7 +66,7 @@ private struct CatalogSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s12) {
-            Text(title).font(.heading)
+            Text(title).font(.playerTitle)
             content
         }
     }
@@ -74,13 +74,10 @@ private struct CatalogSection<Content: View>: View {
 
 private struct ColorSwatches: View {
     private let tokens: [(String, DesignColor)] = [
-        ("surfaceWindow", .surfaceWindow), ("surfaceContent", .surfaceContent),
-        ("surfaceElevated", .surfaceElevated), ("surfaceSidebar", .surfaceSidebar),
-        ("surfacePane", .surfacePane), ("quietFill", .quietFill), ("emptySlot", .emptySlot),
+        ("surfaceElevated", .surfaceElevated), ("quietFill", .quietFill),
         ("textPrimary", .textPrimary), ("textSecondary", .textSecondary), ("textTertiary", .textTertiary),
-        ("accentFill", .accentFill), ("accentText", .accentText), ("accentSoft", .accentSoft),
+        ("accentFill", .accentFill), ("accentText", .accentText),
         ("playerBody", .playerBody), ("ink", .ink), ("inkSecondary", .inkSecondary),
-        ("warning", .warning), ("success", .success), ("successText", .successText),
         ("wheel", .wheel), ("wheelGlyph", .wheelGlyph), ("chrome", .chrome),
         ("artworkPlaceholder", .artworkPlaceholder), ("hairline", .hairline),
     ]
@@ -102,9 +99,8 @@ private struct ColorSwatches: View {
 
 private struct TypeSpecimens: View {
     private let roles: [(String, Font)] = [
-        ("display", .display), ("heading", .heading), ("count", .count), ("playerTitle", .playerTitle),
-        ("playerTitleCompact", .playerTitleCompact), ("emptyStateTitle", .emptyStateTitle),
-        ("cardTitle", .cardTitle), ("paneTitle", .paneTitle), ("sectionTitle", .sectionTitle),
+        ("playerTitle", .playerTitle), ("playerTitleCompact", .playerTitleCompact),
+        ("cardTitle", .cardTitle), ("sectionTitle", .sectionTitle),
         ("bodyEmphasis", .bodyEmphasis), ("bodyText", .bodyText), ("secondaryText", .secondaryText),
         ("rowTitle", .rowTitle), ("columnLabel", .columnLabel), ("meta", .meta), ("tag", .tag),
     ]
@@ -127,7 +123,6 @@ private struct ButtonSpecimens: View {
             ForEach([ControlSize.small, .regular, .large], id: \.self) { size in
                 GridRow {
                     Button("Shuffle Now") {}.buttonStyle(.primary)
-                    Button("Shuffle Again") {}.buttonStyle(.outline)
                     Button("Autofill 30") {}.buttonStyle(.quiet)
                     Button("Shuffle Now") {}.buttonStyle(.primary).disabled(true)
                 }
@@ -145,11 +140,8 @@ private struct PlayerSpecimen: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Playing").font(.paneTitle)
-                Text("23 of 86").font(.secondaryText.monospacedDigit()).foregroundStyle(.secondary)
                 Spacer()
                 PillToolbar {
-                    Button("Open Mini Player", systemImage: "rectangle.inset.bottomright.filled") {}
                     Button("Settings", systemImage: "gearshape") {}
                 }
             }
@@ -191,7 +183,7 @@ private struct PlayerSpecimen: View {
             }
             .padding(.top, Spacing.s8)
 
-            SectionHeader("Up Next") { Text("Shuffled 2:14 PM · fixed order") }
+            SectionHeader("Up Next")
                 .padding(.top, Spacing.s14)
             ForEach(Array(CatalogSample.upNext.enumerated()), id: \.offset) { offset, song in
                 CompactRow {
@@ -201,7 +193,6 @@ private struct PlayerSpecimen: View {
                     if offset == 1 {
                         OutlinedTag("Left pool")
                     }
-                    RowDetail("3:04")
                 }
                 .rowHighlight(offset == 0)
             }
@@ -216,18 +207,12 @@ private struct PlayerSpecimen: View {
 
 private struct EmptyPlayerSpecimen: View {
     var body: some View {
-        VStack(spacing: Spacing.s24) {
-            EmptyState("Just press Play", message: "With an empty pool, Play fills it with 120 random songs from your library, then shuffles.") {
-                Button("Autofill and Shuffle") {}.buttonStyle(.primary)
-            }
-            HStack(spacing: Spacing.s8) {
-                SoftTag("Next shuffle")
-                OutlinedTag("Left pool")
-            }
+        VStack(spacing: Spacing.s20) {
+            OutlinedTag("Left pool")
         }
         .padding(Spacing.s20)
         .frame(width: 300)
-        .paneSurface()
+        .elevatedSurface()
         .clipShape(.rect(cornerRadius: CornerRadius.card))
     }
 }

@@ -43,27 +43,6 @@ public struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-/// The same action when it isn't the pane's lead, e.g. Shuffle Again when nothing has changed.
-public struct OutlineButtonStyle: ButtonStyle {
-    @Environment(\.controlSize) private var controlSize
-    @Environment(\.isEnabled) private var isEnabled
-
-    public func makeBody(configuration: Configuration) -> some View {
-        let metrics = TextButtonMetrics(controlSize)
-        configuration.label
-            .font(metrics.font)
-            .foregroundStyle(.accentText)
-            .padding(.horizontal, Spacing.s16)
-            .frame(minHeight: metrics.height)
-            .overlay {
-                RoundedRectangle(cornerRadius: metrics.radius).strokeBorder(.accentText, lineWidth: 1.5)
-            }
-            .opacity(configuration.isPressed ? 0.7 : 1)
-            .opacity(isEnabled ? 1 : 0.4)
-            .contentShape(.rect(cornerRadius: metrics.radius))
-    }
-}
-
 /// Secondary actions such as Autofill, Clear and Deselect.
 public struct QuietButtonStyle: ButtonStyle {
     @Environment(\.controlSize) private var controlSize
@@ -98,14 +77,22 @@ public struct PillIconButtonStyle: ButtonStyle {
     }
 }
 
-/// The wheel's four edge buttons.
+/// The wheel's four edge buttons. `isOn` marks an edge that shows a mode, like the whole session.
 public struct WheelButtonStyle: ButtonStyle {
+    var isOn = false
+
     @Environment(\.isEnabled) private var isEnabled
 
     public func makeBody(configuration: Configuration) -> some View {
-        WheelGlyph(isPressed: configuration.isPressed, isOn: false, isEnabled: isEnabled) {
-            configuration.label
-        }
+        configuration.label
+            .labelStyle(.iconOnly)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(.wheelGlyph)
+            .frame(width: 36, height: 32)
+            .background(.wheelGlyph.opacity(isOn ? 0.22 : 0), in: .rect(cornerRadius: CornerRadius.regular))
+            .contentShape(.rect)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .opacity(isEnabled ? 1 : 0.4)
     }
 }
 
@@ -128,46 +115,19 @@ public struct WheelCenterButtonStyle: ButtonStyle {
 
 /// An edge of the wheel that shows a mode, like the whole session.
 public struct WheelToggleStyle: ToggleStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
     public func makeBody(configuration: Configuration) -> some View {
         Button {
             configuration.isOn.toggle()
         } label: {
-            WheelGlyph(isPressed: false, isOn: configuration.isOn, isEnabled: isEnabled) {
-                configuration.label
-            }
+            configuration.label
         }
-        .buttonStyle(.plain)
+        .buttonStyle(WheelButtonStyle(isOn: configuration.isOn))
         .accessibilityAddTraits(configuration.isOn ? .isSelected : [])
-    }
-}
-
-private struct WheelGlyph<Label: View>: View {
-    let isPressed: Bool
-    let isOn: Bool
-    let isEnabled: Bool
-    @ViewBuilder let label: Label
-
-    var body: some View {
-        label
-            .labelStyle(.iconOnly)
-            .font(.system(size: 17, weight: .medium))
-            .foregroundStyle(.wheelGlyph)
-            .frame(width: 36, height: 32)
-            .background(.wheelGlyph.opacity(isOn ? 0.22 : 0), in: .rect(cornerRadius: CornerRadius.regular))
-            .contentShape(.rect)
-            .opacity(isPressed ? 0.6 : 1)
-            .opacity(isEnabled ? 1 : 0.4)
     }
 }
 
 extension ButtonStyle where Self == PrimaryButtonStyle {
     public static var primary: PrimaryButtonStyle { .init() }
-}
-
-extension ButtonStyle where Self == OutlineButtonStyle {
-    public static var outline: OutlineButtonStyle { .init() }
 }
 
 extension ButtonStyle where Self == QuietButtonStyle {

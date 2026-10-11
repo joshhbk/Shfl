@@ -10,18 +10,10 @@ struct PrimitiveMetricsTests {
         (ArtworkSize.miniPlayer, CornerRadius.card),
         (ArtworkSize.compact, CornerRadius.regular),
         (ArtworkSize.menuBar, CornerRadius.regular),
-        (ArtworkSize.row, CornerRadius.tag),
         (ArtworkSize.listRow, CornerRadius.tile),
     ])
     func artworkRadius(size: CGFloat, radius: CGFloat) {
         #expect(ArtworkFrame<EmptyView>.cornerRadius(for: size) == radius)
-    }
-
-    @Test("Text buttons take their height and type from the control size")
-    func textButtonMetrics() {
-        #expect(TextButtonMetrics(.small).height == 30)
-        #expect(TextButtonMetrics(.regular).height == 38)
-        #expect(TextButtonMetrics(.large).height == 44)
     }
 
     @Test("The scrubber maps a drag across its width onto its range, clamped at both ends")

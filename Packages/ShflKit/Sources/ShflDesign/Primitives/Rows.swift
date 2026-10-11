@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A 40pt list row for Up Next, the whole session and the pool list. Compose it from
-/// `RowIndex`, an `ArtworkFrame`, `RowTitles` and `RowDetail` or a tag.
+/// `RowIndex`, an `ArtworkFrame`, `RowTitles` and a tag.
 public struct CompactRow<Content: View>: View {
     private let content: Content
 
@@ -53,21 +53,6 @@ public struct RowTitles: View {
         }
         .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-/// Trailing metadata such as a duration.
-public struct RowDetail: View {
-    private let text: String
-
-    public init(_ text: String) {
-        self.text = text
-    }
-
-    public var body: some View {
-        Text(text)
-            .font(.meta.monospacedDigit())
-            .foregroundStyle(.secondary)
     }
 }
 
