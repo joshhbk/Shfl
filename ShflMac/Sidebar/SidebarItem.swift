@@ -4,7 +4,7 @@ enum SidebarItem: Hashable, CaseIterable {
     case songs
     case artists
     case playlists
-    case selected
+    case picks
     case upNext
 
     static let library: [SidebarItem] = [.songs, .artists, .playlists]
@@ -14,7 +14,7 @@ enum SidebarItem: Hashable, CaseIterable {
         case .songs: "Songs"
         case .artists: "Artists"
         case .playlists: "Playlists"
-        case .selected: "Selected"
+        case .picks: "Picks"
         case .upNext: "Up Next"
         }
     }
@@ -24,7 +24,7 @@ enum SidebarItem: Hashable, CaseIterable {
         case .songs: "music.note"
         case .artists: "music.mic"
         case .playlists: "music.note.list"
-        case .selected: "checkmark.circle"
+        case .picks: "checkmark.circle"
         case .upNext: "list.number"
         }
     }
@@ -34,7 +34,7 @@ enum SidebarItem: Hashable, CaseIterable {
         case .songs: "mac.sidebar.songs"
         case .artists: "mac.sidebar.artists"
         case .playlists: "mac.sidebar.playlists"
-        case .selected: "mac.sidebar.selected"
+        case .picks: "mac.sidebar.picks"
         case .upNext: "mac.sidebar.upNext"
         }
     }
@@ -44,7 +44,7 @@ enum SidebarItem: Hashable, CaseIterable {
         case .songs: .songs
         case .artists: .artists
         case .playlists: .playlists
-        case .selected, .upNext: nil
+        case .picks, .upNext: nil
         }
     }
 }

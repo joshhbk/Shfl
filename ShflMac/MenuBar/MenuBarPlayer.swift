@@ -20,7 +20,7 @@ struct MenuBarLabel: View {
     }
 }
 
-/// The menu bar popover: now playing, the pool, and the app's commands.
+/// The menu bar popover: now playing, the picks, and the app's commands.
 struct MenuBarPlayer: View {
     @Environment(ListeningSessionHost.self) private var sessionHost
 
@@ -32,7 +32,7 @@ struct MenuBarPlayer: View {
                 .padding(.bottom, Spacing.s12)
                 .playerSurface()
                 .tintedByArtwork(of: sessionHost.timeline.current)
-            MenuBarPool()
+            MenuBarPicks()
                 .padding(Spacing.s14)
                 .overlay(alignment: .bottom) { Rectangle().fill(.hairline).frame(height: 1) }
             MenuBarCommands()
@@ -100,7 +100,7 @@ private struct MenuBarTransport: View {
     }
 }
 
-struct MenuBarPool: View {
+struct MenuBarPicks: View {
     @Environment(ListeningSessionHost.self) private var sessionHost
     @Environment(DraftEditing.self) private var drafting
 
@@ -109,7 +109,7 @@ struct MenuBarPool: View {
         let timeline = sessionHost.timeline
         VStack(alignment: .leading, spacing: Spacing.s10) {
             HStack(alignment: .firstTextBaseline, spacing: Spacing.s6) {
-                Text("Pool").font(.bodyEmphasis)
+                Text("Picks").font(.bodyEmphasis)
                 Text(draft.songCount, format: .number).font(.cardTitle.monospacedDigit())
                 Text("/ \(draft.capacity)").font(.columnLabel.monospacedDigit()).foregroundStyle(.tertiary)
                 Spacer(minLength: 0)

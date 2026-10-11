@@ -14,8 +14,8 @@ struct SidebarView: View {
                 }
             }
             Section("Session") {
-                SelectedSidebarRow(songCount: drafting.draft.songCount, capacity: drafting.draft.capacity)
-                    .tag(SidebarItem.selected)
+                PicksSidebarRow(songCount: drafting.draft.songCount, capacity: drafting.draft.capacity)
+                    .tag(SidebarItem.picks)
                 SidebarRow(item: .upNext).tag(SidebarItem.upNext)
             }
         }
@@ -33,12 +33,12 @@ private struct SidebarRow: View {
 }
 
 // Rows get values, not environment objects: rows AppKit builds for accessibility lack the environment.
-private struct SelectedSidebarRow: View {
+private struct PicksSidebarRow: View {
     let songCount: Int
     let capacity: Int
 
     var body: some View {
-        SidebarRow(item: .selected)
+        SidebarRow(item: .picks)
             .badge(Text("\(songCount) / \(capacity)").monospacedDigit())
     }
 }

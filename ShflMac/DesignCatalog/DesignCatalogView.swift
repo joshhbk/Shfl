@@ -282,7 +282,7 @@ private struct PlayerSpecimen: View {
                     ArtworkFrame(size: ArtworkSize.listRow) { ArtworkPlaceholder() }
                     RowTitles(song.title, subtitle: song.artist)
                     if offset == 1 {
-                        OutlinedTag("Left pool")
+                        OutlinedTag("Unpicked")
                     }
                 }
                 .rowHighlight(offset == 0)
@@ -314,7 +314,7 @@ private struct EmptyPlayerSpecimen: View {
             .padding(Spacing.s6)
             .elevatedSurface()
             .clipShape(.rect(cornerRadius: CornerRadius.panel))
-            OutlinedTag("Left pool")
+            OutlinedTag("Unpicked")
         }
         .padding(Spacing.s20)
         .frame(width: 300)

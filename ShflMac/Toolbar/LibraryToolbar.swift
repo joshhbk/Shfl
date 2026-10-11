@@ -31,7 +31,7 @@ private struct AutofillButton: View {
         Button("Autofill", systemImage: "wand.and.stars") {
             Task { await drafting.autofill() }
         }
-        .help("Fill Selected with songs from your library")
+        .help("Fill your picks with songs from your library")
         .disabled(!drafting.canAutofill)
         .accessibilityIdentifier("mac.toolbar.autofill")
     }
@@ -44,7 +44,7 @@ private struct ShuffleButton: View {
         Button("Shuffle", systemImage: "shuffle") {
             Task { await sessionHost.startFreshShuffle(autofillingEmptyDraft: true) }
         }
-        .help("Start a fresh shuffle of Selected")
+        .help("Start a fresh shuffle of your picks")
         .disabled(sessionHost.isStartingSession)
         .accessibilityIdentifier("mac.toolbar.shuffle")
     }

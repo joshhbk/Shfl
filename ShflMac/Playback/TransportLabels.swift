@@ -12,8 +12,8 @@ extension TransportIntents.Play {
     var accessibilityHint: String? {
         switch self {
         case .pause, .resume: nil
-        case .shuffleDraft(let count): "Shuffles the \(count) songs in your pool."
-        case .autofillAndShuffle(let count): "Fills the pool with \(count) random songs, then shuffles."
+        case .shuffleDraft(let count): "Shuffles your \(count) picks."
+        case .autofillAndShuffle(let count): "Fills your picks with \(count) random songs, then shuffles."
         }
     }
 

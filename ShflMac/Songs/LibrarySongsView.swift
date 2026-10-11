@@ -13,7 +13,7 @@ struct LibrarySongsView: View {
             sortOrder: sortOrder,
             onReachEnd: loadMore
         ) { songs in
-            AddToSelectedButton(songs: songs, drafting: drafting)
+            AddToPicksButton(songs: songs, drafting: drafting)
         }
         .overlay { emptyState }
         .task { await browser.loadInitialPage() }

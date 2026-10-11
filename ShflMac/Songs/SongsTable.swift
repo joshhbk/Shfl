@@ -56,21 +56,21 @@ struct SongsTable<RowMenu: View>: View {
     }
 }
 
-struct AddToSelectedButton: View {
+struct AddToPicksButton: View {
     let songs: [Song]
     let drafting: DraftEditing
 
     var body: some View {
-        Button("Add to Selected") { drafting.add(songs) }
+        Button("Add to Picks") { drafting.add(songs) }
     }
 }
 
-struct RemoveFromSelectedButton: View {
+struct RemoveFromPicksButton: View {
     let songs: [Song]
     let drafting: DraftEditing
 
     var body: some View {
-        Button("Remove from Selected") { drafting.remove(songs) }
+        Button("Remove from Picks") { drafting.remove(songs) }
     }
 }
 
@@ -80,7 +80,7 @@ private enum SongColumns {
     static func inDraft(_ drafting: DraftEditing) -> some TableColumnContent<Song, Never> {
         let songIDsInDraft = drafting.songIDs
         return TableColumn("") { song in
-            InDraftCheckbox(
+            PickCheckbox(
                 song: song,
                 isInDraft: songIDsInDraft.contains(song.id),
                 toggle: { drafting.toggle(song) }
@@ -129,20 +129,20 @@ private struct PlayCountCell: View {
     }
 }
 
-private struct InDraftCheckbox: View {
+private struct PickCheckbox: View {
     let song: Song
     let isInDraft: Bool
     let toggle: () -> Void
 
     var body: some View {
         Toggle(
-            "In Selected",
+            "In Picks",
             isOn: Binding(get: { isInDraft }, set: { _ in toggle() })
         )
         .toggleStyle(.checkbox)
         .labelsHidden()
-        .accessibilityLabel("\(song.title) in Selected")
-        .accessibilityIdentifier("mac.songs.inDraft.\(song.id)")
+        .accessibilityLabel("\(song.title) in Picks")
+        .accessibilityIdentifier("mac.songs.pick.\(song.id)")
     }
 }
 
