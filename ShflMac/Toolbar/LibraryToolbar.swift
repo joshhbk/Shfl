@@ -3,24 +3,8 @@ import SwiftUI
 
 struct LibraryToolbar: ToolbarContent {
     var body: some ToolbarContent {
-        ToolbarItem { SortMenu() }
         ToolbarItem { AutofillButton() }
         ToolbarItem { ShuffleButton() }
-    }
-}
-
-private struct SortMenu: View {
-    @Environment(LibraryBrowser.self) private var browser
-
-    var body: some View {
-        Menu {
-            SongSortPicker(selection: browser.sortSelection)
-                .pickerStyle(.inline)
-        } label: {
-            Label("Sort", systemImage: "arrow.up.arrow.down")
-        }
-        .help("Sort Songs")
-        .accessibilityIdentifier("mac.toolbar.sort")
     }
 }
 

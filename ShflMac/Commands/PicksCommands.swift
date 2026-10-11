@@ -1,6 +1,7 @@
 import ShflCore
 import SwiftUI
 
+/// ↩ and ⌫ belong to the focused list, not these items: as key equivalents they'd take keys from search and the wheel.
 struct PicksCommands: Commands {
     let drafting: DraftEditing
 
@@ -8,11 +9,9 @@ struct PicksCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Picks") {
-            Button("Add to Picks") {
-                drafting.add(selection?.songs ?? [])
-            }
-            .keyboardShortcut("d", modifiers: .command)
-            .disabled(selection?.songs.isEmpty ?? true)
+            PickMenuItems(selection: selection, drafting: drafting)
+
+            Divider()
 
             Button("Autofill") {
                 Task { await drafting.autofill() }
