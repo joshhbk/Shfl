@@ -97,6 +97,13 @@ public nonisolated struct ListeningSession: Equatable, Sendable {
     }
 }
 
+/// A session that played to its end stays `.ended` until another loads or the session is cleared.
+nonisolated enum SessionPhase: Equatable, Sendable {
+    case none
+    case active(ListeningSession)
+    case ended(ListeningSession, at: Date)
+}
+
 public nonisolated struct PlaybackTraceEntry: Equatable, Sendable, Identifiable {
     public let id = UUID()
     public let timestamp = Date()

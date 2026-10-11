@@ -16,7 +16,7 @@ struct SessionTimelineTests {
     @Test("Splits the session around the current song")
     func splitsAroundCurrent() {
         let timeline = SessionTimeline(
-            activeSession: session, currentSongID: "c", endedSession: nil, draftSongIDs: ["a", "b", "c", "d"]
+            phase: .active(session), currentSongID: "c", draftSongIDs: ["a", "b", "c", "d"]
         )
 
         #expect(timeline.status == .active)
@@ -32,7 +32,7 @@ struct SessionTimelineTests {
     @Test("A current song the session doesn't know leaves everything upcoming")
     func unknownCurrent() {
         let timeline = SessionTimeline(
-            activeSession: session, currentSongID: "elsewhere", endedSession: nil, draftSongIDs: []
+            phase: .active(session), currentSongID: "elsewhere", draftSongIDs: []
         )
 
         #expect(timeline.current == nil)
@@ -43,7 +43,7 @@ struct SessionTimelineTests {
     @Test("Compares the draft with the session both ways")
     func draftChanges() {
         let timeline = SessionTimeline(
-            activeSession: session, currentSongID: "a", endedSession: nil, draftSongIDs: ["a", "b", "new"]
+            phase: .active(session), currentSongID: "a", draftSongIDs: ["a", "b", "new"]
         )
 
         #expect(timeline.joiningNextShuffle == ["new"])
@@ -54,7 +54,7 @@ struct SessionTimelineTests {
     func ended() {
         let endedAt = Date(timeIntervalSince1970: 5_000)
         let timeline = SessionTimeline(
-            activeSession: nil, currentSongID: nil, endedSession: (session, endedAt), draftSongIDs: []
+            phase: .ended(session, at: endedAt), currentSongID: nil, draftSongIDs: []
         )
 
         #expect(timeline.status == .ended(at: endedAt))
@@ -65,7 +65,7 @@ struct SessionTimelineTests {
 
     @Test("With no session there's nothing to show or compare")
     func idle() {
-        let timeline = SessionTimeline(activeSession: nil, currentSongID: nil, endedSession: nil, draftSongIDs: ["a"])
+        let timeline = SessionTimeline(phase: .none, currentSongID: nil, draftSongIDs: ["a"])
 
         #expect(timeline == .idle)
         #expect(timeline.joiningNextShuffle.isEmpty)

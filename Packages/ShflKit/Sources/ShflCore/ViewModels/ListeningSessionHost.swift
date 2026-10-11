@@ -80,9 +80,8 @@ public final class ListeningSessionHost {
 
     public var timeline: SessionTimeline {
         SessionTimeline(
-            activeSession: player.activeSession,
+            phase: player.sessionPhase,
             currentSongID: player.playbackState.currentSongId,
-            endedSession: player.endedSession,
             draftSongIDs: Set(sessionDraft.songs.map(\.id))
         )
     }

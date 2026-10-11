@@ -34,13 +34,14 @@ public final class ShufflePlayer {
         }
     }
 
-    public private(set) var activeSession: ListeningSession?
+    private(set) var sessionPhase = SessionPhase.none
+    public var activeSession: ListeningSession? {
+        if case .active(let session) = sessionPhase { session } else { nil }
+    }
     public private(set) var playbackState: PlaybackState = .empty
     public private(set) var operationNotice: String?
     public private(set) var isLoadingSession = false
     private(set) var sessionEndCount = 0
-    /// The session that last played to its end, until another loads or the session is cleared.
-    private(set) var endedSession: (session: ListeningSession, endedAt: Date)?
     public private(set) var recentPlaybackTrace: [PlaybackTraceEntry] = []
 
     var lastShuffledQueue: [Song] { activeSession?.songOrder ?? [] }
@@ -78,8 +79,7 @@ public final class ShufflePlayer {
 
     /// Stops playback and ends the current listening session.
     func clearSession() async {
-        activeSession = nil
-        endedSession = nil
+        sessionPhase = .none
         updatePlaybackState(.empty)
         operationNotice = nil
         await playbackTransport.clear()
@@ -214,15 +214,14 @@ public final class ShufflePlayer {
                     autoplay: autoplay
                 )
             )
-            activeSession = session
-            endedSession = nil
+            sessionPhase = .active(session)
             let currentSong = session.song(id: currentSongID)
             if let currentSong {
                 updatePlaybackState(autoplay ? .playing(currentSong) : .paused(currentSong))
             }
         } catch {
             await playbackTransport.clear()
-            activeSession = nil
+            sessionPhase = .none
             updatePlaybackState(.error(error))
             throw report("Couldn't load the listening session", error: error)
         }
@@ -286,8 +285,7 @@ public final class ShufflePlayer {
         case .sessionEnded:
             // The session host decides what follows a session end.
             guard let session = activeSession else { return }
-            activeSession = nil
-            endedSession = (session, Date())
+            sessionPhase = .ended(session, at: Date())
             updatePlaybackState(.stopped, endingSession: true)
             sessionEndCount &+= 1
             record("session-ended")

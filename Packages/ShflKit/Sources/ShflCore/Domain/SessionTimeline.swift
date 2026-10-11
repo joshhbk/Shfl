@@ -36,13 +36,11 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
         leftPool: []
     )
 
-    init(
-        activeSession: ListeningSession?,
-        currentSongID: String?,
-        endedSession: (session: ListeningSession, endedAt: Date)?,
-        draftSongIDs: Set<String>
-    ) {
-        if let session = activeSession {
+    init(phase: SessionPhase, currentSongID: String?, draftSongIDs: Set<String>) {
+        switch phase {
+        case .none:
+            self = .idle
+        case .active(let session):
             let order = session.songOrder
             if let index = currentSongID.flatMap(session.songIDs.firstIndex(of:)) {
                 self.init(session: session, status: .active, played: Array(order[..<index]), current: order[index],
@@ -51,11 +49,9 @@ public nonisolated struct SessionTimeline: Equatable, Sendable {
                 self.init(session: session, status: .active, played: [], current: nil,
                           upcoming: order, draftSongIDs: draftSongIDs)
             }
-        } else if let ended = endedSession {
-            self.init(session: ended.session, status: .ended(at: ended.endedAt), played: ended.session.songOrder,
+        case .ended(let session, let endedAt):
+            self.init(session: session, status: .ended(at: endedAt), played: session.songOrder,
                       current: nil, upcoming: [], draftSongIDs: draftSongIDs)
-        } else {
-            self = .idle
         }
     }
 
