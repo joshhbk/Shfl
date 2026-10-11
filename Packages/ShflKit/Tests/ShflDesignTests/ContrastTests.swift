@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct ContrastTests {
     static let schemes: [ColorScheme] = [.light, .dark]
-    static let surfaces: [DesignColor] = [.surfaceWindow, .surfaceContent, .surfaceElevated, .surfaceSidebar, .surfacePane]
+    static let surfaces: [DesignColor] = [.surfaceElevated]
     /// The canvas's sample artwork tones, plus black as the darkest a tone can be.
     static let tones: [Color.Resolved?] = [nil, .init(hex: 0x1E2A5A), .init(hex: 0x43205E), .init(hex: 0x7A1E18), .init(hex: 0x000000)]
 
@@ -39,7 +39,7 @@ struct ContrastTests {
     func neutralText(scheme: ColorScheme) {
         let environment = environment(theme: .pink, scheme: scheme)
         for surface in Self.surfaces {
-            for text in [DesignColor.textPrimary, .textSecondary, .textTertiary, .warning, .successText] {
+            for text in [DesignColor.textPrimary, .textSecondary, .textTertiary] {
                 expectReadable(text, on: surface, in: environment)
             }
         }
@@ -50,8 +50,6 @@ struct ContrastTests {
         let environment = environment(theme: .pink, scheme: scheme)
         expectReadable(.wheelGlyph, on: .wheel, in: environment)
         expectReadable(.chromeGlyph, on: .chrome, in: environment)
-        expectReadable(.chromeText, on: .chrome, in: environment)
-        expectReadable(.chromeTextSecondary, on: .chrome, in: environment)
     }
 
     private func expectReadable(

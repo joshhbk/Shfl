@@ -64,8 +64,4 @@ nonisolated extension ShflTheme {
     )
 
     public static let all: [ShflTheme] = [.silver, .blue, .green, .orange, .pink]
-
-    public static func theme(id: String) -> ShflTheme? {
-        all.first { $0.id == id }
-    }
 }

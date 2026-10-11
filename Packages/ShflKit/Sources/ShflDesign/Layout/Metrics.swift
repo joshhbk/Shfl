@@ -10,8 +10,6 @@ public enum Spacing {
     public static let s14: CGFloat = 14
     public static let s16: CGFloat = 16
     public static let s20: CGFloat = 20
-    public static let s24: CGFloat = 24
-    public static let s32: CGFloat = 32
 }
 
 public enum CornerRadius {
@@ -27,8 +25,6 @@ public enum CornerRadius {
     public static let panel: CGFloat = 10
     /// Large artwork, cards and notices.
     public static let card: CGFloat = 12
-    /// Pill toolbars and popovers.
-    public static let popover: CGFloat = 16
     public static let miniPlayer: CGFloat = 26
 }
 
@@ -37,6 +33,5 @@ public enum ArtworkSize {
     public static let miniPlayer: CGFloat = 208
     public static let compact: CGFloat = 68
     public static let menuBar: CGFloat = 56
-    public static let row: CGFloat = 34
     public static let listRow: CGFloat = 26
 }
