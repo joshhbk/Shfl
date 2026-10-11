@@ -52,6 +52,13 @@ final class AccessibilityWalkTests: XCTestCase {
         XCTAssertGreaterThan(nodes, 1)
     }
 
+    func test_walkingTheMenuBarPlayerDoesNotCrash() async throws {
+        let model = AppModel.preview(library: DeterministicLibrary(songs: songs), draft: Array(songs.prefix(20)))
+        await model.sessionHost.startFreshShuffle()
+        let nodes = try await walk(MenuBarPlayer(), model: model)
+        XCTAssertGreaterThan(nodes, 15)
+    }
+
     func test_walkingTheDesignCatalogDoesNotCrash() async throws {
         let nodes = try await walk(DesignCatalogView(), model: .preview())
         XCTAssertGreaterThan(nodes, 50)

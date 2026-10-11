@@ -29,6 +29,12 @@ final class ViewTeardownTests: XCTestCase {
         }
     }
 
+    func test_closingTheMenuBarPlayerReleasesItsStateWithoutCrashing() async throws {
+        let model = AppModel.preview(draft: DeterministicSongs.make(3))
+        await model.sessionHost.startFreshShuffle()
+        try await showThenTearDown(model) { MenuBarPlayer() }
+    }
+
     func test_closingSettingsReleasesItsStateWithoutCrashing() async throws {
         try await showThenTearDown(.preview()) { ShflSettingsView() }
     }
