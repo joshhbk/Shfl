@@ -29,11 +29,12 @@ struct PicksView: View {
         }
         .overlay {
             if drafting.draft.isEmpty {
-                ContentUnavailableView(
-                    "No Picks Yet",
-                    systemImage: "checkmark.circle",
-                    description: Text("Add songs from your library, or use Autofill.")
-                )
+                EmptyState("No picks yet", message: "Add songs from your library, or let Autofill pick for you.") {
+                    EmptyStateSymbol("checkmark.circle")
+                } actions: {
+                    Button("Autofill") { Task { await drafting.autofill() } }
+                        .disabled(!drafting.canAutofill)
+                }
             }
         }
     }

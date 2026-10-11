@@ -1,9 +1,11 @@
+import AppKit
 import ShflCore
 import ShflDesign
 import SwiftUI
 
 struct LibrarySongsView: View {
     @Environment(LibraryBrowser.self) private var browser
+    @Environment(\.showPlace) private var showPlace
 
     private static let columns = Set(ListColumn.allCases)
 
@@ -39,15 +41,33 @@ struct LibrarySongsView: View {
     private var emptyState: some View {
         if isSearching {
             if browser.searchResults.isEmpty && browser.hasSearchedOnce && !browser.searchLoading {
-                ContentUnavailableView.search(text: browser.searchText)
+                EmptyState(
+                    "No songs match “\(browser.searchText)”",
+                    message: "Check the spelling, or try the same search in Artists."
+                ) {
+                    Button("Clear Search") { browser.searchText = "" }
+                    Button("Search Artists") { showPlace(.artists) }
+                }
             }
         } else if browser.browseSongs.isEmpty {
             if browser.browseLoading {
                 ProgressView()
             } else {
-                ContentUnavailableView("No Songs", systemImage: "music.note", description: Text("Songs you add to your Apple Music library appear here."))
+                EmptyState(
+                    "No songs in your library yet",
+                    message: "Shuffled plays what’s in your Apple Music library. Add music in the Music app and it shows up here."
+                ) {
+                    EmptyStateSymbol("music.note")
+                } actions: {
+                    Button("Open Music", action: openMusic)
+                }
             }
         }
+    }
+
+    private func openMusic() {
+        guard let music = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") else { return }
+        NSWorkspace.shared.openApplication(at: music, configuration: NSWorkspace.OpenConfiguration())
     }
 
     private func loadMore() {
