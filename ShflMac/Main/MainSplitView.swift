@@ -15,6 +15,7 @@ struct MainSplitView: View {
             SidebarView(selection: $selection)
         } detail: {
             DetailColumn(place: selection ?? .songs, isSearchFocused: $isSearchFocused)
+                .environment(\.showPlace, ShowPlaceAction { selection = $0 })
                 .safeAreaInset(edge: .bottom, spacing: 0) { DraftFailureMessage() }
                 .toolbar { LibraryToolbar() }
                 .inspector(isPresented: $isShowingPlayer) {
