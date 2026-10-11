@@ -12,8 +12,10 @@ public nonisolated struct TransportIntents: Equatable, Sendable {
     public enum Shuffle: Equatable, Sendable {
         /// The draft matches the session that's playing.
         case again
-        /// The draft has changed since the session that's playing was shuffled.
+        /// The draft's songs have changed since the session that's playing was shuffled.
         case changedDraft(songCount: Int)
+        /// Only the shuffle style has changed since the session that's playing was shuffled.
+        case changedStyle(playing: ShuffleAlgorithm)
         /// Nothing is playing.
         case draft(songCount: Int)
         case autofillAndShuffle(songCount: Int)
@@ -24,7 +26,13 @@ public nonisolated struct TransportIntents: Equatable, Sendable {
 
     enum SessionState: Equatable, Sendable {
         case none
-        case active(isPlaying: Bool, draftDiffers: Bool)
+        case active(isPlaying: Bool, pending: PendingChange)
+    }
+
+    enum PendingChange: Equatable, Sendable {
+        case none
+        case songs
+        case style(playing: ShuffleAlgorithm)
     }
 
     init(session: SessionState, draftSongCount: Int, autofillSongCount: Int) {
@@ -42,8 +50,12 @@ public nonisolated struct TransportIntents: Equatable, Sendable {
             shuffle = .autofillAndShuffle(songCount: autofillSongCount)
         case (.none, let count):
             shuffle = .draft(songCount: count)
-        case (.active(_, let draftDiffers), let count):
-            shuffle = draftDiffers ? .changedDraft(songCount: count) : .again
+        case (.active(_, .none), _):
+            shuffle = .again
+        case (.active(_, .songs), let count):
+            shuffle = .changedDraft(songCount: count)
+        case (.active(_, .style(let playing)), _):
+            shuffle = .changedStyle(playing: playing)
         }
     }
 }

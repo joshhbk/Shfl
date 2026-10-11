@@ -568,7 +568,7 @@ struct SongPickerView: View {
 
     private func toggle(_ song: Song) {
         switch editor.toggle(song) {
-        case .added(_, reachedMilestone: true):
+        case .added(_, milestone: _?):
             HapticFeedback.milestone.trigger()
         case .failed(let message):
             draftEditFailure = DraftEditFailure(message: message)

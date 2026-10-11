@@ -12,7 +12,7 @@ final class AppModelTests: XCTestCase {
 
         let edit = model.makeDraftEditor().toggle(song)
 
-        XCTAssertEqual(edit, .added(songCount: 1, reachedMilestone: true))
+        XCTAssertEqual(edit, .added(songCount: 1, milestone: 1))
         XCTAssertEqual(model.sessionDraft.songs, [song])
     }
 

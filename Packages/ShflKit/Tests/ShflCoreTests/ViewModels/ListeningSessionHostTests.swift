@@ -459,6 +459,19 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(host.timeline.changes.joiningNextShuffle, ["three"])
     }
 
+    func testShuffleIntentNamesThePlayingStyleWhenOnlyTheStyleChanged() async throws {
+        let host = makeHost()
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        host.sessionDraft.stage(.artistSpacing)
+        await host.startFreshShuffle()
+
+        host.sessionDraft.stage(.weightedByPlayCount)
+        XCTAssertEqual(host.intents.shuffle, .changedStyle(playing: .artistSpacing))
+
+        try host.sessionDraft.add(makeSongs("three"))
+        XCTAssertEqual(host.intents.shuffle, .changedDraft(songCount: 3))
+    }
+
     func testSeekMovesTheTransport() async throws {
         let host = makeHost()
         try host.sessionDraft.add(makeSongs("one"))

@@ -89,18 +89,20 @@ struct SessionTimelineTests {
 struct TransportIntentsTests {
     @Test("Play pauses or resumes a session, otherwise says what it will shuffle")
     func play() {
-        #expect(intents(.active(isPlaying: true, draftDiffers: false)).play == .pause)
-        #expect(intents(.active(isPlaying: false, draftDiffers: false)).play == .resume)
+        #expect(intents(.active(isPlaying: true, pending: .none)).play == .pause)
+        #expect(intents(.active(isPlaying: false, pending: .none)).play == .resume)
         #expect(intents(.none, draft: 37).play == .shuffleDraft(songCount: 37))
         #expect(intents(.none, draft: 0).play == .autofillAndShuffle(songCount: 120))
     }
 
     @Test("Shuffle is Again only when the draft matches what's playing")
     func shuffle() {
-        #expect(intents(.active(isPlaying: true, draftDiffers: false), draft: 86).shuffle == .again)
-        #expect(intents(.active(isPlaying: true, draftDiffers: true), draft: 90).shuffle == .changedDraft(songCount: 90))
+        #expect(intents(.active(isPlaying: true, pending: .none), draft: 86).shuffle == .again)
+        #expect(intents(.active(isPlaying: true, pending: .songs), draft: 90).shuffle == .changedDraft(songCount: 90))
+        #expect(intents(.active(isPlaying: true, pending: .style(playing: .artistSpacing)), draft: 86).shuffle
+            == .changedStyle(playing: .artistSpacing))
         #expect(intents(.none, draft: 12).shuffle == .draft(songCount: 12))
-        #expect(intents(.active(isPlaying: false, draftDiffers: true), draft: 0).shuffle == .autofillAndShuffle(songCount: 120))
+        #expect(intents(.active(isPlaying: false, pending: .songs), draft: 0).shuffle == .autofillAndShuffle(songCount: 120))
     }
 
     private func intents(_ session: TransportIntents.SessionState, draft: Int = 10) -> TransportIntents {
