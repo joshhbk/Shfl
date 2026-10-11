@@ -66,15 +66,12 @@ struct SessionList: View {
 /// The end of a finished session.
 struct LastPlayedSection: View {
     let timeline: SessionTimeline
-    let endedAt: Date
 
     private static let rowCount = 5
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
-            SectionHeader("Last played") {
-                Text("Ended \(endedAt.formatted(date: .omitted, time: .shortened))")
-            }
+            SectionHeader("Last played")
             let start = max(timeline.played.count - Self.rowCount, 0)
             ForEach(Array(timeline.played[start...].enumerated()), id: \.element.id) { offset, song in
                 PlayerSongRow(position: start + offset + 1, song: song)

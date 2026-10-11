@@ -15,8 +15,8 @@ struct PlayingColumn: View {
                 EmptyPlayer(isShowingSession: $isShowingSession)
             case (.active, false):
                 ArtworkPlayer(timeline: timeline, isShowingSession: $isShowingSession)
-            case (.ended(let endedAt), false):
-                FinishedPlayer(timeline: timeline, endedAt: endedAt, isShowingSession: $isShowingSession)
+            case (.ended, false):
+                FinishedPlayer(timeline: timeline, isShowingSession: $isShowingSession)
             case (_, true):
                 WholeSessionPlayer(timeline: timeline, isShowingSession: $isShowingSession)
             }
@@ -125,7 +125,6 @@ private struct EmptyPlayer: View {
 
 private struct FinishedPlayer: View {
     let timeline: SessionTimeline
-    let endedAt: Date
     @Binding var isShowingSession: Bool
 
     var body: some View {
@@ -143,7 +142,7 @@ private struct FinishedPlayer: View {
                     .padding(.top, Spacing.s16)
                 TransportWheel(isShowingSession: $isShowingSession)
                     .padding(.top, Spacing.s8)
-                LastPlayedSection(timeline: timeline, endedAt: endedAt)
+                LastPlayedSection(timeline: timeline)
                     .padding(.top, Spacing.s14)
             }
         }
