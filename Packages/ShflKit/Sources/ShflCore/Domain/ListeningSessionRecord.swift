@@ -14,6 +14,8 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
     let playedSongIDs: Set<String>
     let playbackPosition: TimeInterval
     let savedAt: Date
+    /// Missing from records saved before it was added; those restore as shuffled when saved.
+    let shuffledAt: Date?
 
     init(
         sessionID: UUID = UUID(),
@@ -23,7 +25,8 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
         currentSongID: String,
         playedSongIDs: Set<String>,
         playbackPosition: TimeInterval,
-        savedAt: Date
+        savedAt: Date,
+        shuffledAt: Date? = nil
     ) {
         self.sessionID = sessionID
         self.songOrder = songOrder
@@ -33,6 +36,7 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
         self.playedSongIDs = playedSongIDs
         self.playbackPosition = playbackPosition
         self.savedAt = savedAt
+        self.shuffledAt = shuffledAt
     }
 
     /// Tolerant restore decision resolved against the record itself. Songs that
@@ -47,7 +51,8 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
             id: sessionID,
             songOrder: songOrder,
             algorithm: algorithm,
-            seed: seed
+            seed: seed,
+            shuffledAt: shuffledAt ?? savedAt
         )
         return .restore(
             session: session,
@@ -75,7 +80,8 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
             currentSongID: currentSongID,
             playedSongIDs: Set(session.songIDs.prefix(currentIndex)),
             playbackPosition: playbackPosition,
-            savedAt: savedAt
+            savedAt: savedAt,
+            shuffledAt: session.shuffledAt
         )
     }
 
@@ -104,7 +110,8 @@ nonisolated struct ListeningSessionRecord: Codable, Equatable, Sendable {
             currentSongID: currentSongID,
             playedSongIDs: playedSongIDs,
             playbackPosition: position,
-            savedAt: date
+            savedAt: date,
+            shuffledAt: shuffledAt
         )
     }
 }

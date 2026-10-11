@@ -412,6 +412,82 @@ final class ListeningSessionHostTests: XCTestCase {
         XCTAssertEqual(host.player.activeSession?.songIDs, ["library"])
     }
 
+    func testTimelineShowsAnEndedSessionUntilTheNextOneStarts() async throws {
+        let host = makeHost(autofillSource: StubAutofillSource(songs: makeSongs("library")))
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.startFreshShuffle()
+        let ended = try XCTUnwrap(host.player.activeSession)
+
+        host.sessionDraft.removeAll()
+        await mockService.simulateSessionEnded()
+        await waitUntil { host.player.sessionEndCount == 1 }
+
+        guard case .ended = host.timeline.status else {
+            return XCTFail("Expected an ended timeline, got \(host.timeline.status)")
+        }
+        XCTAssertEqual(host.timeline.played.map(\.id), ended.songIDs)
+        XCTAssertEqual(host.intents.play, .autofillAndShuffle(songCount: 120))
+
+        await host.togglePlayback()
+
+        XCTAssertEqual(host.timeline.status, .active)
+        XCTAssertEqual(host.timeline.current?.id, "library")
+    }
+
+    func testClearingTheSessionForgetsTheEndedOne() async throws {
+        let host = makeHost()
+        try host.sessionDraft.add(makeSongs("one"))
+        await host.startFreshShuffle()
+        host.sessionDraft.removeAll()
+        await mockService.simulateSessionEnded()
+        await waitUntil { host.player.sessionEndCount == 1 }
+
+        await host.player.clearSession()
+
+        XCTAssertEqual(host.timeline.status, .idle)
+    }
+
+    func testShuffleIntentNoticesDraftEditsSinceTheShuffle() async throws {
+        let host = makeHost()
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.startFreshShuffle()
+        XCTAssertEqual(host.intents.shuffle, .again)
+
+        try host.sessionDraft.add(makeSongs("three"))
+
+        XCTAssertEqual(host.intents.shuffle, .changedDraft(songCount: 3))
+        XCTAssertEqual(host.timeline.joiningNextShuffle, ["three"])
+    }
+
+    func testRestoredSessionKeepsWhenItWasShuffled() async throws {
+        let host = makeHost(now: { Date(timeIntervalSince1970: 2_000) })
+        try host.sessionDraft.add(makeSongs("one", "two"))
+        await host.startFreshShuffle()
+        let shuffledAt = try XCTUnwrap(host.timeline.shuffledAt)
+        await waitUntil { (try? self.archive.load().session) != nil }
+
+        let nextHost = ListeningSessionHost(
+            playbackTransport: DeterministicMusicService(),
+            archive: archive,
+            autofillSource: StubAutofillSource(songs: []),
+            now: { shuffledAt.addingTimeInterval(60) }
+        )
+        let restored = await nextHost.restoreSavedSession()
+
+        XCTAssertTrue(restored)
+        XCTAssertEqual(nextHost.timeline.shuffledAt, shuffledAt)
+    }
+
+    func testSeekMovesTheTransport() async throws {
+        let host = makeHost()
+        try host.sessionDraft.add(makeSongs("one"))
+        await host.startFreshShuffle()
+
+        host.seek(to: 42)
+
+        XCTAssertEqual(mockService.currentPlaybackTime, 42)
+    }
+
     func testSessionClearNeverStartsANewSession() async throws {
         let host = makeHost()
         try host.sessionDraft.add(makeSongs("one", "two"))
