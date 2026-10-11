@@ -5,6 +5,7 @@ import SwiftUI
 struct MainSplitView: View {
     @State private var selection: SidebarItem? = .songs
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @SceneStorage("isShowingPlayer") private var isShowingPlayer = true
     @FocusState private var isSearchFocused: Bool
     @Environment(LibraryBrowser.self) private var browser
     @Environment(ListeningSessionHost.self) private var sessionHost
@@ -14,14 +15,18 @@ struct MainSplitView: View {
             SidebarView(selection: $selection)
         } detail: {
             DetailColumn(place: selection ?? .songs, isSearchFocused: $isSearchFocused)
+                .safeAreaInset(edge: .bottom, spacing: 0) { DraftFailureMessage() }
                 .toolbar { LibraryToolbar() }
+                .inspector(isPresented: $isShowingPlayer) {
+                    PlayingColumn()
+                        .inspectorColumnWidth(min: 320, ideal: 340, max: 420)
+                        .toolbar {
+                            Button("Player", systemImage: "sidebar.right") { isShowingPlayer.toggle() }
+                                .help(isShowingPlayer ? "Hide Player" : "Show Player")
+                        }
+                }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                DraftFailureMessage()
-                NowPlayingBar()
-            }
-        }
+        .focusedSceneValue(\.isEditingText, isSearchFocused)
         .onKeyPress(.space, action: playPauseFromSpace)
         .onChange(of: selection, initial: true) {
             browser.activeLane = (selection ?? .songs).libraryLane

@@ -42,6 +42,11 @@ nonisolated enum ColorMath {
         return (lighter + 0.05) / (darker + 0.05)
     }
 
+    static func chroma(_ color: Color.Resolved) -> Float {
+        let lab = OKLab(color)
+        return (lab.a * lab.a + lab.b * lab.b).squareRoot()
+    }
+
     static func luminance(_ color: Color.Resolved) -> Double {
         0.2126 * Double(color.linearRed) + 0.7152 * Double(color.linearGreen) + 0.0722 * Double(color.linearBlue)
     }

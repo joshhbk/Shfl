@@ -7,8 +7,11 @@ import Testing
 struct ContrastTests {
     static let schemes: [ColorScheme] = [.light, .dark]
     static let surfaces: [DesignColor] = [.surfaceElevated]
-    /// The canvas's sample artwork tones, plus black as the darkest a tone can be.
-    static let tones: [Color.Resolved?] = [nil, .init(hex: 0x1E2A5A), .init(hex: 0x43205E), .init(hex: 0x7A1E18), .init(hex: 0x000000)]
+    /// The canvas's sample tones, the extremes, and bright tones that must not wash out the ink.
+    static let tones: [Color.Resolved?] = [
+        nil, .init(hex: 0x1E2A5A), .init(hex: 0x43205E), .init(hex: 0x7A1E18),
+        .init(hex: 0x000000), .init(hex: 0xFFFFFF), .init(hex: 0xE0603A), .init(hex: 0xD9822B), .init(hex: 0x3A8FD9),
+    ]
 
     @Test("Player text holds 4.5:1 on the player body in every theme, scheme and tint", arguments: ShflTheme.all, schemes)
     func playerText(theme: ShflTheme, scheme: ColorScheme) {
