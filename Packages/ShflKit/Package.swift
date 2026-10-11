@@ -30,6 +30,7 @@ let package = Package(
     products: [
         .library(name: "ShflCore", targets: ["ShflCore"]),
         .library(name: "ShflAppleMusicUI", targets: ["ShflAppleMusicUI"]),
+        .library(name: "ShflDesign", targets: ["ShflDesign"]),
         .library(name: "ShflComposition", targets: ["ShflComposition"]),
         .library(name: "ShflDeterministic", targets: ["ShflDeterministic"]),
         .library(name: "ShflLastFM", targets: ["ShflLastFM"]),
@@ -73,6 +74,16 @@ let package = Package(
         .testTarget(
             name: "ShflAppleMusicUITests",
             dependencies: ["ShflAppleMusicUI", "ShflAppleMusic", "ShflCore"],
+            swiftSettings: testSettings
+        ),
+        // SwiftUI only, no ShflCore: the UI kit doesn't know about songs or sessions.
+        .target(
+            name: "ShflDesign",
+            swiftSettings: librarySettings
+        ),
+        .testTarget(
+            name: "ShflDesignTests",
+            dependencies: ["ShflDesign"],
             swiftSettings: testSettings
         ),
         .target(

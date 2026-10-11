@@ -13,6 +13,7 @@ allowed_for() {
         ShflCore) echo 'Foundation|Observation|SwiftData' ;;
         ShflAppleMusic) echo 'Foundation|Observation|Combine|MusicKit|ShflCore' ;;
         ShflAppleMusicUI) echo 'Foundation|Observation|SwiftUI|MusicKit|ShflCore|ShflAppleMusic' ;;
+        ShflDesign) echo 'Foundation|CoreGraphics|SwiftUI' ;;
         ShflLastFM) echo 'Foundation|Observation|CryptoKit|Network|Security|ShflCore' ;;
         ShflDeterministic) echo 'Foundation|Synchronization|ShflCore' ;;
         ShflComposition) echo 'Foundation|Observation|SwiftData|ShflCore|ShflAppleMusic|ShflLastFM|ShflDeterministic' ;;
