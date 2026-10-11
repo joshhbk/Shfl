@@ -19,8 +19,10 @@ final class ShflMacAppDelegate: NSObject, NSApplicationDelegate {
         super.init()
     }
 
+    let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     func applicationWillFinishLaunching(_ notification: Notification) {
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+        if isRunningTests {
             NSApp.setActivationPolicy(.prohibited)
         }
     }

@@ -3,10 +3,12 @@ import SwiftUI
 
 @main
 struct ShflMacApp: App {
+    static let mainWindowID = "main"
+
     @NSApplicationDelegateAdaptor private var appDelegate: ShflMacAppDelegate
 
     var body: some Scene {
-        Window("Shuffled", id: "main") {
+        Window("Shuffled", id: Self.mainWindowID) {
             LaunchRootView(model: appDelegate.model)
                 .shellEnvironment(appDelegate.shell)
         }
@@ -18,6 +20,14 @@ struct ShflMacApp: App {
             DesignCatalogCommands()
             #endif
         }
+
+        MenuBarExtra(isInserted: .constant(!appDelegate.isRunningTests)) {
+            MenuBarPlayer()
+                .shellEnvironment(appDelegate.shell)
+        } label: {
+            MenuBarLabel(sessionHost: appDelegate.model.sessionHost)
+        }
+        .menuBarExtraStyle(.window)
 
         #if DEBUG
         Window("Design Catalog", id: DesignCatalogView.windowID) {

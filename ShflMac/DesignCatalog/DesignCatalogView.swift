@@ -208,6 +208,21 @@ private struct PlayerSpecimen: View {
 private struct EmptyPlayerSpecimen: View {
     var body: some View {
         VStack(spacing: Spacing.s20) {
+            HStack(spacing: Spacing.s10) {
+                Button("Previous", systemImage: "backward.fill") {}.buttonStyle(.transport)
+                Button("Pause", systemImage: "pause.fill") {}.buttonStyle(.transportPrimary)
+                Button("Next", systemImage: "forward.fill") {}.buttonStyle(.transport)
+            }
+            .padding(Spacing.s12)
+            .playerSurface()
+            .clipShape(.rect(cornerRadius: CornerRadius.card))
+            VStack(spacing: 0) {
+                Button("Open Shuffled") {}.buttonStyle(.menuRow)
+                Button("Quit Shuffled") {}.buttonStyle(.menuRow)
+            }
+            .padding(Spacing.s6)
+            .elevatedSurface()
+            .clipShape(.rect(cornerRadius: CornerRadius.panel))
             OutlinedTag("Left pool")
         }
         .padding(Spacing.s20)
