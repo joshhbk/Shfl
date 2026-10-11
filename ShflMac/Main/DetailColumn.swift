@@ -37,7 +37,7 @@ private struct PlaceSearch: ViewModifier {
     func body(content: Content) -> some View {
         @Bindable var browser = browser
         content
-            .searchable(text: $browser.searchText, placement: .toolbar, prompt: prompt)
+            .searchable(text: $browser.searchText, placement: .toolbarPrincipal, prompt: prompt)
             .searchFocused(isFocused)
     }
 }

@@ -16,6 +16,15 @@ struct PrimitiveMetricsTests {
         #expect(ArtworkFrame<EmptyView>.cornerRadius(for: size) == radius)
     }
 
+    @Test("Arrow keys walk the wheel's slots, and the opposite arrow returns to the centre")
+    func wheelSlots() {
+        #expect(ClickWheelSlot.center.moved(.upArrow) == .top)
+        #expect(ClickWheelSlot.top.moved(.downArrow) == .center)
+        #expect(ClickWheelSlot.leading.moved(.rightArrow) == .center)
+        #expect(ClickWheelSlot.top.moved(.leftArrow) == .leading)
+        #expect(ClickWheelSlot.bottom.moved(.upArrow) == .center)
+    }
+
     @Test("The scrubber maps a drag across its width onto its range, clamped at both ends")
     func scrubberValue() {
         let bounds = 10.0...110.0
@@ -24,6 +33,22 @@ struct PrimitiveMetricsTests {
         #expect(Scrubber.value(at: -30, width: 200, in: bounds) == 10)
         #expect(Scrubber.value(at: 260, width: 200, in: bounds) == 110)
         #expect(Scrubber.value(at: 50, width: 0, in: bounds) == 10)
+    }
+
+    @Test("The scrubber's VoiceOver slider never gets a range or step that Slider traps on")
+    func scrubberSliderInputs() {
+        #expect(Scrubber.sliderStep(5, in: 0...1) == 1)
+        #expect(Scrubber.sliderStep(5, in: 0...184) == 5)
+        #expect(Scrubber.sliderRange(for: 0...0) == 0...1)
+        #expect(Scrubber.sliderRange(for: 0...184) == 0...184)
+    }
+
+    @Test("Marquee text scrolls only when it overflows, at a steady speed")
+    func marquee() {
+        #expect(!MarqueeText.overflows(textWidth: 200, availableWidth: 200))
+        #expect(MarqueeText.overflows(textWidth: 201, availableWidth: 200))
+        #expect(!MarqueeText.overflows(textWidth: 500, availableWidth: 0))
+        #expect(MarqueeText.scrollDuration(for: 300) == 10)
     }
 
     @Test("The scrubber fills in proportion, and stays empty for an empty range")

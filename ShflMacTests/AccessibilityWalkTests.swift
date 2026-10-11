@@ -5,6 +5,7 @@ import XCTest
 @testable import ShflMac
 import ShflComposition
 import ShflCore
+import ShflDesign
 import ShflDeterministic
 
 // SwiftUI builds its accessibility tree only for an AX client, so walk through the AX API like VoiceOver does.
@@ -34,6 +35,21 @@ final class AccessibilityWalkTests: XCTestCase {
         _ = try await walk(PlaybackSettingsTab(), model: model)
         _ = try await walk(LibrarySettingsTab(), model: model)
         _ = try await walk(LastFMSettingsTab(), model: model)
+    }
+
+    func test_walkingThePlayerWithASessionDoesNotCrash() async throws {
+        let model = AppModel.preview(library: DeterministicLibrary(songs: songs), draft: Array(songs.prefix(20)))
+        await model.sessionHost.startFreshShuffle()
+        let nodes = try await walk(PlayingColumn(), model: model)
+        XCTAssertGreaterThan(nodes, 20)
+    }
+
+    func test_aScrubberBeforeItsDurationIsKnownDoesNotCrash() async throws {
+        let nodes = try await walk(
+            Scrubber(value: .constant(0), in: 0...1, step: 5).frame(width: 200).playerSurface(),
+            model: .preview()
+        )
+        XCTAssertGreaterThan(nodes, 1)
     }
 
     func test_walkingTheDesignCatalogDoesNotCrash() async throws {

@@ -21,10 +21,11 @@ final class ViewTeardownTests: XCTestCase {
         }
     }
 
-    func test_closingTheNowPlayingBarReleasesItsClockWithoutCrashing() async throws {
-        let model = AppModel.preview()
+    func test_closingThePlayerReleasesItsClockWithoutCrashing() async throws {
+        let model = AppModel.preview(draft: DeterministicSongs.make(3))
+        await model.sessionHost.startFreshShuffle()
         try await showThenTearDown(model) {
-            NowPlayingBar()
+            PlayingColumn()
         }
     }
 
