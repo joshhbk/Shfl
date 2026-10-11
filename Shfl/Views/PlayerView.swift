@@ -71,7 +71,7 @@ struct PlayerView: View {
                     onSettings: onSettingsTapped,
                     onSeek: { time in
                         playbackClock?.handleUserSeek(to: time)
-                        player.seek(to: time)
+                        sessionHost?.seek(to: time)
                     },
                     isShuffling: isStartingSession,
                     showError: showError,

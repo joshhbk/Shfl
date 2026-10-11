@@ -2,15 +2,16 @@ import ShflCore
 import SwiftUI
 
 struct UpNextView: View {
-    @Environment(ShufflePlayer.self) private var player
+    @Environment(ListeningSessionHost.self) private var sessionHost
 
     var body: some View {
-        if let session = player.activeSession {
-            List(Array(session.songOrder.enumerated()), id: \.element.id) { position, song in
+        let timeline = sessionHost.timeline
+        if timeline.status == .active {
+            List(Array(timeline.songs.enumerated()), id: \.element.id) { offset, song in
                 UpNextRow(
-                    position: position + 1,
+                    position: offset + 1,
                     song: song,
-                    isCurrent: song.id == player.playbackState.currentSongId
+                    isCurrent: song.id == timeline.current?.id
                 )
             }
             .accessibilityIdentifier("mac.upNext.list")

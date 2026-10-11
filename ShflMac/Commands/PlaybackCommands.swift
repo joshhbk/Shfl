@@ -3,12 +3,11 @@ import SwiftUI
 
 struct PlaybackCommands: Commands {
     let sessionHost: ListeningSessionHost
-    let player: ShufflePlayer
 
     var body: some Commands {
         CommandMenu("Playback") {
             // No Space equivalent here: MainSplitView handles Space so text fields keep it.
-            Button(player.playbackState.isPlaying ? "Pause" : "Play") {
+            Button(sessionHost.intents.play.title) {
                 Task { await sessionHost.togglePlayback() }
             }
             .disabled(sessionHost.isStartingSession)
@@ -29,7 +28,7 @@ struct PlaybackCommands: Commands {
 
             Divider()
 
-            Button("Shuffle Again") {
+            Button(sessionHost.intents.shuffle.title) {
                 Task { await sessionHost.startFreshShuffle(autofillingEmptyDraft: true) }
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
