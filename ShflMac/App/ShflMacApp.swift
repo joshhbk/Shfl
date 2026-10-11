@@ -12,10 +12,11 @@ struct ShflMacApp: App {
             LaunchRootView(model: appDelegate.model)
                 .shellEnvironment(appDelegate.shell)
         }
-        .defaultSize(width: 1100, height: 700)
+        .defaultSize(width: 1280, height: 760)
         .commands {
             PlaybackCommands(sessionHost: appDelegate.model.sessionHost)
             PicksCommands(drafting: appDelegate.shell.drafting)
+            SortCommands(browser: appDelegate.shell.browser)
             #if DEBUG
             DesignCatalogCommands()
             #endif

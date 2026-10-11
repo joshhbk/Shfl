@@ -137,14 +137,14 @@ private struct ButtonSpecimens: View {
 private struct SongListSpecimen: View {
     @State private var picked: Set<Int> = [0, 2]
 
-    private let columns: Set<ListColumn> = Set(ListColumn.allCases)
+    private let columns: [ListColumn] = [.artwork, .title, .detail, .stat("plays", width: 48), .time, .accessory]
 
     var body: some View {
         VStack(spacing: 0) {
             ListColumns(columns) {
-                ColumnLabel("Title").listColumn(.title)
+                Button("Title") {}.buttonStyle(.columnSort(isSorted: false)).listColumn(.title)
                 ColumnLabel("Album").listColumn(.detail)
-                ColumnLabel("Plays").listColumn(.stat)
+                Button("Plays") {}.buttonStyle(.columnSort(isSorted: true)).listColumn(.stat("plays", width: 48))
                 ColumnLabel("Time").listColumn(.time)
             }
             .frame(height: 28)
@@ -161,7 +161,7 @@ private struct SongListSpecimen: View {
                     }
                     .listColumn(.title)
                     Text(song.album).font(.secondaryText).foregroundStyle(.secondary).listColumn(.detail)
-                    Text(song.plays, format: .number).font(.secondaryText.monospacedDigit()).foregroundStyle(.secondary).listColumn(.stat)
+                    Text(song.plays, format: .number).font(.secondaryText.monospacedDigit()).foregroundStyle(.secondary).listColumn(.stat("plays", width: 48))
                     Text("3:04").font(.secondaryText.monospacedDigit()).foregroundStyle(.secondary).listColumn(.time)
                     Toggle("Pick \(song.title)", isOn: isPicked(index))
                         .toggleStyle(.pick)

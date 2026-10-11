@@ -7,14 +7,14 @@ struct PicksView: View {
     @Environment(DraftEditing.self) private var drafting
     @Environment(LibraryBrowser.self) private var browser
 
-    private static let columns = Set(ListColumn.allCases)
+    private static let columns: [ListColumn] = [.artwork, .title, .detail, SongStat.plays.column, .time, .accessory]
 
     var body: some View {
         SongList(songs: drafting.draft.songs(matching: browser.searchText).reversed()) {
             ListColumns(Self.columns) {
                 ColumnLabel("Title").listColumn(.title)
                 ColumnLabel("Album").listColumn(.detail)
-                ColumnLabel(SongStat.plays.title).listColumn(.stat)
+                ColumnLabel(SongStat.plays.title).listColumn(SongStat.plays.column)
                 ColumnLabel("Time").listColumn(.time)
             }
         } row: { item in
@@ -22,7 +22,7 @@ struct PicksView: View {
                 SongArtwork(song: item.song, size: ArtworkSize.songRow).listColumn(.artwork)
                 SongTitles(item, subtitle: item.song.artist).listColumn(.title)
                 RowDetail(item.song.albumTitle).listColumn(.detail)
-                RowStat(.plays, of: item.song).listColumn(.stat)
+                RowStat(.plays, of: item.song).listColumn(SongStat.plays.column)
                 RowDuration(item.song.duration).listColumn(.time)
                 PickToggle(item).listColumn(.accessory)
             }

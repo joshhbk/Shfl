@@ -1,5 +1,6 @@
 import Foundation
 import ShflCore
+import ShflDesign
 
 /// The number a song list shows beside the album, chosen by how the list is sorted.
 enum SongStat: Equatable {
@@ -14,6 +15,26 @@ enum SongStat: Equatable {
         case .recentlyAdded: self = .added
         }
     }
+
+    var sort: SortOption {
+        switch self {
+        case .plays: .mostPlayed
+        case .lastPlayed: .recentlyPlayed
+        case .added: .recentlyAdded
+        }
+    }
+
+    var column: ListColumn {
+        switch self {
+        case .plays: Self.playsColumn
+        case .lastPlayed: Self.lastPlayedColumn
+        case .added: Self.addedColumn
+        }
+    }
+
+    private static let playsColumn = ListColumn.stat("plays", width: 48)
+    private static let lastPlayedColumn = ListColumn.stat("lastPlayed", width: 78)
+    private static let addedColumn = ListColumn.stat("added", width: 64)
 
     var title: String {
         switch self {

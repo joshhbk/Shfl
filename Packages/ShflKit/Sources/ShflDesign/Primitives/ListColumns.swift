@@ -1,44 +1,35 @@
 import SwiftUI
 
-/// A role in a list row. Each has its own width, and `stat` and `time` sit on the trailing edge.
-public enum ListColumn: Int, CaseIterable, Comparable, Sendable {
-    case artwork
-    case title
-    case detail
-    case stat
-    case time
-    case accessory
+/// One column of a list: its width and which edge its content sits on. Rows and their header list the
+/// same columns, in order.
+public struct ListColumn: Hashable, Sendable {
+    private let id: String
+    let width: Width
+    let isTrailing: Bool
 
-    public static func < (lhs: ListColumn, rhs: ListColumn) -> Bool {
-        lhs.rawValue < rhs.rawValue
+    public static let artwork = ListColumn(id: "artwork", width: .fixed(ArtworkSize.songRow), isTrailing: false)
+    public static let title = ListColumn(id: "title", width: .share(1.6), isTrailing: false)
+    public static let detail = ListColumn(id: "detail", width: .share(1), isTrailing: false)
+    public static let time = ListColumn(id: "time", width: .fixed(44), isTrailing: true)
+    public static let accessory = ListColumn(id: "accessory", width: .fixed(26), isTrailing: false)
+
+    /// A right-aligned number or date, as wide as its longest value or heading.
+    public static func stat(_ id: String, width: CGFloat) -> ListColumn {
+        ListColumn(id: id, width: .fixed(width), isTrailing: true)
     }
 
-    var width: Width {
-        switch self {
-        case .artwork: .fixed(ArtworkSize.songRow)
-        case .title: .share(1.6)
-        case .detail: .share(1)
-        case .stat: .fixed(64)
-        case .time: .fixed(44)
-        case .accessory: .fixed(26)
-        }
-    }
-
-    var isTrailing: Bool { self == .stat || self == .time }
-
-    enum Width: Equatable {
+    enum Width: Hashable, Sendable {
         case fixed(CGFloat)
         case share(CGFloat)
     }
 }
 
-/// Lays out a header and its rows in the same columns. Give each child a role with `.listColumn(_:)`;
-/// children whose role isn't in `columns` are hidden.
+/// Lays out a header and its rows in the same columns. Give every child one of `columns` with `.listColumn(_:)`.
 public struct ListColumns: Layout {
     private let columns: [ListColumn]
 
-    public init(_ columns: Set<ListColumn>) {
-        self.columns = columns.sorted()
+    public init(_ columns: [ListColumn]) {
+        self.columns = columns
     }
 
     static let gap: CGFloat = 12
@@ -58,6 +49,7 @@ public struct ListColumns: Layout {
         let frames = Self.columnFrames(columns, in: bounds.width)
         for subview in subviews {
             guard let column = subview[ListColumnKey.self], let frame = frames[column] else {
+                assertionFailure("Every ListColumns child needs one of its columns: \(columns)")
                 subview.place(at: CGPoint(x: bounds.minX, y: bounds.minY), proposal: .zero)
                 continue
             }
@@ -93,7 +85,6 @@ public struct ListColumns: Layout {
         }
         return frames
     }
-
 }
 
 private struct ListColumnKey: LayoutValueKey {
