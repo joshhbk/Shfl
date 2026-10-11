@@ -7,21 +7,27 @@ struct MainSplitView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @SceneStorage("isShowingPlayer") private var isShowingPlayer = true
     @FocusState private var isSearchFocused: Bool
+    @State private var scopedSearch: ScopedSearch?
     @Environment(LibraryBrowser.self) private var browser
     @Environment(ListeningSessionHost.self) private var sessionHost
 
     private var place: SidebarItem { selection ?? .songs }
 
+    private var searchText: Binding<String> {
+        if let scopedSearch {
+            Binding(get: { scopedSearch.text }, set: { scopedSearch.text = $0 })
+        } else {
+            Binding(get: { browser.searchText }, set: { browser.searchText = $0 })
+        }
+    }
+
     var body: some View {
-        @Bindable var browser = browser
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(selection: $selection)
         } detail: {
             DetailColumn(place: place)
-                // One for the window: per-place searchables can briefly coexist, and NSToolbar throws on a second one.
-                .searchable(text: $browser.searchText, placement: .toolbarPrincipal, prompt: place.searchPrompt)
-                .searchFocused($isSearchFocused)
                 .environment(\.showPlace, ShowPlaceAction { selection = $0 })
+                .environment(\.setSearchScope, SearchScopeAction { scopedSearch = $0 })
                 .safeAreaInset(edge: .bottom, spacing: 0) { DraftFailureMessage() }
                 .toolbar { LibraryToolbar() }
                 .inspector(isPresented: $isShowingPlayer) {
@@ -33,6 +39,9 @@ struct MainSplitView: View {
                         }
                 }
         }
+        // One for the window: per-place searchables can briefly coexist, and NSToolbar throws on a second.
+        .searchable(text: searchText, placement: .toolbarPrincipal, prompt: scopedSearch?.prompt ?? place.searchPrompt)
+        .searchFocused($isSearchFocused)
         .focusedSceneValue(\.isEditingText, isSearchFocused)
         .onKeyPress(.space, action: playPauseFromSpace)
         .onChange(of: selection, initial: true) {

@@ -99,7 +99,7 @@ public final class AppModel {
     }
 
     public func makeSongs(by artist: Artist) -> ArtistDetailViewModel {
-        ArtistDetailViewModel(artistName: artist.name, libraryCatalog: library)
+        ArtistDetailViewModel(artist: artist, libraryCatalog: library)
     }
 
     public func makeSongs(in playlist: Playlist) -> PlaylistDetailViewModel {

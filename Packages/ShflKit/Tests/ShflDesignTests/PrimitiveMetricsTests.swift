@@ -80,4 +80,13 @@ struct PrimitiveMetricsTests {
         let frames = ListColumns.columnFrames([.artwork, .title, .detail, .time, .accessory], in: 100)
         #expect(frames.values.allSatisfy { $0.upperBound >= $0.lowerBound })
     }
+
+    @Test("Monograms use the first letter or digit and pick a stable tone")
+    func monograms() {
+        #expect(MonogramArtwork.initial(of: "beach house") == "B")
+        #expect(MonogramArtwork.initial(of: "(Sandy) Alex G") == "S")
+        #expect(MonogramArtwork.initial(of: "070 Shake") == "0")
+        #expect(MonogramArtwork.initial(of: "") == "♪")
+        #expect(MonogramArtwork.tone(for: "Beach House") == MonogramArtwork.tone(for: "Beach House"))
+    }
 }

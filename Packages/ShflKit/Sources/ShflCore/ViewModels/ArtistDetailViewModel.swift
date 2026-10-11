@@ -12,10 +12,13 @@ public final class ArtistDetailViewModel {
     public var hasMorePages: Bool { lane.hasMorePages }
     var errorMessage: String? { lane.errorMessage }
 
-    public let artistName: String
+    public let artist: Artist
+    public var artistName: String { artist.name }
+    public var hasLoadedAllSongs: Bool { !lane.hasMorePages }
 
-    package init(artistName: String, libraryCatalog: LibraryCatalog) {
-        self.artistName = artistName
+    package init(artist: Artist, libraryCatalog: LibraryCatalog) {
+        self.artist = artist
+        let artistName = artist.name
         self.lane = LibraryLane<Song>(
             fetchPage: { offset, limit in
                 let page = try await libraryCatalog.fetchSongs(
@@ -38,5 +41,9 @@ public final class ArtistDetailViewModel {
 
     public func loadMorePages() async {
         await lane.loadMore()
+    }
+
+    public func loadAllSongs() async {
+        await lane.loadAll()
     }
 }

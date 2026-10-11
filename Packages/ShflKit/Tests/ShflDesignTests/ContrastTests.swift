@@ -48,6 +48,14 @@ struct ContrastTests {
         }
     }
 
+    @Test("White initials hold 4.5:1 on every monogram tone")
+    func monograms() {
+        for tone in Palette.monograms {
+            let ratio = ColorMath.contrastRatio(Palette.onAccent.light, on: tone)
+            #expect(ratio >= ColorMath.minimumTextContrast, "\(tone): \(ratio)")
+        }
+    }
+
     @Test("Wheel glyphs hold 4.5:1", arguments: schemes)
     func wheelGlyphs(scheme: ColorScheme) {
         expectReadable(.wheelGlyph, on: .wheel, in: environment(theme: .pink, scheme: scheme))

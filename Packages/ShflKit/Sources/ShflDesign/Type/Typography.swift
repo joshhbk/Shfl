@@ -4,6 +4,7 @@ import SwiftUI
 /// Counts and times also take `.monospacedDigit()`.
 extension Font {
     public static let cardTitle = Font.system(size: 14, weight: .heavy, design: .rounded)
+    public static let collectionTitle = Font.system(size: 24, weight: .heavy, design: .rounded)
     public static let emptyStateTitle = Font.system(size: 16, weight: .bold, design: .rounded)
 
     public static let playerTitle = Font.system(size: 20, weight: .bold)

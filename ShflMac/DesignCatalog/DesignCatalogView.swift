@@ -17,6 +17,7 @@ struct DesignCatalogView: View {
                 CatalogSection("Type") { TypeSpecimens() }
                 CatalogSection("Buttons") { ButtonSpecimens() }
                 CatalogSection("Song list") { SongListSpecimen() }
+                CatalogSection("Collections") { CollectionSpecimens() }
                 CatalogSection("Empty states") { EmptyStateSpecimens() }
                 CatalogSection("Player") {
                     HStack(alignment: .top, spacing: Spacing.s20) {
@@ -198,6 +199,26 @@ private struct SongListSpecimen: View {
                 if isOn { picked.insert(index) } else { picked.remove(index) }
             }
         )
+    }
+}
+
+private struct CollectionSpecimens: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            CollectionHeader("Beach House", subtitle: "41 songs") {
+                RoundArtworkFrame(size: ArtworkSize.collection) { MonogramArtwork("Beach House") }
+            } actions: {
+                Button("Add All") {}.buttonStyle(.primary)
+            }
+            .frame(width: 560)
+            .contentSurface()
+            .clipShape(.rect(cornerRadius: CornerRadius.card))
+            HStack(spacing: Spacing.s12) {
+                ForEach(["Beach House", "Clairo", "Fontaines D.C.", "Lorde", "Mazzy Star", "070 Shake"], id: \.self) { name in
+                    RoundArtworkFrame(size: ArtworkSize.songRow) { MonogramArtwork(name) }
+                }
+            }
+        }
     }
 }
 
