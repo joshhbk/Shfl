@@ -42,7 +42,12 @@ public struct Scrubber: View {
         .onKeyPress(.leftArrow) { nudge(by: -step) }
         .onKeyPress(.rightArrow) { nudge(by: step) }
         .accessibilityRepresentation {
-            Slider(value: Binding(get: { value }, set: { value = $0; onEditingChanged(false) }), in: bounds, step: step)
+            let range = Self.sliderRange(for: bounds)
+            Slider(
+                value: Binding(get: { value }, set: { value = $0; onEditingChanged(false) }),
+                in: range,
+                step: Self.sliderStep(step, in: range)
+            )
         }
     }
 
@@ -65,6 +70,16 @@ public struct Scrubber: View {
         value = min(max(value + delta, bounds.lowerBound), bounds.upperBound)
         onEditingChanged(false)
         return .handled
+    }
+
+    /// `Slider` traps on an empty range, which a track has before its duration is known.
+    static func sliderRange(for bounds: ClosedRange<Double>) -> ClosedRange<Double> {
+        bounds.upperBound > bounds.lowerBound ? bounds : bounds.lowerBound...(bounds.lowerBound + 1)
+    }
+
+    /// `Slider` traps when its step is longer than its range.
+    static func sliderStep(_ step: Double, in range: ClosedRange<Double>) -> Double {
+        min(step, range.upperBound - range.lowerBound)
     }
 
     static func fraction(of value: Double, in bounds: ClosedRange<Double>) -> CGFloat {

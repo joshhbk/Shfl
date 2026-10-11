@@ -35,6 +35,14 @@ struct PrimitiveMetricsTests {
         #expect(Scrubber.value(at: 50, width: 0, in: bounds) == 10)
     }
 
+    @Test("The scrubber's VoiceOver slider never gets a range or step that Slider traps on")
+    func scrubberSliderInputs() {
+        #expect(Scrubber.sliderStep(5, in: 0...1) == 1)
+        #expect(Scrubber.sliderStep(5, in: 0...184) == 5)
+        #expect(Scrubber.sliderRange(for: 0...0) == 0...1)
+        #expect(Scrubber.sliderRange(for: 0...184) == 0...184)
+    }
+
     @Test("The scrubber fills in proportion, and stays empty for an empty range")
     func scrubberFraction() {
         #expect(Scrubber.fraction(of: 60, in: 10...110) == 0.5)
