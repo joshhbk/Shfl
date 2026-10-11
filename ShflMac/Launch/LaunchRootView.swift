@@ -6,7 +6,7 @@ struct LaunchRootView: View {
 
     var body: some View {
         content
-            .frame(minWidth: 820, minHeight: 520)
+            .frame(minWidth: 1160, minHeight: 520)
             .task { await model.launch() }
     }
 

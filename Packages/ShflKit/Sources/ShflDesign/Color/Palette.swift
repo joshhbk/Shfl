@@ -4,10 +4,16 @@ import SwiftUI
 nonisolated enum Palette {
     static let content = ColorPair(light: .init(hex: 0xFFFFFF), dark: .init(hex: 0x222225))
     static let elevated = ColorPair(light: .init(hex: 0xFFFFFF), dark: .init(hex: 0x262629))
+    static let pane = ColorPair(light: .init(hex: 0xF7F7F9), dark: .init(hex: 0x1E1E21))
 
     static let hairline = ColorPair(
         light: .init(hex: 0x000000, opacity: 0.10),
         dark: .init(hex: 0xFFFFFF, opacity: 0.12)
+    )
+    static let tileNeutral = ColorPair(light: .init(hex: 0xBDBDC3), dark: .init(hex: 0x5C5C63))
+    static let traySlot = ColorPair(
+        light: .init(hex: 0x000000, opacity: 0.08),
+        dark: .init(hex: 0xFFFFFF, opacity: 0.10)
     )
     static let quietFill = ColorPair(
         light: .init(hex: 0x000000, opacity: 0.055),

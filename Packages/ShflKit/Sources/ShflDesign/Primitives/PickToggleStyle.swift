@@ -16,12 +16,10 @@ private struct PickCircle: View {
     let toggle: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.backgroundProminence) private var prominence
 
     static let diameter: CGFloat = 24
 
     var body: some View {
-        let isOnSelection = prominence == .increased
         Button(action: toggle) {
             Image(systemName: isOn ? "checkmark" : "plus")
                 .font(.system(size: 11, weight: .bold))
@@ -30,7 +28,7 @@ private struct PickCircle: View {
                 .background(isOn ? AnyShapeStyle(.accentFill) : AnyShapeStyle(.clear), in: .circle)
                 .overlay {
                     Circle().strokeBorder(
-                        isOnSelection ? AnyShapeStyle(.onAccent) : isOn ? AnyShapeStyle(.accentFill) : AnyShapeStyle(.tertiary),
+                        isOn ? DesignColor(role: .selectable(.accent, selectedOpacity: 1)) : .textTertiary,
                         style: StrokeStyle(lineWidth: 1.5, dash: isEnabled || isOn ? [] : [3, 2])
                     )
                 }

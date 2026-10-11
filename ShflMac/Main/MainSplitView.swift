@@ -26,10 +26,10 @@ struct MainSplitView: View {
             SidebarView(selection: $selection)
         } detail: {
             DetailColumn(place: place)
+                .safeAreaInset(edge: .trailing, spacing: 0) { PicksColumn() }
                 .environment(\.showPlace, ShowPlaceAction { selection = $0 })
                 .environment(\.setSearchScope, SearchScopeAction { scopedSearch = $0 })
                 .safeAreaInset(edge: .bottom, spacing: 0) { DraftFailureMessage() }
-                .toolbar { LibraryToolbar() }
                 .inspector(isPresented: $isShowingPlayer) {
                     PlayingColumn()
                         .inspectorColumnWidth(min: 320, ideal: 340, max: 420)
@@ -45,7 +45,7 @@ struct MainSplitView: View {
         .focusedSceneValue(\.isEditingText, isSearchFocused)
         .onKeyPress(.space, action: playPauseFromSpace)
         .onChange(of: selection, initial: true) {
-            browser.activeLane = (selection ?? .songs).libraryLane
+            browser.activeLane = place.libraryLane
         }
     }
 
