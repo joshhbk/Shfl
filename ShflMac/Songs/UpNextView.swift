@@ -26,12 +26,7 @@ struct UpNextView: View {
     }
 
     static func matching(_ query: String, in songs: [Song]) -> [(offset: Int, element: Song)] {
-        songs.enumerated().filter { _, song in
-            query.isEmpty
-                || song.title.localizedStandardContains(query)
-                || song.artist.localizedStandardContains(query)
-                || song.albumTitle.localizedStandardContains(query)
-        }
+        songs.enumerated().filter { $0.element.matches(query) }
     }
 }
 

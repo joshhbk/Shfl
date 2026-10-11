@@ -35,4 +35,5 @@ public enum ArtworkSize {
     public static let menuBar: CGFloat = 56
     public static let listRow: CGFloat = 26
     public static let songRow: CGFloat = 34
+    public static let collection: CGFloat = 60
 }

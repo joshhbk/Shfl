@@ -122,6 +122,16 @@ final class LibraryLane<Item: Sendable> {
         isLoadingMore = false
     }
 
+    /// Loads pages until there are none left, or one fails or comes back empty.
+    func loadAll() async {
+        await loadInitial()
+        while hasMorePages, errorMessage == nil {
+            let loaded = items.count
+            await loadMore()
+            if items.count == loaded { break }
+        }
+    }
+
     // MARK: - Search
 
     /// Called when the user changes the search text. Handles debounce internally.

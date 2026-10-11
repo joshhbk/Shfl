@@ -26,4 +26,10 @@ nonisolated enum Palette {
     static let artworkPlaceholderGlyph = ColorPair(.init(hex: 0x8E8E94))
 
     static let onAccent = ColorPair(.init(hex: 0xFFFFFF))
+
+    /// Backgrounds for `MonogramArtwork`, each dark enough for white initials.
+    static let monograms: [Color.Resolved] = [
+        .init(hex: 0xA8232E), .init(hex: 0x2B5FC0), .init(hex: 0x25703C),
+        .init(hex: 0xA64508), .init(hex: 0x7B3FA0), .init(hex: 0x3F4753),
+    ]
 }

@@ -11,6 +11,14 @@ public nonisolated struct Song: Codable, Equatable, Identifiable, Sendable {
     public let duration: TimeInterval?
     public let dateAdded: Date?
 
+    /// Whether the title, artist or album contains `query`. An empty query matches everything.
+    public func matches(_ query: String) -> Bool {
+        query.isEmpty
+            || title.localizedStandardContains(query)
+            || artist.localizedStandardContains(query)
+            || albumTitle.localizedStandardContains(query)
+    }
+
     public init(
         id: String,
         title: String,

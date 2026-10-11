@@ -110,3 +110,26 @@ final class SongSpeechTests: XCTestCase {
         XCTAssertTrue(SongSpeech.describe(song, mark: full, stat: nil).hasSuffix("Not picked. Picks are full."))
     }
 }
+
+final class SongOrderTests: XCTestCase {
+    private func song(_ title: String, plays: Int = 0, played: Double? = nil, added: Double? = nil) -> Song {
+        Song(
+            id: title, title: title, artist: "Beach House", albumTitle: "Bloom", artworkURL: nil, playCount: plays,
+            lastPlayedDate: played.map(Date.init(timeIntervalSinceReferenceDate:)),
+            dateAdded: added.map(Date.init(timeIntervalSinceReferenceDate:))
+        )
+    }
+
+    func test_sortsLikeTheCatalog() {
+        let songs = [song("Myth", plays: 5, played: 10, added: 3), song("Lazuli", plays: 9, added: 1), song("Zebra", plays: 5, played: 30)]
+        XCTAssertEqual(SongOrder.sorted(songs, by: .alphabetical).map(\.title), ["Lazuli", "Myth", "Zebra"])
+        XCTAssertEqual(SongOrder.sorted(songs, by: .mostPlayed).map(\.title), ["Lazuli", "Myth", "Zebra"])
+        XCTAssertEqual(SongOrder.sorted(songs, by: .recentlyPlayed).map(\.title), ["Zebra", "Myth", "Lazuli"])
+        XCTAssertEqual(SongOrder.sorted(songs, by: .recentlyAdded).map(\.title), ["Myth", "Lazuli", "Zebra"])
+    }
+
+    func test_countsReadNaturally() {
+        XCTAssertEqual(SongCount.text(1), "1 song")
+        XCTAssertEqual(SongCount.text(41), "41 songs")
+    }
+}

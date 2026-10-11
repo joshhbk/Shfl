@@ -75,12 +75,7 @@ public final class SessionDraftStore {
     public var isAtCapacity: Bool { draft.remainingCapacity == 0 }
 
     public func songs(matching query: String) -> [Song] {
-        guard !query.isEmpty else { return songs }
-        return songs.filter {
-            $0.title.localizedStandardContains(query)
-                || $0.artist.localizedStandardContains(query)
-                || $0.albumTitle.localizedStandardContains(query)
-        }
+        songs.filter { $0.matches(query) }
     }
 
     func contains(_ songID: String) -> Bool {
