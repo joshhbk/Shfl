@@ -71,10 +71,9 @@ struct PlayerHeadline: View {
             Text(title)
                 .font(.playerTitle)
                 .lineLimit(1)
-            Text(subtitle)
+            MarqueeText(subtitle)
                 .font(.bodyText)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)

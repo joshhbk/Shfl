@@ -43,6 +43,14 @@ struct PrimitiveMetricsTests {
         #expect(Scrubber.sliderRange(for: 0...184) == 0...184)
     }
 
+    @Test("Marquee text scrolls only when it overflows, at a steady speed")
+    func marquee() {
+        #expect(!MarqueeText.overflows(textWidth: 200, availableWidth: 200))
+        #expect(MarqueeText.overflows(textWidth: 201, availableWidth: 200))
+        #expect(!MarqueeText.overflows(textWidth: 500, availableWidth: 0))
+        #expect(MarqueeText.scrollDuration(for: 300) == 10)
+    }
+
     @Test("The scrubber fills in proportion, and stays empty for an empty range")
     func scrubberFraction() {
         #expect(Scrubber.fraction(of: 60, in: 10...110) == 0.5)

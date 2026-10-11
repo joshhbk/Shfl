@@ -68,7 +68,7 @@ private struct WholeSessionPlayer: View {
                 VStack(alignment: .leading, spacing: Spacing.s2) {
                     Text(timeline.current?.title ?? "That was the whole session")
                         .font(.playerTitleCompact)
-                    Text(timeline.current?.byline ?? "Every song in it has played.")
+                    MarqueeText(timeline.current?.byline ?? "Every song in it has played.", alignment: .leading)
                         .font(.bodyText)
                         .foregroundStyle(.secondary)
                 }

@@ -152,7 +152,7 @@ private struct PlayerSpecimen: View {
             Text(CatalogSample.current.title)
                 .font(.playerTitle)
                 .padding(.top, Spacing.s16)
-            Text("\(CatalogSample.current.artist) · Punisher")
+            MarqueeText("\(CatalogSample.current.artist), Julien Baker & Lucy Dacus · Punisher (Deluxe Edition)")
                 .font(.bodyText)
                 .foregroundStyle(.secondary)
                 .padding(.top, Spacing.s2)
