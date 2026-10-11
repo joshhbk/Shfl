@@ -33,6 +33,52 @@ struct SongArtwork: View {
     }
 }
 
+/// What the player says about the session: the song that's playing, or why there isn't one.
+struct SessionCopy {
+    let title: String
+    let subtitle: String
+
+    init(timeline: SessionTimeline, play: TransportIntents.Play) {
+        switch (timeline.status, timeline.current) {
+        case (.active, let song?):
+            title = song.title
+            subtitle = song.byline
+        case (.active, nil):
+            title = "Loading…"
+            subtitle = ""
+        case (.ended, _):
+            title = "That was the whole session"
+            subtitle = "All \(timeline.songCount) songs played. " + Self.nextStep(play)
+        case (.idle, _):
+            title = "Just press Play"
+            subtitle = Self.nextStep(play)
+        }
+    }
+
+    private static func nextStep(_ play: TransportIntents.Play) -> String {
+        switch play {
+        case .autofillAndShuffle(let count):
+            "With an empty pool, Play fills it with \(count) random songs from your library, then shuffles."
+        case .shuffleDraft(let count):
+            "Play shuffles the \(count) songs in your pool."
+        case .pause, .resume:
+            ""
+        }
+    }
+}
+
+/// The session's copy, centred under the artwork.
+struct SessionHeadline: View {
+    let timeline: SessionTimeline
+
+    @Environment(ListeningSessionHost.self) private var sessionHost
+
+    var body: some View {
+        let copy = SessionCopy(timeline: timeline, play: sessionHost.intents.play)
+        PlayerHeadline(title: copy.title, subtitle: copy.subtitle)
+    }
+}
+
 /// The big centred title and subtitle under the artwork.
 struct PlayerHeadline: View {
     let title: String

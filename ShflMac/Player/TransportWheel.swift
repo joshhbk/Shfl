@@ -14,19 +14,19 @@ struct TransportWheel: View {
             Button(intents.play.title, systemImage: intents.play.systemImage, action: playOrPause)
                 .contentTransition(.symbolEffect(.replace))
                 .accessibilityHint(intents.play.accessibilityHint ?? "")
-                .disabled(sessionHost.isStartingSession)
+                .disabled(!isEnabled(.center))
                 .accessibilityIdentifier("mac.transport.playPause")
         } top: {
             Button(intents.shuffle.title, systemImage: "shuffle", action: shuffle)
-                .disabled(sessionHost.isStartingSession)
+                .disabled(!isEnabled(.top))
                 .accessibilityIdentifier("mac.transport.shuffle")
         } leading: {
             Button("Previous", systemImage: "backward.fill", action: previous)
-                .disabled(!sessionHost.canSkip)
+                .disabled(!isEnabled(.leading))
                 .accessibilityIdentifier("mac.transport.previous")
         } trailing: {
             Button("Next", systemImage: "forward.fill", action: next)
-                .disabled(!sessionHost.canSkip)
+                .disabled(!isEnabled(.trailing))
                 .accessibilityIdentifier("mac.transport.next")
         } bottom: {
             Toggle(
@@ -34,29 +34,28 @@ struct TransportWheel: View {
                 systemImage: "list.bullet",
                 isOn: $isShowingSession
             )
-            .disabled(sessionHost.timeline.status == .idle)
+            .disabled(!isEnabled(.bottom))
             .accessibilityIdentifier("mac.transport.session")
         }
         .accessibilityLabel("Playback controls")
     }
 
-    private func press(_ slot: ClickWheelSlot) {
+    private func isEnabled(_ slot: ClickWheelSlot) -> Bool {
         switch slot {
-        case .center:
-            guard !sessionHost.isStartingSession else { return }
-            playOrPause()
-        case .top:
-            guard !sessionHost.isStartingSession else { return }
-            shuffle()
-        case .leading:
-            guard sessionHost.canSkip else { return }
-            previous()
-        case .trailing:
-            guard sessionHost.canSkip else { return }
-            next()
-        case .bottom:
-            guard sessionHost.timeline.status != .idle else { return }
-            isShowingSession.toggle()
+        case .center, .top: !sessionHost.isStartingSession
+        case .leading, .trailing: sessionHost.canSkip
+        case .bottom: sessionHost.timeline.status != .idle
+        }
+    }
+
+    private func press(_ slot: ClickWheelSlot) {
+        guard isEnabled(slot) else { return }
+        switch slot {
+        case .center: playOrPause()
+        case .top: shuffle()
+        case .leading: previous()
+        case .trailing: next()
+        case .bottom: isShowingSession.toggle()
         }
     }
 

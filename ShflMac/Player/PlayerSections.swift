@@ -19,7 +19,7 @@ struct UpNextSection: View {
             }
             ForEach(Array(timeline.upcoming.prefix(Self.rowCount).enumerated()), id: \.element.id) { offset, song in
                 PlayerSongRow(position: timeline.played.count + 2 + offset, song: song) {
-                    if timeline.leftPool.contains(song.id) {
+                    if timeline.changes.leftPool.contains(song.id) {
                         OutlinedTag("Left pool")
                             .accessibilityLabel("No longer in the pool, still plays this session")
                     }
@@ -44,7 +44,7 @@ struct SessionList: View {
                             let isCurrent = song.id == timeline.current?.id
                             PlayerSongRow(position: offset + 1, song: song) {
                                 if isCurrent { PlayingNowIcon() }
-                                if timeline.leftPool.contains(song.id) { OutlinedTag("Left pool") }
+                                if timeline.changes.leftPool.contains(song.id) { OutlinedTag("Left pool") }
                             }
                             .fontWeight(isCurrent ? .bold : nil)
                             .opacity(offset < timeline.played.count ? 0.8 : 1)

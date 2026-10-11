@@ -12,7 +12,7 @@ struct PlayingColumn: View {
         Group {
             switch (timeline.status, isShowingSession) {
             case (.idle, _):
-                EmptyPlayer(isShowingSession: $isShowingSession)
+                EmptyPlayer(timeline: timeline, isShowingSession: $isShowingSession)
             case (.active, false):
                 ArtworkPlayer(timeline: timeline, isShowingSession: $isShowingSession)
             case (.ended, false):
@@ -27,6 +27,10 @@ struct PlayingColumn: View {
         .playerSurface()
         .tintedByArtwork(of: timeline.current)
         .focusedSceneValue(\.wholeSession, $isShowingSession)
+        // There's no session to show once it clears, so the next one opens on the artwork.
+        .onChange(of: timeline.status) { _, status in
+            if status == .idle { isShowingSession = false }
+        }
         .accessibilityIdentifier("mac.player")
     }
 }
@@ -41,7 +45,7 @@ private struct ArtworkPlayer: View {
                 PlayerHeader()
                 SongArtwork(song: timeline.current, size: ArtworkSize.hero)
                     .elevation(.artworkLarge)
-                PlayerHeadline(title: timeline.current?.title ?? "", subtitle: timeline.current?.byline ?? "")
+                SessionHeadline(timeline: timeline)
                     .padding(.top, Spacing.s16)
                 PlaybackScrubber()
                     .padding(.top, Spacing.s16)
@@ -59,16 +63,19 @@ private struct WholeSessionPlayer: View {
     let timeline: SessionTimeline
     @Binding var isShowingSession: Bool
 
+    @Environment(ListeningSessionHost.self) private var sessionHost
+
     var body: some View {
+        let copy = SessionCopy(timeline: timeline, play: sessionHost.intents.play)
         VStack(spacing: 0) {
             PlayerHeader()
             HStack(spacing: Spacing.s12) {
                 SongArtwork(song: timeline.current, size: ArtworkSize.compact)
                     .elevation(.artworkSmall)
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    Text(timeline.current?.title ?? "That was the whole session")
+                    Text(copy.title)
                         .font(.playerTitleCompact)
-                    MarqueeText(timeline.current?.byline ?? "Every song in it has played.", alignment: .leading)
+                    MarqueeText(copy.subtitle, alignment: .leading)
                         .font(.bodyText)
                         .foregroundStyle(.secondary)
                 }
@@ -89,8 +96,8 @@ private struct WholeSessionPlayer: View {
 }
 
 private struct EmptyPlayer: View {
+    let timeline: SessionTimeline
     @Binding var isShowingSession: Bool
-    @Environment(ListeningSessionHost.self) private var sessionHost
 
     var body: some View {
         ScrollView {
@@ -98,7 +105,7 @@ private struct EmptyPlayer: View {
                 PlayerHeader()
                 ArtworkFrame(size: ArtworkSize.hero) { ArtworkPlaceholder() }
                     .elevation(.artworkLarge)
-                PlayerHeadline(title: "Just press Play", subtitle: explanation)
+                SessionHeadline(timeline: timeline)
                     .padding(.top, Spacing.s16)
                 IdleScrubber(isFilled: false)
                     .padding(.top, Spacing.s16)
@@ -109,17 +116,6 @@ private struct EmptyPlayer: View {
             }
         }
         .scrollIndicators(.never)
-    }
-
-    private var explanation: String {
-        switch sessionHost.intents.play {
-        case .autofillAndShuffle(let count):
-            "With an empty pool, Play fills it with \(count) random songs from your library, then shuffles."
-        case .shuffleDraft(let count):
-            "Play shuffles the \(count) songs in your pool."
-        case .pause, .resume:
-            ""
-        }
     }
 }
 
@@ -133,10 +129,7 @@ private struct FinishedPlayer: View {
                 PlayerHeader()
                 ArtworkFrame(size: ArtworkSize.hero) { ArtworkPlaceholder(systemImage: "checkmark.circle") }
                     .elevation(.artworkLarge)
-                PlayerHeadline(
-                    title: "That was the whole session",
-                    subtitle: "All \(timeline.songCount) songs played. The pool is empty, so playback stopped here."
-                )
+                SessionHeadline(timeline: timeline)
                 .padding(.top, Spacing.s16)
                 IdleScrubber(isFilled: true)
                     .padding(.top, Spacing.s16)
