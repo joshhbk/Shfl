@@ -2,13 +2,16 @@ import ShflCore
 import ShflDesign
 import SwiftUI
 
-/// Every song list on the Mac. Screens choose the header and the cells in each row; the list owns selection,
-/// ↩ and ⌫, paging, the selection bar, the context menu and what the Picks menu acts on.
-struct SongList<Header: View, Row: View>: View {
+/// Every song list on the Mac. Screens choose the columns, the stat VoiceOver reads, the column headings and
+/// each row's cells; the list owns selection, ↩ and ⌫, paging, the selection bar, the context menu and what the
+/// Picks menu acts on.
+struct SongList<Header: View, Cells: View>: View {
     let songs: [Song]
+    let columns: [ListColumn]
+    let stat: SongStat?
     var onReachEnd: () -> Void = {}
     @ViewBuilder let header: () -> Header
-    @ViewBuilder let row: (SongItem) -> Row
+    @ViewBuilder let cells: (SongItem) -> Cells
 
     @State private var selection = Set<Song.ID>()
     @Environment(DraftEditing.self) private var drafting
@@ -23,7 +26,8 @@ struct SongList<Header: View, Row: View>: View {
         let selected = SongSelection(songs: songs.filter { selection.contains($0.id) }, marks: marks)
         List(selection: $selection) {
             ForEach(songs) { song in
-                row(SongItem(song: song, mark: marks[song], togglePick: { drafting.toggle(song) }))
+                let item = SongItem(song: song, mark: marks[song], togglePick: { drafting.toggle(song) })
+                SongRow(item, stat: stat, columns: columns, cells: cells)
                     .listRowInsets(EdgeInsets(top: 0, leading: SongListMetrics.rowInset, bottom: 0, trailing: SongListMetrics.rowInset))
                     .onAppear {
                         if song.id == songs.last?.id { onReachEnd() }
@@ -34,7 +38,7 @@ struct SongList<Header: View, Row: View>: View {
         .scrollContentBackground(.hidden)
         .contentSurface()
         .safeAreaInset(edge: .top, spacing: 0) {
-            SongListHeader(content: header)
+            SongListHeader { ListColumns(columns) { header() } }
         }
         .overlay(alignment: .bottom) {
             if selected.songs.count > 1 {
