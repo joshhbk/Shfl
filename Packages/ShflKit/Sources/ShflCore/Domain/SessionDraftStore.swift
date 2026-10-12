@@ -71,6 +71,11 @@ public final class SessionDraftStore {
     public var songCount: Int { draft.songs.count }
     public var capacity: Int { SessionDraft.maxSongs }
     public var milestones: Set<Int> { SessionDraft.milestones }
+
+    /// The highest milestone passed since the draft held `before` songs.
+    public func milestone(reachedFrom before: Int) -> Int? {
+        SessionDraft.milestones.filter { $0 > before && $0 <= songCount }.max()
+    }
     public var remainingCapacity: Int { draft.remainingCapacity }
     public var isEmpty: Bool { draft.songs.isEmpty }
     public var isAtCapacity: Bool { draft.remainingCapacity == 0 }
