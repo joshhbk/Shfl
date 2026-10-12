@@ -13,26 +13,27 @@ struct LibrarySongsView: View {
     private var isSearching: Bool { !browser.searchText.isEmpty }
 
     var body: some View {
-        SongList(songs: isSearching ? browser.searchResults : browser.browseSongs, onReachEnd: loadMore) {
-            ListColumns(Self.columns) {
-                SortHeader("Title", sort: .alphabetical).listColumn(.title)
-                ColumnLabel("Album").listColumn(.detail)
-                ForEach(Self.stats, id: \.self) { stat in
-                    SortHeader(stat.title, sort: stat.sort).listColumn(stat.column)
-                }
-                ColumnLabel("Time").listColumn(.time)
+        SongList(
+            songs: isSearching ? browser.searchResults : browser.browseSongs,
+            columns: Self.columns,
+            stat: SongStat(browser.sortOption),
+            onReachEnd: loadMore
+        ) {
+            SortHeader("Title", sort: .alphabetical).listColumn(.title)
+            ColumnLabel("Album").listColumn(.detail)
+            ForEach(Self.stats, id: \.self) { stat in
+                SortHeader(stat.title, sort: stat.sort).listColumn(stat.column)
             }
-        } row: { item in
-            SongRow(item, stat: SongStat(browser.sortOption), columns: Self.columns) {
-                SongArtwork(song: item.song, size: ArtworkSize.songRow).listColumn(.artwork)
-                SongTitles(item, subtitle: item.song.artist).listColumn(.title)
-                RowDetail(item.song.albumTitle).listColumn(.detail)
-                ForEach(Self.stats, id: \.self) { stat in
-                    RowStat(stat, of: item.song).listColumn(stat.column)
-                }
-                RowDuration(item.song.duration).listColumn(.time)
-                PickToggle(item).listColumn(.accessory)
+            ColumnLabel("Time").listColumn(.time)
+        } cells: { item in
+            SongArtwork(song: item.song, size: ArtworkSize.songRow).listColumn(.artwork)
+            SongTitles(item, subtitle: item.song.artist).listColumn(.title)
+            RowDetail(item.song.albumTitle).listColumn(.detail)
+            ForEach(Self.stats, id: \.self) { stat in
+                RowStat(stat, of: item.song).listColumn(stat.column)
             }
+            RowDuration(item.song.duration).listColumn(.time)
+            PickToggle(item).listColumn(.accessory)
         }
         .overlay { emptyState }
         .task { await browser.loadInitialPage() }

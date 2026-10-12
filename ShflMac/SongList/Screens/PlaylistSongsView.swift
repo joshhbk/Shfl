@@ -15,20 +15,16 @@ struct PlaylistSongsView: View {
 
     var body: some View {
         let shown = songs.songs.filter { $0.matches(search.text) }
-        SongList(songs: shown) {
-            ListColumns(Self.columns) {
-                ColumnLabel("Title").listColumn(.title)
-                ColumnLabel("Album").listColumn(.detail)
-                ColumnLabel("Time").listColumn(.time)
-            }
-        } row: { item in
-            SongRow(item, stat: nil, columns: Self.columns) {
-                SongArtwork(song: item.song, size: ArtworkSize.songRow).listColumn(.artwork)
-                SongTitles(item, subtitle: item.song.artist).listColumn(.title)
-                RowDetail(item.song.albumTitle).listColumn(.detail)
-                RowDuration(item.song.duration).listColumn(.time)
-                PickToggle(item).listColumn(.accessory)
-            }
+        SongList(songs: shown, columns: Self.columns, stat: nil) {
+            ColumnLabel("Title").listColumn(.title)
+            ColumnLabel("Album").listColumn(.detail)
+            ColumnLabel("Time").listColumn(.time)
+        } cells: { item in
+            SongArtwork(song: item.song, size: ArtworkSize.songRow).listColumn(.artwork)
+            SongTitles(item, subtitle: item.song.artist).listColumn(.title)
+            RowDetail(item.song.albumTitle).listColumn(.detail)
+            RowDuration(item.song.duration).listColumn(.time)
+            PickToggle(item).listColumn(.accessory)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             CollectionHeader(
