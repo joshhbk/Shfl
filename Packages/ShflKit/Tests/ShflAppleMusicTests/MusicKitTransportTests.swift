@@ -61,6 +61,17 @@ final class MusicKitTransportTests: XCTestCase {
         XCTAssertEqual(events.last, .stateChanged(.playing(songs[2])))
     }
 
+    func testReportsSessionSongsWhenTheQueueLeavesOneOut() async throws {
+        fake.unqueueableSongIDs = [songs[1].id]
+        try await transport.load(request(currentSongID: songs[0].id))
+
+        try await transport.skipToNext()
+        await waitForStateUpdate()
+
+        XCTAssertEqual(transport.currentSongId, songs[2].id)
+        XCTAssertEqual(events.last, .stateChanged(.playing(songs[2])))
+    }
+
     func testMovingBetweenSongsDoesNotPublishEmptyOrStopped() async throws {
         try await transport.load(request(currentSongID: songs[0].id))
         try await transport.skipToNext()

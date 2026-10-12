@@ -9,6 +9,7 @@ import Foundation
 /// - Moving between entries passes through a moment with no current entry and
 ///   a stopped player.
 /// - Finishing the final entry leaves it loaded with the player stopped.
+/// - A song the library resolves can still be left out of the queue.
 @MainActor
 final class FakeMusicPlayer: MusicPlayerSurface {
     struct QueuedEntry {
@@ -18,6 +19,8 @@ final class FakeMusicPlayer: MusicPlayerSurface {
 
     /// Songs that no longer resolve in the library and are dropped on install.
     var unresolvableSongIDs: Set<String> = []
+    /// Songs that resolve but that the queue silently leaves out.
+    var unqueueableSongIDs: Set<String> = []
     var songDuration: TimeInterval = 180
 
     private(set) var queue: [QueuedEntry] = []
@@ -37,10 +40,10 @@ final class FakeMusicPlayer: MusicPlayerSurface {
             throw PlaybackLoadError.currentSongMissing(currentSongID)
         }
         generation += 1
-        queue = resolved.enumerated().map { index, song in
+        queue = resolved.filter { !unqueueableSongIDs.contains($0.id) }.enumerated().map { index, song in
             QueuedEntry(id: "entry-\(generation)-\(index)", song: song)
         }
-        currentIndex = startIndex
+        currentIndex = queue.firstIndex { $0.song.id == resolved[startIndex].id }
         hasReplacedIdentifiers = false
         await notify()
         return resolved
