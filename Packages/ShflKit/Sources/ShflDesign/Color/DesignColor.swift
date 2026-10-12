@@ -12,6 +12,7 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
         case ink
         case inkSecondary
         case hairline
+        case sidebarWash
     }
 
     let role: Role
@@ -44,6 +45,9 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
             guard !increasedContrast else { return ink }
             let body = DesignColor.playerBody.resolve(in: environment)
             return ColorMath.quietest(ink, on: body, from: 0.84)
+        case .sidebarWash:
+            let accent = theme.accent.resolved(for: scheme)
+            return ColorMath.mix(Palette.sidebar.resolved(for: scheme), with: accent, share: 0.09)
         case .hairline:
             let pair = increasedContrast ? Palette.textTertiary : Palette.hairline
             return pair.resolved(for: scheme)
@@ -56,6 +60,8 @@ nonisolated extension ShapeStyle where Self == DesignColor {
     public static var surfaceContent: DesignColor { .init(role: .fixed(Palette.content)) }
     /// Popovers, menus and settings panels.
     public static var surfaceElevated: DesignColor { .init(role: .fixed(Palette.elevated)) }
+    /// The sidebar, washed with the theme colour.
+    public static var surfaceSidebar: DesignColor { .init(role: .sidebarWash) }
     /// The Picks column.
     public static var surfacePane: DesignColor { .init(role: .fixed(Palette.pane)) }
     /// An empty slot in the tray.
