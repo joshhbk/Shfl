@@ -75,6 +75,8 @@ nonisolated extension ShapeStyle where Self == DesignColor {
     /// The theme colour adjusted to hold 4.5:1 as text on content surfaces.
     public static var accentText: DesignColor { .init(role: .accentText) }
     public static var onAccent: DesignColor { .init(role: .fixed(Palette.onAccent)) }
+    /// A status that's working, like scrobbling.
+    public static var ok: DesignColor { .init(role: .fixed(Palette.ok)) }
     /// Text and outlines for something that didn't work, like a batch with no room.
     public static var warning: DesignColor { .init(role: .fixed(Palette.warning)) }
     /// `accentText` for marks inside list rows, like the playing glyph and the Next shuffle tag.
