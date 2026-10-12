@@ -40,7 +40,6 @@ struct PlayerEntry: Equatable {
     /// The entry's song with MusicKit's identifiers, or nil when the entry
     /// isn't a song.
     let song: Song?
-    let duration: TimeInterval
 }
 
 enum PlayerStatus: Equatable {
@@ -111,7 +110,7 @@ package final class MusicKitTransport {
     }
 
     package var currentSongDuration: TimeInterval {
-        player.currentEntry?.duration ?? 0
+        player.currentEntry?.song?.duration ?? 0
     }
 
     package var currentSongId: String? {

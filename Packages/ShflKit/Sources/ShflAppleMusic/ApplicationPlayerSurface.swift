@@ -40,12 +40,11 @@ final class ApplicationPlayerSurface: MusicPlayerSurface {
     var currentEntry: PlayerEntry? {
         guard let entry = player.queue.currentEntry else { return nil }
         guard case .song(let song) = entry.item else {
-            return PlayerEntry(id: entry.id, song: nil, duration: 0)
+            return PlayerEntry(id: entry.id, song: nil)
         }
         return PlayerEntry(
             id: entry.id,
-            song: ShflCore.Song(song, artworkURL: song.artwork?.url(width: 1200, height: 1200)),
-            duration: song.duration ?? 0
+            song: ShflCore.Song(song, artworkURL: song.artwork?.url(width: 1200, height: 1200))
         )
     }
 
