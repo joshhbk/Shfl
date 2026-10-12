@@ -4,6 +4,7 @@ import SwiftUI
 nonisolated enum Palette {
     static let content = ColorPair(light: .init(hex: 0xFFFFFF), dark: .init(hex: 0x222225))
     static let elevated = ColorPair(light: .init(hex: 0xFFFFFF), dark: .init(hex: 0x262629))
+    static let sidebar = ColorPair(light: .init(hex: 0xE9E9ED), dark: .init(hex: 0x29292C))
     static let pane = ColorPair(light: .init(hex: 0xF7F7F9), dark: .init(hex: 0x1E1E21))
 
     static let hairline = ColorPair(
@@ -32,6 +33,7 @@ nonisolated enum Palette {
     static let artworkPlaceholderGlyph = ColorPair(.init(hex: 0x8E8E94))
 
     static let onAccent = ColorPair(.init(hex: 0xFFFFFF))
+    static let ok = ColorPair(light: .init(hex: 0x2E9E55), dark: .init(hex: 0x3FB56A))
     static let warning = ColorPair(light: .init(hex: 0xA8291F), dark: .init(hex: 0xFF8F80))
 
     /// Backgrounds for `MonogramArtwork`, each dark enough for white initials.

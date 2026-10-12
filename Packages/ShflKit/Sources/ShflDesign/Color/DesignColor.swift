@@ -12,6 +12,7 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
         case ink
         case inkSecondary
         case hairline
+        case sidebarWash
     }
 
     let role: Role
@@ -44,6 +45,9 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
             guard !increasedContrast else { return ink }
             let body = DesignColor.playerBody.resolve(in: environment)
             return ColorMath.quietest(ink, on: body, from: 0.84)
+        case .sidebarWash:
+            let accent = theme.accent.resolved(for: scheme)
+            return ColorMath.mix(Palette.sidebar.resolved(for: scheme), with: accent, share: 0.09)
         case .hairline:
             let pair = increasedContrast ? Palette.textTertiary : Palette.hairline
             return pair.resolved(for: scheme)
@@ -56,6 +60,8 @@ nonisolated extension ShapeStyle where Self == DesignColor {
     public static var surfaceContent: DesignColor { .init(role: .fixed(Palette.content)) }
     /// Popovers, menus and settings panels.
     public static var surfaceElevated: DesignColor { .init(role: .fixed(Palette.elevated)) }
+    /// The sidebar, washed with the theme colour.
+    public static var surfaceSidebar: DesignColor { .init(role: .sidebarWash) }
     /// The Picks column.
     public static var surfacePane: DesignColor { .init(role: .fixed(Palette.pane)) }
     /// An empty slot in the tray.
@@ -75,6 +81,8 @@ nonisolated extension ShapeStyle where Self == DesignColor {
     /// The theme colour adjusted to hold 4.5:1 as text on content surfaces.
     public static var accentText: DesignColor { .init(role: .accentText) }
     public static var onAccent: DesignColor { .init(role: .fixed(Palette.onAccent)) }
+    /// A status that's working, like scrobbling.
+    public static var ok: DesignColor { .init(role: .fixed(Palette.ok)) }
     /// Text and outlines for something that didn't work, like a batch with no room.
     public static var warning: DesignColor { .init(role: .fixed(Palette.warning)) }
     /// `accentText` for marks inside list rows, like the playing glyph and the Next shuffle tag.
