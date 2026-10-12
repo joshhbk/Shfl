@@ -23,3 +23,34 @@ final class TraySlotsTests: XCTestCase {
         XCTAssertEqual(slots.slots.count, 120)
     }
 }
+
+final class TrayMotionTests: XCTestCase {
+    func test_fiftyRipplesItsRowLeftToRight() {
+        var motion = TrayMotion()
+        motion.play(.milestone(50))
+
+        XCTAssertEqual(motion.pulseDelay(for: 40, capacity: 120, columns: 10), 0)
+        XCTAssertEqual(motion.pulseDelay(for: 49, capacity: 120, columns: 10), 9 * TrayMotion.rippleStep)
+        XCTAssertNil(motion.pulseDelay(for: 39, capacity: 120, columns: 10))
+        XCTAssertEqual(motion.milestoneBeats, 1)
+    }
+
+    func test_theFirstPickAndAFullTrayPulseTogether() {
+        var motion = TrayMotion()
+        motion.play(.milestone(1))
+        XCTAssertEqual(motion.pulseDelay(for: 0, capacity: 120, columns: 10), 0)
+        XCTAssertNil(motion.pulseDelay(for: 1, capacity: 120, columns: 10))
+
+        motion.play(.milestone(120))
+        XCTAssertEqual(motion.pulseDelay(for: 7, capacity: 120, columns: 10), 0)
+        XCTAssertEqual(motion.pulseDelay(for: 119, capacity: 120, columns: 10), 0)
+    }
+
+    func test_noRoomOnlyFlashesTheSlots() {
+        var motion = TrayMotion()
+        motion.play(.noRoom)
+
+        XCTAssertEqual(motion.noRoomFlashes, 1)
+        XCTAssertEqual(motion.milestoneBeats, 0)
+    }
+}
