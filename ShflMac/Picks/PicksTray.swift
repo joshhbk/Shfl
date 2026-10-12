@@ -75,7 +75,9 @@ struct PicksTray: View {
                     .accessibilityHidden(true)
             }
         }
-        .task(id: draft.songs.map(\.id)) { await tones.load(draft.songs, using: store.map(ArtworkPalette.init)) }
+        .onChange(of: draft.songs.map(\.id), initial: true) {
+            tones.load(draft.songs, using: store.map(ArtworkPalette.init))
+        }
         .onChange(of: drafting.moment) { _, moment in
             if let moment { motion.play(moment.kind) }
         }
