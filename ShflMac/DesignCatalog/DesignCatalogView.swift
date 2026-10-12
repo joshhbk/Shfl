@@ -216,7 +216,9 @@ private struct PicksSpecimen: View {
                 CountFraction(46, of: 120)
                 Tray(capacity: 120, filled: 46, marks: [50, 100, 120]) { index in
                     if index < 46 {
-                        PickedTile(tone: index == 7 ? nil : tones[index % tones.count]).tileRing(index >= 43)
+                        PickedTile(tone: index == 7 ? nil : tones[index % tones.count])
+                            .tileRing(index >= 43)
+                            .tileFocus(index == 21)
                     } else {
                         EmptyTile().milestoneOutline([50, 100, 120].contains(index + 1))
                     }
