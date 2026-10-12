@@ -59,7 +59,7 @@ final class FakeMusicPlayer: MusicPlayerSurface {
     var currentEntry: PlayerEntry? {
         guard let currentIndex, queue.indices.contains(currentIndex) else { return nil }
         let entry = queue[currentIndex]
-        return PlayerEntry(id: entry.id, song: reportedSong(entry.song), duration: songDuration)
+        return PlayerEntry(id: entry.id, song: reportedSong(entry.song))
     }
 
     func prepareToPlay() async throws {}
@@ -144,17 +144,17 @@ final class FakeMusicPlayer: MusicPlayerSurface {
         await notify()
     }
 
+    /// Songs without a length play for `songDuration`.
     private func reportedSong(_ song: Song) -> Song {
-        guard hasReplacedIdentifiers else { return song }
-        return Song(
-            id: "catalog-\(song.id)",
+        Song(
+            id: hasReplacedIdentifiers ? "catalog-\(song.id)" : song.id,
             title: song.title,
             artist: song.artist,
             albumTitle: song.albumTitle,
-            artworkURL: nil,
+            artworkURL: hasReplacedIdentifiers ? nil : song.artworkURL,
             playCount: song.playCount,
             lastPlayedDate: song.lastPlayedDate,
-            duration: song.duration,
+            duration: song.duration ?? songDuration,
             dateAdded: song.dateAdded
         )
     }
