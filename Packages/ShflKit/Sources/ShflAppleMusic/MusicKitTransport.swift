@@ -275,7 +275,7 @@ package final class MusicKitTransport {
 
     /// The session's own song for an entry. Resolves by position in the live
     /// queue first, because MusicKit can replace entry and song IDs when
-    /// playback starts, then by song ID.
+    /// playback starts, then by song ID, then by what the song is.
     private func song(for entry: PlayerEntry) -> Song? {
         let liveEntryIDs = player.entryIDs
         if liveEntryIDs.count == sessionSongOrder.count,
@@ -283,7 +283,9 @@ package final class MusicKitTransport {
             return sessionSongOrder[index]
         }
         if let reported = entry.song,
-           let sessionSong = sessionSongOrder.first(where: { $0.id == reported.id }) {
+           let sessionSong = sessionSongOrder.first(where: { $0.id == reported.id })
+            // MusicKit can leave an unplayable song out of the queue, which breaks positions too.
+            ?? sessionSongOrder.first(where: { $0.isSameRecording(as: reported) }) {
             return sessionSong
         }
         #if DEBUG
@@ -315,6 +317,12 @@ package final class MusicKitTransport {
         case .unknown:
             return .stopped
         }
+    }
+}
+
+private extension Song {
+    func isSameRecording(as other: Song) -> Bool {
+        title == other.title && artist == other.artist && albumTitle == other.albumTitle
     }
 }
 
