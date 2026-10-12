@@ -91,10 +91,6 @@ public struct PickedTile: View {
     public var body: some View {
         RoundedRectangle(cornerRadius: CornerRadius.tile)
             .fill(tone.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tileNeutral))
-            .overlay {
-                RoundedRectangle(cornerRadius: CornerRadius.tile)
-                    .strokeBorder(.gray.opacity(0.3), lineWidth: 1)
-            }
             .aspectRatio(1, contentMode: .fit)
     }
 }
