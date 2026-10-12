@@ -6,12 +6,13 @@ import ShflCore
 final class DraftEditing {
     deinit {} // Keep nonisolated: Xcode 27 synthesizes an isolated one that can crash on release. See ViewTeardownTests.
 
-    private(set) var milestonePulses = 0
+    private(set) var moment: PicksMoment?
     private(set) var failureMessage: String?
 
     @ObservationIgnored private let editor: SessionDraftEditor
     @ObservationIgnored private let browser: LibraryBrowser
     @ObservationIgnored private let beep: () -> Void
+    @ObservationIgnored private var momentCount = 0
 
     init(editor: SessionDraftEditor, browser: LibraryBrowser, beep: @escaping () -> Void) {
         self.editor = editor
@@ -47,9 +48,13 @@ final class DraftEditing {
 
     func autofill() async {
         failureMessage = nil
+        let before = draft.songCount
         await editor.autofill(using: browser)
         if case .error(let message) = browser.autofillState {
             failureMessage = message
+        }
+        if let milestone = draft.milestone(reachedFrom: before) {
+            mark(.milestone(milestone))
         }
     }
 
@@ -61,13 +66,19 @@ final class DraftEditing {
         switch edit {
         case .added(_, let milestone):
             failureMessage = nil
-            if milestone != nil { milestonePulses += 1 }
+            if let milestone { mark(.milestone(milestone)) }
         case .removed:
             failureMessage = nil
         case .rejectedAtCapacity:
             beep()
+            mark(.noRoom)
         case .failed(let message):
             failureMessage = message
         }
+    }
+
+    private func mark(_ kind: PicksMoment.Kind) {
+        momentCount += 1
+        moment = PicksMoment(kind: kind, id: momentCount)
     }
 }

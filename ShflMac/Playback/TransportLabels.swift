@@ -28,7 +28,7 @@ extension TransportIntents.Shuffle {
         case .again: "Shuffle Again"
         case .changedDraft: "Shuffle Now"
         case .changedStyle: "Start New Shuffle Now"
-        case .draft(let count): count == 1 ? "Shuffle 1 Song" : "Shuffle \(count) Songs"
+        case .draft: "Shuffle"
         case .autofillAndShuffle: "Autofill and Shuffle"
         }
     }

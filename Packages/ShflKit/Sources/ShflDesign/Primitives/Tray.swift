@@ -1,14 +1,23 @@
 import SwiftUI
 
-/// A grid of square tiles, with a ruler naming each row that ends on one of `marks`.
+/// A grid of square tiles, with a ruler naming each row that ends on one of `marks`. Marks up to `filled`
+/// step up in weight and colour, and a full tray keeps an outline.
 public struct Tray<Tile: View>: View {
     private let capacity: Int
+    private let filled: Int
     private let columns: Int
     private let marks: Set<Int>
     private let tile: (Int) -> Tile
 
-    public init(capacity: Int, columns: Int = 10, marks: Set<Int>, @ViewBuilder tile: @escaping (Int) -> Tile) {
+    public init(
+        capacity: Int,
+        filled: Int,
+        columns: Int = 10,
+        marks: Set<Int>,
+        @ViewBuilder tile: @escaping (Int) -> Tile
+    ) {
         self.capacity = capacity
+        self.filled = filled
         self.columns = columns
         self.marks = marks
         self.tile = tile
@@ -27,7 +36,18 @@ public struct Tray<Tile: View>: View {
                             Color.clear.aspectRatio(1, contentMode: .fit)
                         }
                     }
-                    RulerMark(rowEnd: min((row + 1) * columns, capacity), marks: marks)
+                    let rowEnd = min((row + 1) * columns, capacity)
+                    RulerMark(rowEnd: rowEnd, isMarked: marks.contains(rowEnd), isReached: rowEnd <= filled)
+                }
+            }
+        }
+        .background(alignment: .leading) {
+            if filled >= capacity {
+                GeometryReader { tray in
+                    RoundedRectangle(cornerRadius: CornerRadius.control)
+                        .strokeBorder(.accentText, lineWidth: 2)
+                        .padding(-5)
+                        .frame(width: tray.size.width - TrayMetrics.rulerWidth - TrayMetrics.gap * 2)
                 }
             }
         }
@@ -41,14 +61,15 @@ enum TrayMetrics {
 
 private struct RulerMark: View {
     let rowEnd: Int
-    let marks: Set<Int>
+    let isMarked: Bool
+    let isReached: Bool
 
     var body: some View {
         Group {
-            if marks.contains(rowEnd) {
+            if isMarked {
                 Text(rowEnd, format: .number)
-                    .font(.rulerMark.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                    .font(isReached ? .rulerMarkReached.monospacedDigit() : .rulerMark.monospacedDigit())
+                    .foregroundStyle(isReached ? AnyShapeStyle(.accentText) : AnyShapeStyle(.tertiary))
             } else {
                 Color.clear.gridCellUnsizedAxes(.vertical)
             }
