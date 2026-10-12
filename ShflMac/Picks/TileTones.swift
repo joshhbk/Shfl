@@ -1,8 +1,9 @@
 import ShflAppleMusicUI
 import ShflCore
+import ShflDesign
 import SwiftUI
 
-/// Each picked song's artwork colour for its tray tile, loaded once per song.
+/// Each picked song's tile colour, read from its artwork once.
 @Observable
 @MainActor
 final class TileTones {
@@ -13,16 +14,15 @@ final class TileTones {
 
     subscript(song: Song) -> Color? { tones[song.id] }
 
-    func load(_ songs: [Song], using palette: ArtworkPalette?) async {
+    // Each load outlives the view's update, so editing picks mid-load can't leave a song uncoloured.
+    func load(_ songs: [Song], using palette: ArtworkPalette?) {
         guard let palette else { return }
-        let missing = songs.map(\.id).filter { !requested.contains($0) }
-        requested.formUnion(missing)
-        await withTaskGroup(of: (String, Color?).self) { group in
-            for id in missing {
-                group.addTask { @MainActor in (id, await palette.colors(for: .song(id: id))?.first) }
-            }
-            for await (id, tone) in group {
-                tones[id] = tone
+        for id in songs.map(\.id) where !requested.contains(id) {
+            requested.insert(id)
+            Task { [weak self] in
+                let colors = await palette.pixelColors(for: .song(id: id)) ?? []
+                let tone = ArtworkTone.tile(from: colors.map { $0.resolve(in: EnvironmentValues()) })
+                self?.tones[id] = tone.map(Color.init)
             }
         }
     }
