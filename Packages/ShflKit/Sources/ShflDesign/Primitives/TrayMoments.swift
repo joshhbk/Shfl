@@ -29,7 +29,7 @@ private struct TilePulse: ViewModifier {
                 }
             } keyframes: { _ in
                 KeyframeTrack {
-                    LinearKeyframe(0, duration: delay)
+                    LinearKeyframe(0, duration: max(delay, 0.001))
                     LinearKeyframe(0.6 * peak, duration: 0.12)
                     LinearKeyframe(0, duration: 0.4)
                 }
@@ -39,7 +39,8 @@ private struct TilePulse: ViewModifier {
                 tile.scaleEffect(scale)
             } keyframes: { _ in
                 KeyframeTrack {
-                    LinearKeyframe(1, duration: delay)
+                    // A zero-length keyframe leaves the scale invalid and the tile undrawn.
+                    LinearKeyframe(1, duration: max(delay, 0.001))
                     SpringKeyframe(1 + 0.28 * peak, duration: 0.12)
                     SpringKeyframe(1, duration: 0.3, spring: .bouncy)
                 }
