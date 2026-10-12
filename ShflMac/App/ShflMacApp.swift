@@ -14,6 +14,7 @@ struct ShflMacApp: App {
         }
         .defaultSize(width: 1280, height: 760)
         .commands {
+            LibraryCommands()
             PlaybackCommands(sessionHost: appDelegate.model.sessionHost)
             PicksCommands(drafting: appDelegate.shell.drafting, preferences: appDelegate.model.libraryPreferences)
             SortCommands(browser: appDelegate.shell.browser)
