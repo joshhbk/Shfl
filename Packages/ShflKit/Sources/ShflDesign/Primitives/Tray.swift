@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A grid of square tiles, with a ruler naming each row that ends on one of `marks`. Marks up to `filled`
-/// step up in weight and colour, and a full tray keeps an outline.
+/// step up in weight and colour.
 public struct Tray<Tile: View>: View {
     private let capacity: Int
     private let filled: Int
@@ -38,16 +38,6 @@ public struct Tray<Tile: View>: View {
                     }
                     let rowEnd = min((row + 1) * columns, capacity)
                     RulerMark(rowEnd: rowEnd, isMarked: marks.contains(rowEnd), isReached: rowEnd <= filled)
-                }
-            }
-        }
-        .background(alignment: .leading) {
-            if filled >= capacity {
-                GeometryReader { tray in
-                    RoundedRectangle(cornerRadius: CornerRadius.control)
-                        .strokeBorder(.accentText, lineWidth: 2)
-                        .padding(-5)
-                        .frame(width: tray.size.width - TrayMetrics.rulerWidth - TrayMetrics.gap * 2)
                 }
             }
         }
