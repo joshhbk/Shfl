@@ -225,11 +225,6 @@ private struct PicksSpecimen: View {
                 }
             }
             .frame(width: 260)
-            VStack(alignment: .leading, spacing: Spacing.s14) {
-                CountFraction(37, of: 120)
-                CapacityRule(37, of: 120, marks: [50, 100, 120])
-            }
-            .frame(width: 260)
         }
         .padding(Spacing.s20)
         .paneSurface()
