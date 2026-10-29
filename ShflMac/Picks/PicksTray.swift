@@ -26,7 +26,7 @@ struct PicksTray: View {
             joiningNextShuffle: sessionHost.timeline.changes.joiningNextShuffle
         )
         VStack(alignment: .leading, spacing: Spacing.s8) {
-            Tray(capacity: draft.capacity, filled: draft.songCount, columns: Self.columns, marks: Set(TrayMarks.ruler(draft))) { index in
+            Tray(capacity: draft.capacity, columns: Self.columns) { index in
                 switch slots[index] {
                 case .picked(let song, let joinsNextShuffle):
                     PickedTile(tone: tones[song])
