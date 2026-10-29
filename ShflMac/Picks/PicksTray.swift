@@ -3,7 +3,7 @@ import ShflCore
 import ShflDesign
 import SwiftUI
 
-/// Every slot in your picks, filled oldest first. One Tab stop: arrow keys walk the picks and ⌫ removes one.
+/// Every slot in your picks, filled oldest first. One Tab stop: clicks and arrow keys pick a tile and ⌫ removes it.
 /// VoiceOver reads it as the list of picks.
 struct PicksTray: View {
     @State private var tones = TileTones()
@@ -32,6 +32,7 @@ struct PicksTray: View {
                     PickedTile(tone: tones[song])
                         .tileRing(joinsNextShuffle)
                         .tileFocus(isFocused && cursor?.index == index)
+                        .onTapGesture { select(index) }
                         .tilePulse(
                             trigger: motion.milestoneBeats,
                             delay: motion.pulseDelay(for: index, capacity: draft.capacity, columns: Self.columns)
@@ -59,7 +60,7 @@ struct PicksTray: View {
             }
             .onDeleteCommand(perform: removeFocusedPick)
             .onChange(of: isFocused) { _, focused in
-                cursor = focused ? TrayCursor(count: draft.songCount) : nil
+                cursor = focused ? cursor ?? TrayCursor(count: draft.songCount) : nil
             }
             if isShowingNoRoom {
                 Text(draft.isAtCapacity ? "Picks are full" : "Not enough room")
@@ -99,6 +100,11 @@ private extension PicksTray {
         default: .down
         }
         cursor?.move(step, count: drafting.draft.songCount, columns: Self.columns)
+    }
+
+    func select(_ index: Int) {
+        cursor = TrayCursor(index: index)
+        isFocused = true
     }
 
     func removeFocusedPick() {
