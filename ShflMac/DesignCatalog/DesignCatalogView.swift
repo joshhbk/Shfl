@@ -228,9 +228,6 @@ private struct PicksSpecimen: View {
             VStack(alignment: .leading, spacing: Spacing.s14) {
                 CountFraction(37, of: 120)
                 CapacityRule(37, of: 120, marks: [50, 100, 120])
-                StatusLine("Next shuffle") { Text("Picks have changed").foregroundStyle(.accentText) }
-                FieldLabel("Least Played").fieldHighlight(true)
-                FieldLabel("Artist Spacing")
             }
             .frame(width: 260)
         }

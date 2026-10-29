@@ -32,7 +32,7 @@ struct PicksColumn: View {
                     .padding(.top, Spacing.s12)
                     .padding(.bottom, Spacing.s16)
             }
-            ShuffleBlock()
+            ShuffleButton()
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.bottom, Spacing.s16)
