@@ -20,8 +20,6 @@ struct PicksColumn: View {
                     .padding(.top, Spacing.s14)
                 PicksActions()
                     .padding(.top, Spacing.s14)
-                LatestPicks()
-                    .padding(.top, Spacing.s20)
                 Spacer(minLength: Spacing.s16)
             case .list:
                 CapacityRule(draft.songCount, of: draft.capacity, marks: TrayMarks.ruler(draft))

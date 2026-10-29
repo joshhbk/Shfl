@@ -114,23 +114,3 @@ private extension PicksTray {
         self.cursor = cursor.clamped(to: drafting.draft.songCount)
     }
 }
-
-/// The three newest picks under the tray.
-struct LatestPicks: View {
-    @Environment(DraftEditing.self) private var drafting
-
-    var body: some View {
-        let latest = drafting.draft.songs.suffix(3).reversed()
-        if !latest.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Latest picks")
-                    .font(.columnLabel)
-                    .foregroundStyle(.tertiary)
-                    .padding(.bottom, Spacing.s4)
-                ForEach(latest) { song in
-                    PickRow(song: song)
-                }
-            }
-        }
-    }
-}
