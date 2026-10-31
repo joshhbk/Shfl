@@ -23,7 +23,7 @@ final class SessionDraftEditorTests: XCTestCase {
         let edit = editor.toggle(makeSongs(1)[0])
 
         XCTAssertEqual(draft.songs.map(\.id), ["1"])
-        XCTAssertEqual(edit, .added(songCount: 1, reachedMilestone: true))
+        XCTAssertEqual(edit, .added(songCount: 1, milestone: 1))
     }
 
     func test_addingReportsMilestonesOnlyAtTheirCounts() throws {
@@ -35,9 +35,9 @@ final class SessionDraftEditorTests: XCTestCase {
         let toFifty = editor.toggle(makeSongs(1, start: 201)[0])
         let toFiftyOne = editor.toggle(makeSongs(1, start: 202)[0])
 
-        XCTAssertEqual(toFortyNine, .added(songCount: 49, reachedMilestone: false))
-        XCTAssertEqual(toFifty, .added(songCount: 50, reachedMilestone: true))
-        XCTAssertEqual(toFiftyOne, .added(songCount: 51, reachedMilestone: false))
+        XCTAssertEqual(toFortyNine, .added(songCount: 49, milestone: nil))
+        XCTAssertEqual(toFifty, .added(songCount: 50, milestone: 50))
+        XCTAssertEqual(toFiftyOne, .added(songCount: 51, milestone: nil))
     }
 
     func test_fillingTheDraftIsAMilestone() throws {
@@ -47,7 +47,7 @@ final class SessionDraftEditorTests: XCTestCase {
 
         let edit = editor.toggle(makeSongs(1, start: 500)[0])
 
-        XCTAssertEqual(edit, .added(songCount: SessionDraft.maxSongs, reachedMilestone: true))
+        XCTAssertEqual(edit, .added(songCount: SessionDraft.maxSongs, milestone: 120))
     }
 
     func test_toggleRemovesFromTheDraft() throws {
@@ -80,7 +80,7 @@ final class SessionDraftEditorTests: XCTestCase {
         let edit = editor.add(makeSongs(3))
 
         XCTAssertEqual(draft.songs.map(\.id), ["1", "2", "3"])
-        XCTAssertEqual(edit, .added(songCount: 3, reachedMilestone: false))
+        XCTAssertEqual(edit, .added(songCount: 3, milestone: nil))
     }
 
     func test_addingSeveralPastAMilestoneReachesIt() throws {
@@ -90,7 +90,7 @@ final class SessionDraftEditorTests: XCTestCase {
 
         let edit = editor.add(makeSongs(3, start: 200))
 
-        XCTAssertEqual(edit, .added(songCount: 51, reachedMilestone: true))
+        XCTAssertEqual(edit, .added(songCount: 51, milestone: 50))
     }
 
     func test_addingMoreThanFitsAddsNone() throws {
@@ -112,7 +112,7 @@ final class SessionDraftEditorTests: XCTestCase {
 
         let edit = editor.add(makeSongs(2))
 
-        XCTAssertEqual(edit, .added(songCount: 2, reachedMilestone: false))
+        XCTAssertEqual(edit, .added(songCount: 2, milestone: nil))
         XCTAssertTrue(editor.autofillIsExhausted)
     }
 
