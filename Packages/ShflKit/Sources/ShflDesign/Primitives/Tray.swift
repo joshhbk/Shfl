@@ -131,3 +131,17 @@ extension View {
         }
     }
 }
+
+extension View {
+    /// The keyboard focus ring on a tile: 3pt in the theme colour, outside the tile.
+    public func tileFocus(_ isFocused: Bool) -> some View {
+        overlay {
+            if isFocused {
+                RoundedRectangle(cornerRadius: CornerRadius.tile + 4)
+                    .strokeBorder(.accentFill, lineWidth: 3)
+                    .padding(-4)
+            }
+        }
+        .zIndex(isFocused ? 1 : 0)
+    }
+}

@@ -2,6 +2,7 @@ import XCTest
 @testable import ShflMac
 import ShflCore
 
+@MainActor
 final class TraySlotsTests: XCTestCase {
     private let milestones: Set<Int> = [1, 50, 100, 120]
 
@@ -24,6 +25,7 @@ final class TraySlotsTests: XCTestCase {
     }
 }
 
+@MainActor
 final class TrayMotionTests: XCTestCase {
     func test_fiftyRipplesItsRowLeftToRight() {
         var motion = TrayMotion()
@@ -52,5 +54,36 @@ final class TrayMotionTests: XCTestCase {
 
         XCTAssertEqual(motion.noRoomFlashes, 1)
         XCTAssertEqual(motion.milestoneBeats, 0)
+    }
+}
+
+@MainActor
+final class TrayCursorTests: XCTestCase {
+    func test_startsOnTheNewestPick() {
+        XCTAssertEqual(TrayCursor(count: 37)?.index, 36)
+        XCTAssertNil(TrayCursor(count: 0))
+    }
+
+    func test_movesATileOrARowAndStopsAtTheEdges() throws {
+        var cursor = try XCTUnwrap(TrayCursor(count: 37))
+
+        cursor.move(.up, count: 37, columns: 10)
+        XCTAssertEqual(cursor.index, 26)
+        cursor.move(.left, count: 37, columns: 10)
+        XCTAssertEqual(cursor.index, 25)
+        cursor.move(.down, count: 37, columns: 10)
+        XCTAssertEqual(cursor.index, 35)
+        cursor.move(.down, count: 37, columns: 10)
+        XCTAssertEqual(cursor.index, 35, "Nothing picked below")
+        cursor.move(.right, count: 37, columns: 10)
+        cursor.move(.right, count: 37, columns: 10)
+        XCTAssertEqual(cursor.index, 36, "Stops at the newest pick")
+    }
+
+    func test_staysOnAPickAfterARemoval() throws {
+        let cursor = try XCTUnwrap(TrayCursor(count: 3))
+
+        XCTAssertEqual(cursor.clamped(to: 2)?.index, 1)
+        XCTAssertNil(cursor.clamped(to: 0))
     }
 }
