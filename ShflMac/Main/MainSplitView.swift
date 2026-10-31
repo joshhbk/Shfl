@@ -43,6 +43,7 @@ struct MainSplitView: View {
         .searchable(text: searchText, placement: .toolbarPrincipal, prompt: scopedSearch?.prompt ?? place.searchPrompt)
         .searchFocused($isSearchFocused)
         .focusedSceneValue(\.isEditingText, isSearchFocused)
+        .focusedSceneValue(\.libraryPlace, $selection)
         .onKeyPress(.space, action: playPauseFromSpace)
         .onChange(of: selection, initial: true) {
             browser.activeLane = place.libraryLane
