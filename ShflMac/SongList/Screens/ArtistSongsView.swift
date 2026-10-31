@@ -16,24 +16,20 @@ struct ArtistSongsView: View {
 
     var body: some View {
         let shown = SongOrder.sorted(songs.songs.filter { $0.matches(search.text) }, by: order)
-        SongList(songs: shown) {
-            ListColumns(Self.columns) {
-                Button("Title") { order = .alphabetical }
-                    .buttonStyle(.columnSort(isSorted: order == .alphabetical))
-                    .listColumn(.title)
-                Button(SongStat.plays.title) { order = .mostPlayed }
-                    .buttonStyle(.columnSort(isSorted: order == .mostPlayed))
-                    .listColumn(SongStat.plays.column)
-                ColumnLabel("Time").listColumn(.time)
-            }
-        } row: { item in
-            SongRow(item, stat: .plays, columns: Self.columns) {
-                SongArtwork(song: item.song, size: ArtworkSize.songRow).listColumn(.artwork)
-                SongTitles(item, subtitle: item.song.albumTitle).listColumn(.title)
-                RowStat(.plays, of: item.song).listColumn(SongStat.plays.column)
-                RowDuration(item.song.duration).listColumn(.time)
-                PickToggle(item).listColumn(.accessory)
-            }
+        SongList(songs: shown, columns: Self.columns, stat: .plays) {
+            Button("Title") { order = .alphabetical }
+                .buttonStyle(.columnSort(isSorted: order == .alphabetical))
+                .listColumn(.title)
+            Button(SongStat.plays.title) { order = .mostPlayed }
+                .buttonStyle(.columnSort(isSorted: order == .mostPlayed))
+                .listColumn(SongStat.plays.column)
+            ColumnLabel("Time").listColumn(.time)
+        } cells: { item in
+            SongArtwork(song: item.song, size: ArtworkSize.songRow).listColumn(.artwork)
+            SongTitles(item, subtitle: item.song.albumTitle).listColumn(.title)
+            RowStat(.plays, of: item.song).listColumn(SongStat.plays.column)
+            RowDuration(item.song.duration).listColumn(.time)
+            PickToggle(item).listColumn(.accessory)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             ArtistHeader(songs: songs)

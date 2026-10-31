@@ -9,11 +9,11 @@ struct SongRow<Cells: View>: View {
     private let columns: [ListColumn]
     private let cells: Cells
 
-    init(_ item: SongItem, stat: SongStat?, columns: [ListColumn], @ViewBuilder cells: () -> Cells) {
+    init(_ item: SongItem, stat: SongStat?, columns: [ListColumn], @ViewBuilder cells: (SongItem) -> Cells) {
         self.item = item
         self.stat = stat
         self.columns = columns
-        self.cells = cells()
+        self.cells = cells(item)
     }
 
     var body: some View {
