@@ -5,6 +5,9 @@ import SwiftUI
 extension Font {
     public static let cardTitle = Font.system(size: 14, weight: .heavy, design: .rounded)
     public static let collectionTitle = Font.system(size: 24, weight: .heavy, design: .rounded)
+    public static let columnTitle = Font.system(size: 15, weight: .semibold)
+    public static let countLarge = Font.system(size: 46, weight: .heavy, design: .rounded)
+    public static let countUnit = Font.system(size: 20, weight: .bold, design: .rounded)
     public static let emptyStateTitle = Font.system(size: 16, weight: .bold, design: .rounded)
 
     public static let playerTitle = Font.system(size: 20, weight: .bold)
@@ -18,6 +21,7 @@ extension Font {
     public static let meta = Font.system(size: 11)
     public static let columnLabel = Font.system(size: 11, weight: .semibold)
     public static let tag = Font.system(size: 10.5, weight: .semibold)
+    public static let rulerMark = Font.system(size: 10)
     public static let keyHint = Font.system(size: 11, weight: .semibold)
 
     /// For 28–32pt-tall buttons.

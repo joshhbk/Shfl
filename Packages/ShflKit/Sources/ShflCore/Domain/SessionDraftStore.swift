@@ -70,6 +70,7 @@ public final class SessionDraftStore {
     public var algorithm: ShuffleAlgorithm { draft.algorithm }
     public var songCount: Int { draft.songs.count }
     public var capacity: Int { SessionDraft.maxSongs }
+    public var milestones: Set<Int> { SessionDraft.milestones }
     public var remainingCapacity: Int { draft.remainingCapacity }
     public var isEmpty: Bool { draft.songs.isEmpty }
     public var isAtCapacity: Bool { draft.remainingCapacity == 0 }

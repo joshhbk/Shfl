@@ -2,10 +2,10 @@ import SwiftUI
 
 /// A design token that resolves against the current colour scheme, contrast setting, theme and artwork tint.
 public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
-    enum Role: Hashable, Sendable {
+    indirect enum Role: Hashable, Sendable {
         case fixed(ColorPair)
-        /// Neutral text that turns `onAccent` on a selected list row.
-        case text(ColorPair, selectedOpacity: Float)
+        /// Turns `onAccent` on a selected list row.
+        case selectable(Role, selectedOpacity: Float)
         case accent
         case accentText
         case playerBody
@@ -23,8 +23,8 @@ public nonisolated struct DesignColor: ShapeStyle, Hashable, Sendable {
         switch role {
         case .fixed(let pair):
             return pair.resolved(for: scheme)
-        case .text(let pair, let selectedOpacity):
-            guard environment.backgroundProminence == .increased else { return pair.resolved(for: scheme) }
+        case .selectable(let role, let selectedOpacity):
+            guard environment.backgroundProminence == .increased else { return DesignColor(role: role).resolve(in: environment) }
             return Palette.onAccent.resolved(for: scheme).opacity(selectedOpacity)
         case .accent:
             return theme.accent.resolved(for: scheme)
@@ -56,19 +56,27 @@ nonisolated extension ShapeStyle where Self == DesignColor {
     public static var surfaceContent: DesignColor { .init(role: .fixed(Palette.content)) }
     /// Popovers, menus and settings panels.
     public static var surfaceElevated: DesignColor { .init(role: .fixed(Palette.elevated)) }
+    /// The Picks column.
+    public static var surfacePane: DesignColor { .init(role: .fixed(Palette.pane)) }
+    /// An empty slot in the tray.
+    public static var traySlot: DesignColor { .init(role: .fixed(Palette.traySlot)) }
+    /// A picked song's tile when its artwork has no colour to give.
+    public static var tileNeutral: DesignColor { .init(role: .fixed(Palette.tileNeutral)) }
 
     public static var hairline: DesignColor { .init(role: .hairline) }
     public static var quietFill: DesignColor { .init(role: .fixed(Palette.quietFill)) }
 
-    public static var textPrimary: DesignColor { .init(role: .text(Palette.textPrimary, selectedOpacity: 1)) }
-    public static var textSecondary: DesignColor { .init(role: .text(Palette.textSecondary, selectedOpacity: 1)) }
-    public static var textTertiary: DesignColor { .init(role: .text(Palette.textTertiary, selectedOpacity: 0.8)) }
+    public static var textPrimary: DesignColor { .init(role: .selectable(.fixed(Palette.textPrimary), selectedOpacity: 1)) }
+    public static var textSecondary: DesignColor { .init(role: .selectable(.fixed(Palette.textSecondary), selectedOpacity: 1)) }
+    public static var textTertiary: DesignColor { .init(role: .selectable(.fixed(Palette.textTertiary), selectedOpacity: 0.8)) }
 
     /// Fills: selected rows, primary buttons, tray tiles.
     public static var accentFill: DesignColor { .init(role: .accent) }
     /// The theme colour adjusted to hold 4.5:1 as text on content surfaces.
     public static var accentText: DesignColor { .init(role: .accentText) }
     public static var onAccent: DesignColor { .init(role: .fixed(Palette.onAccent)) }
+    /// `accentText` for marks inside list rows, like the playing glyph and the Next shuffle tag.
+    public static var accentMark: DesignColor { .init(role: .selectable(.accentText, selectedOpacity: 1)) }
 
     /// The player's background: the theme body, tinted by `artworkTint(_:)` unless Increase Contrast is on.
     public static var playerBody: DesignColor { .init(role: .playerBody) }

@@ -22,33 +22,25 @@ public struct OutlinedTag: View {
 public struct AccentTag: View {
     private let text: String
 
-    @Environment(\.backgroundProminence) private var prominence
-
     public init(_ text: String) {
         self.text = text
     }
 
     public var body: some View {
-        let isOnSelection = prominence == .increased
         TagText(text)
-            .foregroundStyle(isOnSelection ? AnyShapeStyle(.primary) : AnyShapeStyle(.accentText))
-            .background(
-                isOnSelection ? AnyShapeStyle(.primary.opacity(0.2)) : AnyShapeStyle(.accentText.opacity(0.14)),
-                in: .rect(cornerRadius: CornerRadius.tag)
-            )
+            .foregroundStyle(.accentMark)
+            .background(.accentMark.opacity(0.16), in: .rect(cornerRadius: CornerRadius.tag))
     }
 }
 
 /// The speaker beside the song that's playing now.
 public struct NowPlayingGlyph: View {
-    @Environment(\.backgroundProminence) private var prominence
-
     public init() {}
 
     public var body: some View {
         Image(systemName: "speaker.wave.2.fill")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(prominence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(.accentText))
+            .foregroundStyle(.accentMark)
             .accessibilityLabel("Playing now")
     }
 }

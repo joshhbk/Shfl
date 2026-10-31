@@ -6,6 +6,7 @@ struct PicksCommands: Commands {
     let drafting: DraftEditing
 
     @FocusedValue(\.songSelection) private var selection
+    @FocusedValue(\.picksLayout) private var layout
 
     var body: some Commands {
         CommandMenu("Picks") {
@@ -24,6 +25,17 @@ struct PicksCommands: Commands {
             }
             .keyboardShortcut(.delete, modifiers: [.command, .shift])
             .disabled(drafting.draft.isEmpty)
+        }
+
+        CommandGroup(after: .sidebar) {
+            if let layout {
+                Picker("Show Picks As", selection: layout) {
+                    Text("Picks as Tray").tag(PicksLayout.tray)
+                    Text("Picks as List").tag(PicksLayout.list)
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
         }
     }
 }
