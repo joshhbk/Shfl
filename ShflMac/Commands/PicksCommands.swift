@@ -4,6 +4,7 @@ import SwiftUI
 /// ↩ and ⌫ belong to the focused list, not these items: as key equivalents they'd take keys from search and the wheel.
 struct PicksCommands: Commands {
     let drafting: DraftEditing
+    let preferences: LibraryPreferences
 
     @FocusedValue(\.songSelection) private var selection
     @FocusedValue(\.picksLayout) private var layout
@@ -20,11 +21,21 @@ struct PicksCommands: Commands {
             .keyboardShortcut("a", modifiers: [.command, .shift])
             .disabled(!drafting.canAutofill)
 
+            Menu("Autofill Using") {
+                AutofillSourceItems(preferences: preferences)
+            }
+
             Button("Clear Picks") {
                 drafting.clearAll()
             }
             .keyboardShortcut(.delete, modifiers: [.command, .shift])
             .disabled(drafting.draft.isEmpty)
+
+            Divider()
+
+            Menu("Shuffle Style") {
+                ShuffleStyleItems(draft: drafting.draft)
+            }
         }
 
         CommandGroup(after: .sidebar) {

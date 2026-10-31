@@ -45,11 +45,7 @@ public final class SessionDraftEditor {
         } catch {
             return .failed(error.localizedDescription)
         }
-        let after = draft.songCount
-        return .added(
-            songCount: after,
-            milestone: SessionDraft.milestones.filter { $0 > before && $0 <= after }.max()
-        )
+        return .added(songCount: draft.songCount, milestone: draft.milestone(reachedFrom: before))
     }
 
     public func canAutofill(using browser: LibraryBrowser) -> Bool {

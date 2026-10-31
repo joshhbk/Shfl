@@ -6,9 +6,13 @@ import SwiftUI
 /// Every slot in your picks, filled oldest first. VoiceOver reads it as the list of picks.
 struct PicksTray: View {
     @State private var tones = TileTones()
+    @State private var motion = TrayMotion()
+    @State private var isShowingNoRoom = false
     @Environment(DraftEditing.self) private var drafting
     @Environment(ListeningSessionHost.self) private var sessionHost
     @Environment(\.artworkStore) private var store
+
+    private static let columns = 10
 
     var body: some View {
         let draft = drafting.draft
@@ -18,23 +22,47 @@ struct PicksTray: View {
             milestones: draft.milestones,
             joiningNextShuffle: sessionHost.timeline.changes.joiningNextShuffle
         )
-        Tray(capacity: draft.capacity, marks: Set(TrayMarks.ruler(draft))) { index in
-            switch slots[index] {
-            case .picked(let song, let joinsNextShuffle):
-                PickedTile(tone: tones[song]).tileRing(joinsNextShuffle)
-            case .empty(let isMilestone):
-                EmptyTile().milestoneOutline(isMilestone)
+        VStack(alignment: .leading, spacing: Spacing.s8) {
+            Tray(capacity: draft.capacity, filled: draft.songCount, columns: Self.columns, marks: Set(TrayMarks.ruler(draft))) { index in
+                switch slots[index] {
+                case .picked(let song, let joinsNextShuffle):
+                    PickedTile(tone: tones[song])
+                        .tileRing(joinsNextShuffle)
+                        .tilePulse(
+                            trigger: motion.milestoneBeats,
+                            delay: motion.pulseDelay(for: index, capacity: draft.capacity, columns: Self.columns)
+                        )
+                case .empty(let isMilestone):
+                    EmptyTile()
+                        .milestoneOutline(isMilestone)
+                        .slotWarning(trigger: motion.noRoomFlashes)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Tray")
+            .accessibilityChildren {
+                ForEach(draft.songs.reversed()) { song in
+                    Text("\(song.title), \(song.artist)")
+                }
+            }
+            .accessibilityIdentifier("mac.picks.tray")
+            if isShowingNoRoom {
+                Text(draft.isAtCapacity ? "Picks are full" : "Not enough room")
+                    .font(.statusLabel)
+                    .foregroundStyle(.warning)
+                    .transition(.opacity)
             }
         }
         .task(id: draft.songs.map(\.id)) { await tones.load(draft.songs, using: store.map(ArtworkPalette.init)) }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Tray")
-        .accessibilityChildren {
-            ForEach(draft.songs.reversed()) { song in
-                Text("\(song.title), \(song.artist)")
-            }
+        .onChange(of: drafting.moment) { _, moment in
+            if let moment { motion.play(moment.kind) }
         }
-        .accessibilityIdentifier("mac.picks.tray")
+        .task(id: motion.noRoomFlashes) {
+            guard motion.noRoomFlashes > 0 else { return }
+            withAnimation { isShowingNoRoom = true }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { isShowingNoRoom = false }
+        }
     }
 }
 

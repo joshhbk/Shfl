@@ -43,6 +43,27 @@ public struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+/// The lead action when it would only repeat what's already happening: Shuffle Again.
+public struct AccentOutlineButtonStyle: ButtonStyle {
+    @Environment(\.controlSize) private var controlSize
+    @Environment(\.isEnabled) private var isEnabled
+
+    public func makeBody(configuration: Configuration) -> some View {
+        let metrics = TextButtonMetrics(controlSize)
+        configuration.label
+            .font(metrics.font)
+            .foregroundStyle(.accentText)
+            .padding(.horizontal, Spacing.s16)
+            .frame(minHeight: metrics.height)
+            .overlay {
+                RoundedRectangle(cornerRadius: metrics.radius).strokeBorder(.accentText, lineWidth: 1.5)
+            }
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .opacity(isEnabled ? 1 : 0.4)
+            .contentShape(.rect(cornerRadius: metrics.radius))
+    }
+}
+
 /// Secondary actions such as Autofill, Clear and Deselect.
 public struct QuietButtonStyle: ButtonStyle {
     @Environment(\.controlSize) private var controlSize
@@ -112,6 +133,10 @@ public struct WheelToggleStyle: ToggleStyle {
 
 extension ButtonStyle where Self == PrimaryButtonStyle {
     public static var primary: PrimaryButtonStyle { .init() }
+}
+
+extension ButtonStyle where Self == AccentOutlineButtonStyle {
+    public static var accentOutline: AccentOutlineButtonStyle { .init() }
 }
 
 extension ButtonStyle where Self == QuietButtonStyle {
