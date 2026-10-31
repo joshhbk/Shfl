@@ -20,19 +20,15 @@ struct PicksColumn: View {
                     .padding(.top, Spacing.s14)
                 PicksActions()
                     .padding(.top, Spacing.s14)
-                LatestPicks()
-                    .padding(.top, Spacing.s20)
                 Spacer(minLength: Spacing.s16)
             case .list:
-                CapacityRule(draft.songCount, of: draft.capacity, marks: TrayMarks.ruler(draft))
-                    .padding(.top, Spacing.s14)
                 PicksList()
-                    .padding(.top, Spacing.s10)
+                    .padding(.top, Spacing.s14)
                 PicksActions()
                     .padding(.top, Spacing.s12)
                     .padding(.bottom, Spacing.s16)
             }
-            ShuffleBlock()
+            ShuffleButton()
         }
         .padding(.horizontal, Spacing.s20)
         .padding(.bottom, Spacing.s16)
@@ -124,12 +120,5 @@ private struct PicksActions: View {
         }
         .buttonStyle(.quiet)
         .controlSize(.small)
-    }
-}
-
-enum TrayMarks {
-    /// The milestones the ruler names; the first pick is a milestone but not a row end.
-    static func ruler(_ draft: SessionDraftStore) -> [Int] {
-        draft.milestones.filter { $0 > 1 }.sorted()
     }
 }

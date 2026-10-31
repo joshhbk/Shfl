@@ -3,7 +3,7 @@ import ShflCore
 import ShflDesign
 import SwiftUI
 
-/// Every slot in your picks, filled oldest first. One Tab stop: arrow keys walk the picks and ⌫ removes one.
+/// Every slot in your picks, filled oldest first. One Tab stop: clicks and arrow keys pick a tile and ⌫ removes it.
 /// VoiceOver reads it as the list of picks.
 struct PicksTray: View {
     @State private var tones = TileTones()
@@ -26,12 +26,13 @@ struct PicksTray: View {
             joiningNextShuffle: sessionHost.timeline.changes.joiningNextShuffle
         )
         VStack(alignment: .leading, spacing: Spacing.s8) {
-            Tray(capacity: draft.capacity, filled: draft.songCount, columns: Self.columns, marks: Set(TrayMarks.ruler(draft))) { index in
+            Tray(capacity: draft.capacity, columns: Self.columns) { index in
                 switch slots[index] {
                 case .picked(let song, let joinsNextShuffle):
                     PickedTile(tone: tones[song])
                         .tileRing(joinsNextShuffle)
                         .tileFocus(isFocused && cursor?.index == index)
+                        .onTapGesture { select(index) }
                         .tilePulse(
                             trigger: motion.milestoneBeats,
                             delay: motion.pulseDelay(for: index, capacity: draft.capacity, columns: Self.columns)
@@ -59,7 +60,7 @@ struct PicksTray: View {
             }
             .onDeleteCommand(perform: removeFocusedPick)
             .onChange(of: isFocused) { _, focused in
-                cursor = focused ? TrayCursor(count: draft.songCount) : nil
+                cursor = focused ? cursor ?? TrayCursor(count: draft.songCount) : nil
             }
             if isShowingNoRoom {
                 Text(draft.isAtCapacity ? "Picks are full" : "Not enough room")
@@ -75,7 +76,9 @@ struct PicksTray: View {
                     .accessibilityHidden(true)
             }
         }
-        .task(id: draft.songs.map(\.id)) { await tones.load(draft.songs, using: store.map(ArtworkPalette.init)) }
+        .onChange(of: draft.songs.map(\.id), initial: true) {
+            tones.load(draft.songs, using: store.map(ArtworkPalette.init))
+        }
         .onChange(of: drafting.moment) { _, moment in
             if let moment { motion.play(moment.kind) }
         }
@@ -99,30 +102,15 @@ private extension PicksTray {
         cursor?.move(step, count: drafting.draft.songCount, columns: Self.columns)
     }
 
+    func select(_ index: Int) {
+        cursor = TrayCursor(index: index)
+        isFocused = true
+    }
+
     func removeFocusedPick() {
         let songs = drafting.draft.songs
         guard let cursor, songs.indices.contains(cursor.index) else { return }
         drafting.remove([songs[cursor.index]])
         self.cursor = cursor.clamped(to: drafting.draft.songCount)
-    }
-}
-
-/// The three newest picks under the tray.
-struct LatestPicks: View {
-    @Environment(DraftEditing.self) private var drafting
-
-    var body: some View {
-        let latest = drafting.draft.songs.suffix(3).reversed()
-        if !latest.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Latest picks")
-                    .font(.columnLabel)
-                    .foregroundStyle(.tertiary)
-                    .padding(.bottom, Spacing.s4)
-                ForEach(latest) { song in
-                    PickRow(song: song)
-                }
-            }
-        }
     }
 }

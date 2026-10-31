@@ -21,8 +21,6 @@ extension Font {
     public static let meta = Font.system(size: 11)
     public static let columnLabel = Font.system(size: 11, weight: .semibold)
     public static let tag = Font.system(size: 10.5, weight: .semibold)
-    public static let rulerMark = Font.system(size: 10)
-    public static let rulerMarkReached = Font.system(size: 12, weight: .heavy, design: .rounded)
     public static let statusLine = Font.system(size: 11)
     public static let statusLabel = Font.system(size: 11, weight: .semibold)
     public static let keyHint = Font.system(size: 11, weight: .semibold)

@@ -214,7 +214,7 @@ private struct PicksSpecimen: View {
         HStack(alignment: .top, spacing: Spacing.s20) {
             VStack(alignment: .leading, spacing: Spacing.s14) {
                 CountFraction(46, of: 120)
-                Tray(capacity: 120, filled: 46, marks: [50, 100, 120]) { index in
+                Tray(capacity: 120) { index in
                     if index < 46 {
                         PickedTile(tone: index == 7 ? nil : tones[index % tones.count])
                             .tileRing(index >= 43)
@@ -223,14 +223,6 @@ private struct PicksSpecimen: View {
                         EmptyTile().milestoneOutline([50, 100, 120].contains(index + 1))
                     }
                 }
-            }
-            .frame(width: 260)
-            VStack(alignment: .leading, spacing: Spacing.s14) {
-                CountFraction(37, of: 120)
-                CapacityRule(37, of: 120, marks: [50, 100, 120])
-                StatusLine("Next shuffle") { Text("Picks have changed").foregroundStyle(.accentText) }
-                FieldLabel("Least Played").fieldHighlight(true)
-                FieldLabel("Artist Spacing")
             }
             .frame(width: 260)
         }

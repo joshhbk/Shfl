@@ -1,31 +1,20 @@
 import SwiftUI
 
-/// A grid of square tiles, with a ruler naming each row that ends on one of `marks`. Marks up to `filled`
-/// step up in weight and colour, and a full tray keeps an outline.
+/// A grid of square tiles.
 public struct Tray<Tile: View>: View {
     private let capacity: Int
-    private let filled: Int
     private let columns: Int
-    private let marks: Set<Int>
     private let tile: (Int) -> Tile
 
-    public init(
-        capacity: Int,
-        filled: Int,
-        columns: Int = 10,
-        marks: Set<Int>,
-        @ViewBuilder tile: @escaping (Int) -> Tile
-    ) {
+    public init(capacity: Int, columns: Int = 10, @ViewBuilder tile: @escaping (Int) -> Tile) {
         self.capacity = capacity
-        self.filled = filled
         self.columns = columns
-        self.marks = marks
         self.tile = tile
     }
 
     public var body: some View {
         let rows = (capacity + columns - 1) / columns
-        Grid(horizontalSpacing: TrayMetrics.gap, verticalSpacing: TrayMetrics.gap) {
+        Grid(horizontalSpacing: 4, verticalSpacing: 4) {
             ForEach(0..<rows, id: \.self) { row in
                 GridRow {
                     ForEach(0..<columns, id: \.self) { column in
@@ -36,47 +25,9 @@ public struct Tray<Tile: View>: View {
                             Color.clear.aspectRatio(1, contentMode: .fit)
                         }
                     }
-                    let rowEnd = min((row + 1) * columns, capacity)
-                    RulerMark(rowEnd: rowEnd, isMarked: marks.contains(rowEnd), isReached: rowEnd <= filled)
                 }
             }
         }
-        .background(alignment: .leading) {
-            if filled >= capacity {
-                GeometryReader { tray in
-                    RoundedRectangle(cornerRadius: CornerRadius.control)
-                        .strokeBorder(.accentText, lineWidth: 2)
-                        .padding(-5)
-                        .frame(width: tray.size.width - TrayMetrics.rulerWidth - TrayMetrics.gap * 2)
-                }
-            }
-        }
-    }
-}
-
-enum TrayMetrics {
-    static let gap: CGFloat = 4
-    static let rulerWidth: CGFloat = 26
-}
-
-private struct RulerMark: View {
-    let rowEnd: Int
-    let isMarked: Bool
-    let isReached: Bool
-
-    var body: some View {
-        Group {
-            if isMarked {
-                Text(rowEnd, format: .number)
-                    .font(isReached ? .rulerMarkReached.monospacedDigit() : .rulerMark.monospacedDigit())
-                    .foregroundStyle(isReached ? AnyShapeStyle(.accentText) : AnyShapeStyle(.tertiary))
-            } else {
-                Color.clear.gridCellUnsizedAxes(.vertical)
-            }
-        }
-        .frame(width: TrayMetrics.rulerWidth, alignment: .leading)
-        .padding(.leading, TrayMetrics.gap)
-        .accessibilityHidden(true)
     }
 }
 
@@ -91,10 +42,6 @@ public struct PickedTile: View {
     public var body: some View {
         RoundedRectangle(cornerRadius: CornerRadius.tile)
             .fill(tone.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tileNeutral))
-            .overlay {
-                RoundedRectangle(cornerRadius: CornerRadius.tile)
-                    .strokeBorder(.gray.opacity(0.3), lineWidth: 1)
-            }
             .aspectRatio(1, contentMode: .fit)
     }
 }

@@ -12,6 +12,10 @@ struct TrayCursor: Equatable {
         index = count - 1
     }
 
+    init(index: Int) {
+        self.index = index
+    }
+
     mutating func move(_ step: Step, count: Int, columns: Int) {
         let target = switch step {
         case .left: index - 1

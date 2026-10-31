@@ -50,3 +50,17 @@ struct PicksCommands: Commands {
         }
     }
 }
+
+private struct ShuffleStyleItems: View {
+    let draft: SessionDraftStore
+
+    var body: some View {
+        Picker("Shuffle Style", selection: Binding(get: { draft.algorithm }, set: { draft.stage($0) })) {
+            ForEach(ShuffleAlgorithm.allCases, id: \.self) { algorithm in
+                Text(algorithm.displayName).tag(algorithm)
+            }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+    }
+}
